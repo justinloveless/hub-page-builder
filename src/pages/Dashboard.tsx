@@ -1,0 +1,140 @@
+import { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
+import { supabase } from "@/integrations/supabase/client";
+import { User } from "@supabase/supabase-js";
+import { Button } from "@/components/ui/button";
+import { toast } from "sonner";
+import { Loader2, Plus, LogOut, Settings } from "lucide-react";
+import SiteCard from "@/components/SiteCard";
+import type { Tables } from "@/integrations/supabase/types";
+
+type Site = Tables<"sites">;
+
+const Dashboard = () => {
+  const [user, setUser] = useState<User | null>(null);
+  const [sites, setSites] = useState<Site[]>([]);
+  const [loading, setLoading] = useState(true);
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    // Set up auth state listener FIRST
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      setUser(session?.user ?? null);
+      if (!session?.user && event === "SIGNED_OUT") {
+        navigate("/auth");
+      }
+    });
+
+    // THEN check for existing session
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (!session) {
+        navigate("/auth");
+      } else {
+        setUser(session.user);
+        loadSites();
+      }
+    });
+
+    return () => subscription.unsubscribe();
+  }, [navigate]);
+
+  const loadSites = async () => {
+    try {
+      const { data, error } = await supabase
+        .from("sites")
+        .select("*")
+        .order("created_at", { ascending: false });
+
+      if (error) throw error;
+      setSites(data || []);
+    } catch (error: any) {
+      toast.error("Failed to load sites");
+      console.error(error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleSignOut = async () => {
+    await supabase.auth.signOut();
+    toast.success("Signed out successfully");
+  };
+
+  if (loading || !user) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </div>
+    );
+  }
+
+  return (
+    <div className="min-h-screen bg-background">
+      {/* Header */}
+      <header className="border-b border-border bg-card/50 backdrop-blur-sm sticky top-0 z-50">
+        <div className="container mx-auto px-4 h-16 flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-primary to-accent flex items-center justify-center">
+              <span className="text-primary-foreground font-bold text-lg">SH</span>
+            </div>
+            <h1 className="text-xl font-bold">Static Hub</h1>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => navigate("/settings")}
+            >
+              <Settings className="h-5 w-5" />
+            </Button>
+            <Button variant="ghost" size="icon" onClick={handleSignOut}>
+              <LogOut className="h-5 w-5" />
+            </Button>
+          </div>
+        </div>
+      </header>
+
+      {/* Main Content */}
+      <main className="container mx-auto px-4 py-8">
+        <div className="flex items-center justify-between mb-8">
+          <div>
+            <h2 className="text-3xl font-bold mb-2">Your Sites</h2>
+            <p className="text-muted-foreground">
+              Manage all your static sites in one place
+            </p>
+          </div>
+          <Button className="bg-gradient-to-r from-primary to-accent hover:opacity-90">
+            <Plus className="mr-2 h-5 w-5" />
+            Add Site
+          </Button>
+        </div>
+
+        {sites.length === 0 ? (
+          <div className="text-center py-16">
+            <div className="w-24 h-24 rounded-full bg-muted mx-auto mb-6 flex items-center justify-center">
+              <Plus className="h-12 w-12 text-muted-foreground" />
+            </div>
+            <h3 className="text-2xl font-semibold mb-2">No sites yet</h3>
+            <p className="text-muted-foreground mb-6 max-w-md mx-auto">
+              Get started by adding your first static site. Connect your GitHub repository
+              and start managing content with ease.
+            </p>
+            <Button className="bg-gradient-to-r from-primary to-accent hover:opacity-90">
+              <Plus className="mr-2 h-5 w-5" />
+              Add Your First Site
+            </Button>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {sites.map((site) => (
+              <SiteCard key={site.id} site={site} />
+            ))}
+          </div>
+        )}
+      </main>
+    </div>
+  );
+};
+
+export default Dashboard;
