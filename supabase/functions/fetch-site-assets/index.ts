@@ -9,30 +9,61 @@ const corsHeaders = {
 
 // Convert PEM private key to CryptoKey for JWT signing using Node crypto
 async function importPrivateKey(pem: string): Promise<CryptoKey> {
-  // Use Node.js crypto to handle both PKCS#1 and PKCS#8 formats
-  const keyObject = createPrivateKey(pem)
-  
-  // Export as PKCS#8 PEM
-  const pkcs8Pem = keyObject.export({
-    type: 'pkcs8',
-    format: 'pem',
-  }) as string
+  try {
+    // Handle escaped newlines in environment variables
+    // If stored as "-----BEGIN RSA PRIVATE KEY-----\nMII..." we need actual newlines
+    let formattedPem = pem.replace(/\\n/g, '\n')
+    
+    // Ensure proper PEM format with newlines
+    if (!formattedPem.includes('\n')) {
+      // If there are no newlines at all, try to add them
+      if (formattedPem.includes('-----BEGIN RSA PRIVATE KEY-----')) {
+        formattedPem = formattedPem
+          .replace('-----BEGIN RSA PRIVATE KEY-----', '-----BEGIN RSA PRIVATE KEY-----\n')
+          .replace('-----END RSA PRIVATE KEY-----', '\n-----END RSA PRIVATE KEY-----')
+      } else if (formattedPem.includes('-----BEGIN PRIVATE KEY-----')) {
+        formattedPem = formattedPem
+          .replace('-----BEGIN PRIVATE KEY-----', '-----BEGIN PRIVATE KEY-----\n')
+          .replace('-----END PRIVATE KEY-----', '\n-----END PRIVATE KEY-----')
+      }
+    }
+    
+    console.log('Key format check:', {
+      hasBeginMarker: formattedPem.includes('BEGIN'),
+      hasEndMarker: formattedPem.includes('END'),
+      hasNewlines: formattedPem.includes('\n'),
+      length: formattedPem.length
+    })
+    
+    // Use Node.js crypto to handle both PKCS#1 and PKCS#8 formats
+    const keyObject = createPrivateKey(formattedPem)
+    
+    // Export as PKCS#8 PEM
+    const pkcs8Pem = keyObject.export({
+      type: 'pkcs8',
+      format: 'pem',
+    }) as string
 
-  // Remove PEM headers/footers and whitespace
-  const pemContents = pkcs8Pem
-    .replace('-----BEGIN PRIVATE KEY-----', '')
-    .replace('-----END PRIVATE KEY-----', '')
-    .replace(/\s/g, '')
+    // Remove PEM headers/footers and whitespace
+    const pemContents = pkcs8Pem
+      .replace('-----BEGIN PRIVATE KEY-----', '')
+      .replace('-----END PRIVATE KEY-----', '')
+      .replace(/\s/g, '')
 
-  const binaryDer = Uint8Array.from(atob(pemContents), (c) => c.charCodeAt(0))
+    const binaryDer = Uint8Array.from(atob(pemContents), (c) => c.charCodeAt(0))
 
-  return await crypto.subtle.importKey(
-    'pkcs8',
-    binaryDer,
-    { name: 'RSASSA-PKCS1-v1_5', hash: 'SHA-256' },
-    false,
-    ['sign']
-  )
+    return await crypto.subtle.importKey(
+      'pkcs8',
+      binaryDer,
+      { name: 'RSASSA-PKCS1-v1_5', hash: 'SHA-256' },
+      false,
+      ['sign']
+    )
+  } catch (error) {
+    console.error('Failed to import private key:', error)
+    const errorMsg = error instanceof Error ? error.message : String(error)
+    throw new Error(`Failed to import private key: ${errorMsg}`)
+  }
 }
 
 Deno.serve(async (req) => {
