@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -34,6 +34,10 @@ const AssetManager = ({ siteId }: AssetManagerProps) => {
   const [found, setFound] = useState<boolean | null>(null);
   const [uploadDialogOpen, setUploadDialogOpen] = useState(false);
   const [selectedAsset, setSelectedAsset] = useState<AssetConfig | null>(null);
+
+  useEffect(() => {
+    fetchAssets();
+  }, [siteId]);
 
   const fetchAssets = async () => {
     setLoading(true);
