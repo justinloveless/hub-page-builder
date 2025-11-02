@@ -1,1 +1,7 @@
 project_id = "inrivbbifhraowqlqzsp"
+
+[functions.create-site]
+verify_jwt = true
+
+[functions.github-installation-details]
+verify_jwt = true
