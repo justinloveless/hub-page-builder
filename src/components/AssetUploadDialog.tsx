@@ -409,25 +409,6 @@ const AssetUploadDialog = ({ open, onOpenChange, asset, siteId, onSuccess }: Ass
                   />
                 </div>
 
-                {preview && (
-                  <div className="space-y-2">
-                    <Label>Preview</Label>
-                    {asset.type === 'image' || file?.type.startsWith('image/') ? (
-                      <div className="border rounded-lg p-4 bg-muted/50">
-                        <img
-                          src={preview}
-                          alt="Preview"
-                          className="max-w-full max-h-64 mx-auto object-contain"
-                        />
-                      </div>
-                    ) : (
-                      <div className="border rounded-lg p-4 bg-muted/50">
-                        <pre className="text-xs overflow-x-auto max-h-48">{preview}</pre>
-                      </div>
-                    )}
-                  </div>
-                )}
-
                 <div className="space-y-2">
                   <Label htmlFor="message-upload">Commit Message</Label>
                   <Textarea
@@ -439,7 +420,8 @@ const AssetUploadDialog = ({ open, onOpenChange, asset, siteId, onSuccess }: Ass
                   />
                 </div>
 
-                <div className="flex justify-end gap-2 pt-2">
+                {/* Actions moved above the preview for better mobile access */}
+                <div className="flex justify-end gap-2 pt-1">
                   <Button
                     variant="outline"
                     onClick={() => onOpenChange(false)}
@@ -464,6 +446,25 @@ const AssetUploadDialog = ({ open, onOpenChange, asset, siteId, onSuccess }: Ass
                     )}
                   </Button>
                 </div>
+
+                {preview && (
+                  <div className="space-y-2">
+                    <Label>Preview</Label>
+                    {asset.type === 'image' || file?.type.startsWith('image/') ? (
+                      <div className="border rounded-lg p-4 bg-muted/50">
+                        <img
+                          src={preview}
+                          alt="Preview"
+                          className="max-w-full max-h-64 mx-auto object-contain"
+                        />
+                      </div>
+                    ) : (
+                      <div className="border rounded-lg p-4 bg-muted/50">
+                        <pre className="text-xs overflow-x-auto max-h-48">{preview}</pre>
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
             </ScrollArea>
           </TabsContent>
