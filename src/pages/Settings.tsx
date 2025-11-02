@@ -2,42 +2,51 @@ import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Separator } from "@/components/ui/separator";
 import { toast } from "sonner";
-import { ArrowLeft, Save } from "lucide-react";
+import { ArrowLeft, Shield } from "lucide-react";
+import { Skeleton } from "@/components/ui/skeleton";
 
 const Settings = () => {
   const navigate = useNavigate();
-  const [loading, setLoading] = useState(false);
-  const [githubAppSlug, setGithubAppSlug] = useState("");
-  const [githubClientId, setGithubClientId] = useState("");
-  const [githubClientSecret, setGithubClientSecret] = useState("");
+  const [loading, setLoading] = useState(true);
+  const [config, setConfig] = useState<{
+    slug: string;
+    client_id: string;
+    client_secret: string;
+  } | null>(null);
 
   useEffect(() => {
-    // Check auth
-    supabase.auth.getSession().then(({ data: { session } }) => {
+    const fetchConfig = async () => {
+      // Check auth
+      const { data: { session } } = await supabase.auth.getSession();
       if (!session) {
         navigate("/auth");
+        return;
       }
-    });
-  }, [navigate]);
 
-  const handleSaveSettings = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setLoading(true);
+      // Fetch GitHub app config
+      const { data, error } = await supabase
+        .from("github_app_config")
+        .select("*")
+        .single();
 
-    try {
-      // In a real implementation, these would be stored securely
-      toast.success("Settings saved successfully");
-    } catch (error: any) {
-      toast.error("Failed to save settings");
-    } finally {
+      if (error) {
+        toast.error("Failed to load GitHub app configuration");
+        console.error(error);
+      } else if (data) {
+        setConfig({
+          slug: data.slug,
+          client_id: data.client_id,
+          client_secret: data.client_secret,
+        });
+      }
+      
       setLoading(false);
-    }
-  };
+    };
+
+    fetchConfig();
+  }, [navigate]);
 
   return (
     <div className="min-h-screen bg-background">
@@ -60,59 +69,72 @@ const Settings = () => {
       <main className="container mx-auto px-4 py-8 max-w-3xl">
         <Card>
           <CardHeader>
-            <CardTitle>GitHub App Configuration</CardTitle>
-            <CardDescription>
-              Configure your GitHub App credentials to enable repository integration
-            </CardDescription>
+            <div className="flex items-start justify-between">
+              <div>
+                <CardTitle>GitHub App Configuration</CardTitle>
+                <CardDescription>
+                  System-managed GitHub App credentials (read-only)
+                </CardDescription>
+              </div>
+              <Shield className="h-5 w-5 text-muted-foreground" />
+            </div>
           </CardHeader>
           <CardContent>
-            <form onSubmit={handleSaveSettings} className="space-y-6">
-              <div className="space-y-2">
-                <Label htmlFor="app-slug">GitHub App Slug</Label>
-                <Input
-                  id="app-slug"
-                  placeholder="my-static-hub-app"
-                  value={githubAppSlug}
-                  onChange={(e) => setGithubAppSlug(e.target.value)}
-                />
-                <p className="text-sm text-muted-foreground">
-                  The slug of your GitHub App (found in the app's URL)
+            {loading ? (
+              <div className="space-y-6">
+                <div className="space-y-2">
+                  <Skeleton className="h-4 w-32" />
+                  <Skeleton className="h-10 w-full" />
+                </div>
+                <div className="space-y-2">
+                  <Skeleton className="h-4 w-24" />
+                  <Skeleton className="h-10 w-full" />
+                </div>
+                <div className="space-y-2">
+                  <Skeleton className="h-4 w-28" />
+                  <Skeleton className="h-10 w-full" />
+                </div>
+              </div>
+            ) : config ? (
+              <div className="space-y-6">
+                <div className="space-y-2">
+                  <p className="text-sm font-medium">GitHub App Slug</p>
+                  <p className="text-sm text-muted-foreground bg-muted/50 p-3 rounded-md font-mono">
+                    {config.slug}
+                  </p>
+                </div>
+
+                <div className="space-y-2">
+                  <p className="text-sm font-medium">Client ID</p>
+                  <p className="text-sm text-muted-foreground bg-muted/50 p-3 rounded-md font-mono">
+                    {config.client_id}
+                  </p>
+                </div>
+
+                <div className="space-y-2">
+                  <p className="text-sm font-medium">Client Secret</p>
+                  <p className="text-sm text-muted-foreground bg-muted/50 p-3 rounded-md font-mono">
+                    ••••••••••••••••
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    Client secret is stored securely and cannot be displayed
+                  </p>
+                </div>
+
+                <div className="bg-blue-500/10 border border-blue-500/20 rounded-md p-4">
+                  <p className="text-sm text-blue-300">
+                    <strong>Note:</strong> This configuration is managed by system administrators.
+                    Contact your administrator if changes are needed.
+                  </p>
+                </div>
+              </div>
+            ) : (
+              <div className="bg-yellow-500/10 border border-yellow-500/20 rounded-md p-4">
+                <p className="text-sm text-yellow-300">
+                  No GitHub App configuration found. Please contact your system administrator to set up the GitHub App credentials.
                 </p>
               </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="client-id">Client ID</Label>
-                <Input
-                  id="client-id"
-                  placeholder="Iv1.abc123..."
-                  value={githubClientId}
-                  onChange={(e) => setGithubClientId(e.target.value)}
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="client-secret">Client Secret</Label>
-                <Input
-                  id="client-secret"
-                  type="password"
-                  placeholder="••••••••"
-                  value={githubClientSecret}
-                  onChange={(e) => setGithubClientSecret(e.target.value)}
-                />
-                <p className="text-sm text-muted-foreground">
-                  Your secret will be stored securely
-                </p>
-              </div>
-
-              <Separator />
-
-              <div className="flex justify-end">
-                <Button type="submit" disabled={loading}>
-                  <Save className="mr-2 h-4 w-4" />
-                  Save Settings
-                </Button>
-              </div>
-            </form>
+            )}
           </CardContent>
         </Card>
 
