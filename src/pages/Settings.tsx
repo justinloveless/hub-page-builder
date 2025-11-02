@@ -30,7 +30,7 @@ const Settings = () => {
       const { data, error } = await supabase
         .from("github_app_config")
         .select("*")
-        .single();
+        .maybeSingle();
 
       if (error) {
         toast.error("Failed to load GitHub app configuration");

@@ -72,10 +72,14 @@ const AddSiteDialog = ({ onSiteAdded }: AddSiteDialogProps) => {
       const { data: config, error } = await supabase
         .from('github_app_config')
         .select('client_id, slug')
-        .single();
+        .maybeSingle();
 
-      if (error || !config) {
-        throw new Error("GitHub App not configured");
+      if (error) {
+        throw new Error("Failed to load GitHub App configuration");
+      }
+
+      if (!config) {
+        throw new Error("GitHub App not configured. Please contact your administrator.");
       }
 
       // Build OAuth URL
