@@ -15,3 +15,6 @@ verify_jwt = true
 [functions.upload-site-asset]
 verify_jwt = true
 
+[functions.fetch-asset-content]
+verify_jwt = true
+

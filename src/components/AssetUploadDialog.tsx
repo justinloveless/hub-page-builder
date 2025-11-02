@@ -1,12 +1,13 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { Upload, RefreshCw, FileText, Image as ImageIcon } from "lucide-react";
+import { Upload, RefreshCw, FileText, Image as ImageIcon, Loader2 } from "lucide-react";
 
 interface AssetConfig {
   path: string;
@@ -30,6 +31,49 @@ const AssetUploadDialog = ({ open, onOpenChange, asset, siteId, onSuccess }: Ass
   const [preview, setPreview] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
   const [commitMessage, setCommitMessage] = useState(`Update ${asset.path}`);
+  const [textContent, setTextContent] = useState("");
+  const [loadingContent, setLoadingContent] = useState(false);
+  const [currentSha, setCurrentSha] = useState<string | null>(null);
+  const [activeTab, setActiveTab] = useState<string>("upload");
+
+  const isTextAsset = asset.type === "text" || asset.type === "markdown";
+
+  useEffect(() => {
+    if (open && isTextAsset) {
+      loadExistingContent();
+    } else {
+      setTextContent("");
+      setCurrentSha(null);
+    }
+  }, [open, asset.path]);
+
+  const loadExistingContent = async () => {
+    setLoadingContent(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('fetch-asset-content', {
+        body: { 
+          site_id: siteId,
+          asset_path: asset.path
+        },
+      });
+
+      if (error) throw error;
+
+      if (data.found) {
+        setTextContent(data.content);
+        setCurrentSha(data.sha);
+        setActiveTab("edit");
+      } else {
+        setTextContent("");
+        setCurrentSha(null);
+      }
+    } catch (error: any) {
+      console.error("Failed to load content:", error);
+      toast.error("Failed to load existing content");
+    } finally {
+      setLoadingContent(false);
+    }
+  };
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const selectedFile = e.target.files?.[0];
@@ -108,97 +152,261 @@ const AssetUploadDialog = ({ open, onOpenChange, asset, siteId, onSuccess }: Ass
     }
   };
 
+  const uploadTextContent = async () => {
+    if (!textContent.trim()) {
+      toast.error("Content cannot be empty");
+      return;
+    }
+
+    setUploading(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('upload-site-asset', {
+        body: {
+          site_id: siteId,
+          file_path: asset.path,
+          content: btoa(textContent),
+          message: commitMessage,
+          sha: currentSha,
+        },
+      });
+
+      if (error) throw error;
+
+      toast.success("Content saved successfully!");
+      onSuccess();
+      onOpenChange(false);
+      
+      // Reset form
+      setTextContent("");
+      setCommitMessage(`Update ${asset.path}`);
+      setCurrentSha(null);
+    } catch (error: any) {
+      console.error("Failed to save content:", error);
+      toast.error(error.message || "Failed to save content");
+    } finally {
+      setUploading(false);
+    }
+  };
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>Upload Asset: {asset.label || asset.path}</DialogTitle>
+          <DialogTitle>{isTextAsset ? "Edit" : "Upload"} {asset.label || asset.path}</DialogTitle>
           <DialogDescription>
-            {asset.description || 'Upload a file to this asset location'}
+            {asset.description || 'Manage this asset'}
           </DialogDescription>
         </DialogHeader>
 
-        <div className="space-y-4">
-          {/* File constraints */}
-          <div className="text-sm text-muted-foreground space-y-1">
-            {asset.maxSize && (
-              <p>• Maximum size: {(asset.maxSize / 1024 / 1024).toFixed(1)} MB</p>
-            )}
-            {asset.allowedExtensions && (
-              <p>• Allowed types: {asset.allowedExtensions.join(', ')}</p>
-            )}
-          </div>
+        {isTextAsset ? (
+          <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+            <TabsList className="grid w-full grid-cols-2">
+              <TabsTrigger value="edit">
+                <FileText className="mr-2 h-4 w-4" />
+                Edit Content
+              </TabsTrigger>
+              <TabsTrigger value="upload">
+                <Upload className="mr-2 h-4 w-4" />
+                Upload File
+              </TabsTrigger>
+            </TabsList>
 
-          {/* File input */}
-          <div className="space-y-2">
-            <Label htmlFor="file">Select File</Label>
-            <Input
-              id="file"
-              type="file"
-              onChange={handleFileChange}
-              accept={asset.allowedExtensions?.join(',')}
-            />
-          </div>
-
-          {/* Preview */}
-          {preview && (
-            <div className="space-y-2">
-              <Label>Preview</Label>
-              {asset.type === 'image' || file?.type.startsWith('image/') ? (
-                <div className="border rounded-lg p-4 bg-muted/50">
-                  <img
-                    src={preview}
-                    alt="Preview"
-                    className="max-w-full max-h-96 mx-auto object-contain"
-                  />
+            <TabsContent value="edit" className="space-y-4">
+              {loadingContent ? (
+                <div className="flex items-center justify-center py-8">
+                  <Loader2 className="h-6 w-6 animate-spin" />
+                  <span className="ml-2 text-sm text-muted-foreground">Loading content...</span>
                 </div>
               ) : (
-                <div className="border rounded-lg p-4 bg-muted/50">
-                  <pre className="text-xs overflow-x-auto max-h-64">{preview}</pre>
+                <>
+                  <div className="space-y-2">
+                    <Label htmlFor="content">Content</Label>
+                    <Textarea
+                      id="content"
+                      value={textContent}
+                      onChange={(e) => setTextContent(e.target.value)}
+                      placeholder="Enter your content here..."
+                      className="min-h-[300px] font-mono text-sm"
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="message-edit">Commit Message</Label>
+                    <Input
+                      id="message-edit"
+                      value={commitMessage}
+                      onChange={(e) => setCommitMessage(e.target.value)}
+                      placeholder={`Update ${asset.label || asset.path}`}
+                    />
+                  </div>
+
+                  <div className="flex justify-end gap-2">
+                    <Button variant="outline" onClick={() => onOpenChange(false)} disabled={uploading}>
+                      Cancel
+                    </Button>
+                    <Button onClick={uploadTextContent} disabled={uploading}>
+                      {uploading ? (
+                        <>
+                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                          Saving...
+                        </>
+                      ) : (
+                        <>
+                          <Upload className="mr-2 h-4 w-4" />
+                          Save & Commit
+                        </>
+                      )}
+                    </Button>
+                  </div>
+                </>
+              )}
+            </TabsContent>
+
+            <TabsContent value="upload" className="space-y-4">
+              <div className="text-sm text-muted-foreground space-y-1">
+                {asset.maxSize && (
+                  <p>• Maximum size: {(asset.maxSize / 1024 / 1024).toFixed(1)} MB</p>
+                )}
+                {asset.allowedExtensions && (
+                  <p>• Allowed types: {asset.allowedExtensions.join(', ')}</p>
+                )}
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="file">Select File</Label>
+                <Input
+                  id="file"
+                  type="file"
+                  onChange={handleFileChange}
+                  accept={asset.allowedExtensions?.join(',')}
+                />
+              </div>
+
+              {preview && (
+                <div className="space-y-2">
+                  <Label>Preview</Label>
+                  <div className="border rounded-lg p-4 bg-muted/50">
+                    <pre className="text-xs overflow-x-auto max-h-64">{preview}</pre>
+                  </div>
                 </div>
+              )}
+
+              <div className="space-y-2">
+                <Label htmlFor="message-upload">Commit Message</Label>
+                <Textarea
+                  id="message-upload"
+                  value={commitMessage}
+                  onChange={(e) => setCommitMessage(e.target.value)}
+                  placeholder="Describe your changes..."
+                  rows={2}
+                />
+              </div>
+
+              <div className="flex justify-end gap-2">
+                <Button
+                  variant="outline"
+                  onClick={() => onOpenChange(false)}
+                  disabled={uploading}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  onClick={handleUpload}
+                  disabled={!file || uploading}
+                >
+                  {uploading ? (
+                    <>
+                      <RefreshCw className="mr-2 h-4 w-4 animate-spin" />
+                      Uploading...
+                    </>
+                  ) : (
+                    <>
+                      <Upload className="mr-2 h-4 w-4" />
+                      Upload & Commit
+                    </>
+                  )}
+                </Button>
+              </div>
+            </TabsContent>
+          </Tabs>
+        ) : (
+          <div className="space-y-4">
+            <div className="text-sm text-muted-foreground space-y-1">
+              {asset.maxSize && (
+                <p>• Maximum size: {(asset.maxSize / 1024 / 1024).toFixed(1)} MB</p>
+              )}
+              {asset.allowedExtensions && (
+                <p>• Allowed types: {asset.allowedExtensions.join(', ')}</p>
               )}
             </div>
-          )}
 
-          {/* Commit message */}
-          <div className="space-y-2">
-            <Label htmlFor="message">Commit Message</Label>
-            <Textarea
-              id="message"
-              value={commitMessage}
-              onChange={(e) => setCommitMessage(e.target.value)}
-              placeholder="Describe your changes..."
-              rows={2}
-            />
-          </div>
+            <div className="space-y-2">
+              <Label htmlFor="file">Select File</Label>
+              <Input
+                id="file"
+                type="file"
+                onChange={handleFileChange}
+                accept={asset.allowedExtensions?.join(',')}
+              />
+            </div>
 
-          {/* Actions */}
-          <div className="flex justify-end gap-2">
-            <Button
-              variant="outline"
-              onClick={() => onOpenChange(false)}
-              disabled={uploading}
-            >
-              Cancel
-            </Button>
-            <Button
-              onClick={handleUpload}
-              disabled={!file || uploading}
-            >
-              {uploading ? (
-                <>
-                  <RefreshCw className="mr-2 h-4 w-4 animate-spin" />
-                  Uploading...
-                </>
-              ) : (
-                <>
-                  <Upload className="mr-2 h-4 w-4" />
-                  Upload & Commit
-                </>
-              )}
-            </Button>
+            {preview && (
+              <div className="space-y-2">
+                <Label>Preview</Label>
+                {asset.type === 'image' || file?.type.startsWith('image/') ? (
+                  <div className="border rounded-lg p-4 bg-muted/50">
+                    <img
+                      src={preview}
+                      alt="Preview"
+                      className="max-w-full max-h-96 mx-auto object-contain"
+                    />
+                  </div>
+                ) : (
+                  <div className="border rounded-lg p-4 bg-muted/50">
+                    <pre className="text-xs overflow-x-auto max-h-64">{preview}</pre>
+                  </div>
+                )}
+              </div>
+            )}
+
+            <div className="space-y-2">
+              <Label htmlFor="message">Commit Message</Label>
+              <Textarea
+                id="message"
+                value={commitMessage}
+                onChange={(e) => setCommitMessage(e.target.value)}
+                placeholder="Describe your changes..."
+                rows={2}
+              />
+            </div>
+
+            <div className="flex justify-end gap-2">
+              <Button
+                variant="outline"
+                onClick={() => onOpenChange(false)}
+                disabled={uploading}
+              >
+                Cancel
+              </Button>
+              <Button
+                onClick={handleUpload}
+                disabled={!file || uploading}
+              >
+                {uploading ? (
+                  <>
+                    <RefreshCw className="mr-2 h-4 w-4 animate-spin" />
+                    Uploading...
+                  </>
+                ) : (
+                  <>
+                    <Upload className="mr-2 h-4 w-4" />
+                    Upload & Commit
+                  </>
+                )}
+              </Button>
+            </div>
           </div>
-        </div>
+        )}
       </DialogContent>
     </Dialog>
   );

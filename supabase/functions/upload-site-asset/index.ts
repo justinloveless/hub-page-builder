@@ -53,7 +53,7 @@ Deno.serve(async (req) => {
     }
 
     // Parse request body
-    const { site_id, file_path, content, message, branch } = await req.json()
+    const { site_id, file_path, content, message, branch, sha } = await req.json()
 
     if (!site_id || !file_path || !content) {
       throw new Error('Missing required fields: site_id, file_path, content')
@@ -116,23 +116,27 @@ Deno.serve(async (req) => {
     const [owner, repo] = site.repo_full_name.split('/')
     const targetBranch = branch || site.default_branch
 
-    // Check if file already exists to get its SHA
-    let fileSha: string | undefined
-    try {
-      const { data: existingFile } = await octokit.request('GET /repos/{owner}/{repo}/contents/{path}', {
-        owner,
-        repo,
-        path: file_path,
-        ref: targetBranch,
-      })
-      fileSha = (existingFile as any).sha
-      console.log('File exists, will update. SHA:', fileSha)
-    } catch (error: any) {
-      if (error.status === 404) {
-        console.log('File does not exist, will create new')
-      } else {
-        throw error
+    // Check if file already exists to get its SHA (if not provided)
+    let fileSha: string | undefined = sha
+    if (!fileSha) {
+      try {
+        const { data: existingFile } = await octokit.request('GET /repos/{owner}/{repo}/contents/{path}', {
+          owner,
+          repo,
+          path: file_path,
+          ref: targetBranch,
+        })
+        fileSha = (existingFile as any).sha
+        console.log('File exists, will update. SHA:', fileSha)
+      } catch (error: any) {
+        if (error.status === 404) {
+          console.log('File does not exist, will create new')
+        } else {
+          throw error
+        }
       }
+    } else {
+      console.log('Using provided SHA:', fileSha)
     }
 
     // Upload or update the file
