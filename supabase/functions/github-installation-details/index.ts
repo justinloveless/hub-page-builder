@@ -8,21 +8,66 @@ const corsHeaders = {
 
 // Convert PEM private key to CryptoKey for JWT signing
 async function importPrivateKey(pem: string): Promise<CryptoKey> {
-  // Remove header/footer and whitespace
-  const pemHeader = '-----BEGIN RSA PRIVATE KEY-----'
-  const pemFooter = '-----END RSA PRIVATE KEY-----'
-  const pemContents = pem
-    .replace(pemHeader, '')
-    .replace(pemFooter, '')
+  // Check if it's PKCS#8 or PKCS#1 format
+  const isPkcs8 = pem.includes('-----BEGIN PRIVATE KEY-----')
+  const isPkcs1 = pem.includes('-----BEGIN RSA PRIVATE KEY-----')
+
+  if (!isPkcs8 && !isPkcs1) {
+    throw new Error('Invalid private key format. Expected PKCS#1 or PKCS#8 PEM format.')
+  }
+
+  // Remove PEM headers/footers and whitespace
+  let pemContents = pem
+    .replace('-----BEGIN PRIVATE KEY-----', '')
+    .replace('-----END PRIVATE KEY-----', '')
+    .replace('-----BEGIN RSA PRIVATE KEY-----', '')
+    .replace('-----END RSA PRIVATE KEY-----', '')
     .replace(/\s/g, '')
 
-  // Convert base64 to binary
   const binaryDer = Uint8Array.from(atob(pemContents), (c) => c.charCodeAt(0))
 
-  // Import as CryptoKey
+  // PKCS#8 can be imported directly
+  if (isPkcs8) {
+    return await crypto.subtle.importKey(
+      'pkcs8',
+      binaryDer,
+      { name: 'RSASSA-PKCS1-v1_5', hash: 'SHA-256' },
+      false,
+      ['sign']
+    )
+  }
+
+  // For PKCS#1, we need to wrap it in PKCS#8 structure
+  // PKCS#8 structure for RSA private key
+  const pkcs8Header = new Uint8Array([
+    0x30, 0x82, 0x04, 0xbd, // SEQUENCE, length will be adjusted
+    0x02, 0x01, 0x00,       // version: 0
+    0x30, 0x0d,             // SEQUENCE
+    0x06, 0x09,             // OID length
+    0x2a, 0x86, 0x48, 0x86, 0xf7, 0x0d, 0x01, 0x01, 0x01, // RSA OID
+    0x05, 0x00,             // NULL
+    0x04, 0x82, 0x04, 0xa7  // OCTET STRING, length will be adjusted
+  ])
+
+  // Calculate total length
+  const totalLength = pkcs8Header.length + binaryDer.length
+  const pkcs8Der = new Uint8Array(totalLength)
+  
+  // Copy header
+  pkcs8Der.set(pkcs8Header, 0)
+  // Copy PKCS#1 key
+  pkcs8Der.set(binaryDer, pkcs8Header.length)
+
+  // Update lengths in the header
+  const keyLength = binaryDer.length
+  pkcs8Der[2] = ((keyLength + 24) >> 8) & 0xff
+  pkcs8Der[3] = (keyLength + 24) & 0xff
+  pkcs8Der[16] = ((keyLength) >> 8) & 0xff
+  pkcs8Der[17] = keyLength & 0xff
+
   return await crypto.subtle.importKey(
     'pkcs8',
-    binaryDer,
+    pkcs8Der,
     { name: 'RSASSA-PKCS1-v1_5', hash: 'SHA-256' },
     false,
     ['sign']
