@@ -56,6 +56,7 @@ const AssetManager = ({ siteId }: AssetManagerProps) => {
       }
     } catch (error: any) {
       console.error("Failed to fetch assets:", error);
+      setFound(false);
       toast.error(error.message || "Failed to fetch site assets");
     } finally {
       setLoading(false);
@@ -114,27 +115,46 @@ const AssetManager = ({ siteId }: AssetManagerProps) => {
   return (
     <Card>
       <CardHeader>
-        <div className="flex items-center justify-between">
-          <div>
-            <CardTitle>Asset Manager</CardTitle>
-            <CardDescription>
-              Manage site assets defined in site-assets.json
-            </CardDescription>
+          <div className="flex items-center justify-between">
+            <div>
+              <CardTitle>Asset Manager</CardTitle>
+              <CardDescription>
+                Manage site assets defined in site-assets.json
+              </CardDescription>
+            </div>
+            <div className="flex items-center gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={fetchAssets}
+                disabled={loading}
+              >
+                {loading ? (
+                  <RefreshCw className="h-4 w-4 animate-spin" />
+                ) : (
+                  <RefreshCw className="h-4 w-4" />
+                )}
+                <span className="ml-2">Load Assets</span>
+              </Button>
+              <Button
+                size="sm"
+                onClick={createTemplatePr}
+                disabled={creatingPr}
+              >
+                {creatingPr ? (
+                  <>
+                    <RefreshCw className="mr-2 h-4 w-4 animate-spin" />
+                    Creating PR...
+                  </>
+                ) : (
+                  <>
+                    <GitPullRequest className="mr-2 h-4 w-4" />
+                    Create Template PR
+                  </>
+                )}
+              </Button>
+            </div>
           </div>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={fetchAssets}
-            disabled={loading}
-          >
-            {loading ? (
-              <RefreshCw className="h-4 w-4 animate-spin" />
-            ) : (
-              <RefreshCw className="h-4 w-4" />
-            )}
-            <span className="ml-2">Load Assets</span>
-          </Button>
-        </div>
       </CardHeader>
       <CardContent>
         {loading ? (
