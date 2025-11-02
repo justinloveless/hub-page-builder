@@ -7,12 +7,21 @@ const corsHeaders = {
 };
 
 function normalizePemKey(pem: string): string {
-  if (!pem) throw new Error('PEM key is empty');
-  let normalized = pem.replace(/\\n/g, '\n');
-  if (!normalized.includes('-----BEGIN')) {
-    normalized = '-----BEGIN PRIVATE KEY-----\n' + normalized + '\n-----END PRIVATE KEY-----';
+  let s = pem.trim()
+  // strip wrapping quotes if present
+  if ((s.startsWith('"') && s.endsWith('"')) || (s.startsWith("'") && s.endsWith("'"))) {
+    s = s.slice(1, -1)
   }
-  return normalized.trim();
+  s = s.replace(/\\r\\n/g, '\n').replace(/\r\n/g, '\n').replace(/\\n/g, '\n').replace(/\r/g, '')
+  // ensure header/footer on their own lines
+  s = s
+    .replace('-----BEGIN PRIVATE KEY-----', '-----BEGIN PRIVATE KEY-----\n')
+    .replace('-----END PRIVATE KEY-----', '\n-----END PRIVATE KEY-----')
+    .replace('-----BEGIN RSA PRIVATE KEY-----', '-----BEGIN RSA PRIVATE KEY-----\n')
+    .replace('-----END RSA PRIVATE KEY-----', '\n-----END RSA PRIVATE KEY-----')
+  // ensure trailing newline
+  if (!s.endsWith('\n')) s += '\n'
+  return s
 }
 
 Deno.serve(async (req) => {
@@ -95,13 +104,29 @@ Deno.serve(async (req) => {
       });
     }
 
-    const privateKey = normalizePemKey(Deno.env.get('GITHUB_APP_PKEY')!);
+    const privateKeyPem = Deno.env.get('GITHUB_APP_PKEY');
+    if (!privateKeyPem) {
+      return new Response(JSON.stringify({ error: 'GITHUB_APP_PKEY environment variable not set' }), {
+        status: 500,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+    const normalizedKey = normalizePemKey(privateKeyPem);
+    console.log('Key format:', {
+      hasBegin: normalizedKey.includes('BEGIN'),
+      hasEnd: normalizedKey.includes('END'),
+      isPKCS8: normalizedKey.includes('BEGIN PRIVATE KEY'),
+      length: normalizedKey.length,
+    });
+    
     const app = new App({
       appId: appConfig.app_id,
-      privateKey: privateKey,
+      privateKey: normalizedKey,
     });
 
     const octokit = await app.getInstallationOctokit(site.github_installation_id);
+    console.log('Got GitHub installation client');
     const [owner, repo] = site.repo_full_name.split('/');
 
     // Try to get the contents of the path
