@@ -1,6 +1,5 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.78.0'
-import { create as createJWT } from 'https://deno.land/x/djwt@v3.0.2/mod.ts'
-import { createPrivateKey } from 'node:crypto'
+import { SignJWT, importPKCS8 } from 'https://esm.sh/jose@5.9.6'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -47,55 +46,49 @@ const SITE_ASSETS_TEMPLATE = {
   ]
 }
 
-// Convert PEM private key to CryptoKey for JWT signing using Node crypto
-async function importPrivateKey(pem: string): Promise<CryptoKey> {
-  try {
-    // Handle escaped newlines in environment variables
-    let formattedPem = pem.replace(/\\n/g, '\n')
-    
-    // Ensure proper PEM format with newlines
-    if (!formattedPem.includes('\n')) {
-      if (formattedPem.includes('-----BEGIN RSA PRIVATE KEY-----')) {
-        formattedPem = formattedPem
-          .replace('-----BEGIN RSA PRIVATE KEY-----', '-----BEGIN RSA PRIVATE KEY-----\n')
-          .replace('-----END RSA PRIVATE KEY-----', '\n-----END RSA PRIVATE KEY-----')
-      } else if (formattedPem.includes('-----BEGIN PRIVATE KEY-----')) {
-        formattedPem = formattedPem
-          .replace('-----BEGIN PRIVATE KEY-----', '-----BEGIN PRIVATE KEY-----\n')
-          .replace('-----END PRIVATE KEY-----', '\n-----END PRIVATE KEY-----')
-      }
-    }
-    
-    const keyObject = createPrivateKey({
-      key: formattedPem,
-      format: 'pem',
-      type: formattedPem.includes('-----BEGIN RSA PRIVATE KEY-----') ? 'pkcs1' : 'pkcs8',
-    })
-    
-    const pkcs8Pem = keyObject.export({
-      type: 'pkcs8',
-      format: 'pem',
-    }) as string
-
-    const pemContents = pkcs8Pem
-      .replace('-----BEGIN PRIVATE KEY-----', '')
-      .replace('-----END PRIVATE KEY-----', '')
-      .replace(/\s/g, '')
-
-    const binaryDer = Uint8Array.from(atob(pemContents), (c) => c.charCodeAt(0))
-
-    return await crypto.subtle.importKey(
-      'pkcs8',
-      binaryDer,
-      { name: 'RSASSA-PKCS1-v1_5', hash: 'SHA-256' },
-      false,
-      ['sign']
-    )
-  } catch (error) {
-    console.error('Failed to import private key:', error)
-    const errorMsg = error instanceof Error ? error.message : String(error)
-    throw new Error(`Failed to import private key: ${errorMsg}`)
+// PEM normalization and JOSE-based key import/signing
+function normalizePem(pem: string): string {
+  let s = pem.trim()
+  if ((s.startsWith('"') && s.endsWith('"')) || (s.startsWith("'") && s.endsWith("'"))) {
+    s = s.slice(1, -1)
   }
+  s = s
+    .replace(/\\r\\n/g, '\n')
+    .replace(/\r\n/g, '\n')
+    .replace(/\r/g, '\n')
+    .replace(/\\n/g, '\n')
+    .trim()
+  return s
+}
+
+async function importPemForRs256(pem: string): Promise<CryptoKey> {
+  const p = normalizePem(pem)
+  const hasBegin = p.includes('BEGIN')
+  const hasEnd = p.includes('END')
+  const isPkcs1 = p.includes('-----BEGIN RSA PRIVATE KEY-----')
+  const isPkcs8 = p.includes('-----BEGIN PRIVATE KEY-----')
+  console.log('PEM diagnostics', { hasBegin, hasEnd, isPkcs1, isPkcs8, hasNewlines: p.includes('\n'), pemLength: p.length })
+  try {
+    if (isPkcs8) return await importPKCS8(p, 'RS256')
+    if (isPkcs1) return await importPKCS1(p, 'RS256')
+    throw new Error('Unsupported PEM header. Expecting PKCS#1 or PKCS#8')
+  } catch (e1) {
+    try {
+      return isPkcs8 ? await importPKCS1(p, 'RS256') : await importPKCS8(p, 'RS256')
+    } catch (e2) {
+      throw new Error(`Failed to import PEM with jose. First: ${(e1 as Error).message}. Second: ${(e2 as Error).message}`)
+    }
+  }
+}
+
+async function createGithubAppJwt(pem: string, appId: string | number): Promise<string> {
+  const key = await importPemForRs256(pem)
+  return await new SignJWT({})
+    .setProtectedHeader({ alg: 'RS256' })
+    .setIssuedAt()
+    .setExpirationTime('10m')
+    .setIssuer(String(appId))
+    .sign(key)
 }
 
 Deno.serve(async (req) => {
@@ -179,15 +172,7 @@ Deno.serve(async (req) => {
     }
 
     // Create JWT for GitHub App authentication
-    const now = Math.floor(Date.now() / 1000)
-    const payload = {
-      iat: now,
-      exp: now + 600,
-      iss: config.app_id,
-    }
-
-    const privateKey = await importPrivateKey(privateKeyPem)
-    const jwt = await createJWT({ alg: 'RS256', typ: 'JWT' }, payload, privateKey)
+const jwt = await createGithubAppJwt(privateKeyPem, config.app_id)
 
     console.log('Created GitHub App JWT')
 
