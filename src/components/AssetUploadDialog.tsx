@@ -276,7 +276,7 @@ const AssetUploadDialog = ({ open, onOpenChange, asset, siteId, onSuccess }: Ass
             </TabsTrigger>
           </TabsList>
 
-          <TabsContent value="view" className="flex-1 space-y-4">
+          <TabsContent value="view" className="flex-1 flex flex-col overflow-hidden">
             {loadingFiles ? (
               <div className="flex items-center justify-center py-8">
                 <Loader2 className="h-6 w-6 animate-spin" />
@@ -287,8 +287,8 @@ const AssetUploadDialog = ({ open, onOpenChange, asset, siteId, onSuccess }: Ass
                 No assets found. Upload one to get started.
               </div>
             ) : (
-              <ScrollArea className="h-[400px] pr-4">
-                <div className="space-y-2">
+              <ScrollArea className="flex-1 pr-4">
+                <div className="space-y-2 pb-4">
                   {existingFiles.map((file) => (
                     <div
                       key={file.path}
@@ -333,133 +333,139 @@ const AssetUploadDialog = ({ open, onOpenChange, asset, siteId, onSuccess }: Ass
           </TabsContent>
 
           {isTextAsset && (
-            <TabsContent value="edit" className="flex-1 space-y-4">
+            <TabsContent value="edit" className="flex-1 flex flex-col overflow-hidden">
               {loadingContent ? (
                 <div className="flex items-center justify-center py-8">
                   <Loader2 className="h-6 w-6 animate-spin" />
                   <span className="ml-2 text-sm text-muted-foreground">Loading content...</span>
                 </div>
               ) : (
-                <>
-                  <div className="space-y-2">
-                    <Label htmlFor="content">Content</Label>
-                    <Textarea
-                      id="content"
-                      value={textContent}
-                      onChange={(e) => setTextContent(e.target.value)}
-                      placeholder="Enter your content here..."
-                      className="min-h-[300px] font-mono text-sm"
-                    />
-                  </div>
+                <ScrollArea className="flex-1 pr-4">
+                  <div className="space-y-4 pb-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="content">Content</Label>
+                      <Textarea
+                        id="content"
+                        value={textContent}
+                        onChange={(e) => setTextContent(e.target.value)}
+                        placeholder="Enter your content here..."
+                        className="min-h-[200px] font-mono text-sm"
+                      />
+                    </div>
 
-                  <div className="space-y-2">
-                    <Label htmlFor="message-edit">Commit Message</Label>
-                    <Input
-                      id="message-edit"
-                      value={commitMessage}
-                      onChange={(e) => setCommitMessage(e.target.value)}
-                      placeholder={`Update ${asset.label || asset.path}`}
-                    />
-                  </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="message-edit">Commit Message</Label>
+                      <Input
+                        id="message-edit"
+                        value={commitMessage}
+                        onChange={(e) => setCommitMessage(e.target.value)}
+                        placeholder={`Update ${asset.label || asset.path}`}
+                      />
+                    </div>
 
-                  <div className="flex justify-end gap-2">
-                    <Button variant="outline" onClick={() => onOpenChange(false)} disabled={uploading}>
-                      Cancel
-                    </Button>
-                    <Button onClick={uploadTextContent} disabled={uploading}>
-                      {uploading ? (
-                        <>
-                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                          Saving...
-                        </>
-                      ) : (
-                        <>
-                          <Upload className="mr-2 h-4 w-4" />
-                          Save & Commit
-                        </>
-                      )}
-                    </Button>
+                    <div className="flex justify-end gap-2 pt-2">
+                      <Button variant="outline" onClick={() => onOpenChange(false)} disabled={uploading}>
+                        Cancel
+                      </Button>
+                      <Button onClick={uploadTextContent} disabled={uploading}>
+                        {uploading ? (
+                          <>
+                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                            Saving...
+                          </>
+                        ) : (
+                          <>
+                            <Upload className="mr-2 h-4 w-4" />
+                            Save & Commit
+                          </>
+                        )}
+                      </Button>
+                    </div>
                   </div>
-                </>
+                </ScrollArea>
               )}
             </TabsContent>
           )}
 
-          <TabsContent value="upload" className="flex-1 space-y-4">
-            <div className="text-sm text-muted-foreground space-y-1">
-              {asset.maxSize && (
-                <p>• Maximum size: {(asset.maxSize / 1024 / 1024).toFixed(1)} MB</p>
-              )}
-              {asset.allowedExtensions && (
-                <p>• Allowed types: {asset.allowedExtensions.join(', ')}</p>
-              )}
-            </div>
+          <TabsContent value="upload" className="flex-1 flex flex-col overflow-hidden">
+            <ScrollArea className="flex-1 pr-4">
+              <div className="space-y-4 pb-4">
+                <div className="text-sm text-muted-foreground space-y-1">
+                  {asset.maxSize && (
+                    <p>• Maximum size: {(asset.maxSize / 1024 / 1024).toFixed(1)} MB</p>
+                  )}
+                  {asset.allowedExtensions && (
+                    <p>• Allowed types: {asset.allowedExtensions.join(', ')}</p>
+                  )}
+                </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="file">Select File</Label>
-              <Input
-                id="file"
-                type="file"
-                onChange={handleFileChange}
-                accept={asset.allowedExtensions?.join(',')}
-              />
-            </div>
+                <div className="space-y-2">
+                  <Label htmlFor="file">Select File</Label>
+                  <Input
+                    id="file"
+                    type="file"
+                    onChange={handleFileChange}
+                    accept={asset.allowedExtensions?.join(',')}
+                  />
+                </div>
 
-            {preview && (
-              <div className="space-y-2">
-                <Label>Preview</Label>
-                {asset.type === 'image' || file?.type.startsWith('image/') ? (
-                  <div className="border rounded-lg p-4 bg-muted/50">
-                    <img
-                      src={preview}
-                      alt="Preview"
-                      className="max-w-full max-h-96 mx-auto object-contain"
-                    />
-                  </div>
-                ) : (
-                  <div className="border rounded-lg p-4 bg-muted/50">
-                    <pre className="text-xs overflow-x-auto max-h-64">{preview}</pre>
+                {preview && (
+                  <div className="space-y-2">
+                    <Label>Preview</Label>
+                    {asset.type === 'image' || file?.type.startsWith('image/') ? (
+                      <div className="border rounded-lg p-4 bg-muted/50">
+                        <img
+                          src={preview}
+                          alt="Preview"
+                          className="max-w-full max-h-64 mx-auto object-contain"
+                        />
+                      </div>
+                    ) : (
+                      <div className="border rounded-lg p-4 bg-muted/50">
+                        <pre className="text-xs overflow-x-auto max-h-48">{preview}</pre>
+                      </div>
+                    )}
                   </div>
                 )}
+
+                <div className="space-y-2">
+                  <Label htmlFor="message-upload">Commit Message</Label>
+                  <Textarea
+                    id="message-upload"
+                    value={commitMessage}
+                    onChange={(e) => setCommitMessage(e.target.value)}
+                    placeholder="Describe your changes..."
+                    rows={2}
+                  />
+                </div>
+
+                <div className="flex justify-end gap-2 pt-2">
+                  <Button
+                    variant="outline"
+                    onClick={() => onOpenChange(false)}
+                    disabled={uploading}
+                  >
+                    Cancel
+                  </Button>
+                  <Button
+                    onClick={handleUpload}
+                    disabled={!file || uploading}
+                  >
+                    {uploading ? (
+                      <>
+                        <RefreshCw className="mr-2 h-4 w-4 animate-spin" />
+                        Uploading...
+                      </>
+                    ) : (
+                      <>
+                        <Upload className="mr-2 h-4 w-4" />
+                        Upload & Commit
+                      </>
+                    )}
+                  </Button>
+                </div>
               </div>
-            )}
-
-            <div className="space-y-2">
-              <Label htmlFor="message-upload">Commit Message</Label>
-              <Textarea
-                id="message-upload"
-                value={commitMessage}
-                onChange={(e) => setCommitMessage(e.target.value)}
-                placeholder="Describe your changes..."
-                rows={2}
-              />
-            </div>
-
-            <div className="flex justify-end gap-2">
-              <Button
-                variant="outline"
-                onClick={() => onOpenChange(false)}
-                disabled={uploading}
-              >
-                Cancel
-              </Button>
-              <Button
-                onClick={handleUpload}
-                disabled={!file || uploading}
-              >
-                {uploading ? (
-                  <>
-                    <RefreshCw className="mr-2 h-4 w-4 animate-spin" />
-                    Uploading...
-                  </>
-                ) : (
-                  <>
-                    <Upload className="mr-2 h-4 w-4" />
-                    Upload & Commit
-                  </>
-                )}
-              </Button>
-            </div>
+            </ScrollArea>
           </TabsContent>
         </Tabs>
       </DialogContent>
