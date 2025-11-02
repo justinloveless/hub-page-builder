@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import { Loader2, Plus, LogOut, Settings } from "lucide-react";
 import SiteCard from "@/components/SiteCard";
+import AddSiteDialog from "@/components/AddSiteDialog";
 import type { Tables } from "@/integrations/supabase/types";
 
 type Site = Tables<"sites">;
@@ -104,10 +105,7 @@ const Dashboard = () => {
               Manage all your static sites in one place
             </p>
           </div>
-          <Button className="bg-gradient-to-r from-primary to-accent hover:opacity-90">
-            <Plus className="mr-2 h-5 w-5" />
-            Add Site
-          </Button>
+          <AddSiteDialog onSiteAdded={loadSites} />
         </div>
 
         {sites.length === 0 ? (
@@ -120,10 +118,7 @@ const Dashboard = () => {
               Get started by adding your first static site. Connect your GitHub repository
               and start managing content with ease.
             </p>
-            <Button className="bg-gradient-to-r from-primary to-accent hover:opacity-90">
-              <Plus className="mr-2 h-5 w-5" />
-              Add Your First Site
-            </Button>
+            <AddSiteDialog onSiteAdded={loadSites} />
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
