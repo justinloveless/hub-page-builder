@@ -5,9 +5,10 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { Upload, RefreshCw, FileText, Image as ImageIcon, Loader2 } from "lucide-react";
+import { Upload, RefreshCw, FileText, Loader2, Trash2, ExternalLink, Eye } from "lucide-react";
 
 interface AssetConfig {
   path: string;
@@ -16,6 +17,15 @@ interface AssetConfig {
   description?: string;
   maxSize?: number;
   allowedExtensions?: string[];
+}
+
+interface AssetFile {
+  name: string;
+  path: string;
+  sha: string;
+  size: number;
+  type: string;
+  download_url: string;
 }
 
 interface AssetUploadDialogProps {
@@ -34,18 +44,37 @@ const AssetUploadDialog = ({ open, onOpenChange, asset, siteId, onSuccess }: Ass
   const [textContent, setTextContent] = useState("");
   const [loadingContent, setLoadingContent] = useState(false);
   const [currentSha, setCurrentSha] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState<string>("upload");
+  const [activeTab, setActiveTab] = useState<string>("view");
+  const [existingFiles, setExistingFiles] = useState<AssetFile[]>([]);
+  const [loadingFiles, setLoadingFiles] = useState(false);
+  const [deleting, setDeleting] = useState<string | null>(null);
 
   const isTextAsset = asset.type === "text" || asset.type === "markdown";
 
   useEffect(() => {
-    if (open && isTextAsset) {
-      loadExistingContent();
-    } else {
-      setTextContent("");
-      setCurrentSha(null);
+    if (open) {
+      loadExistingFiles();
+      if (isTextAsset && activeTab === 'edit') {
+        loadExistingContent();
+      }
     }
-  }, [open, asset.path]);
+  }, [open, activeTab]);
+
+  const loadExistingFiles = async () => {
+    setLoadingFiles(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('list-directory-assets', {
+        body: { site_id: siteId, asset_path: asset.path },
+      });
+
+      if (error) throw error;
+      setExistingFiles(data.files || []);
+    } catch (error: any) {
+      console.error('Error loading existing files:', error);
+    } finally {
+      setLoadingFiles(false);
+    }
+  };
 
   const loadExistingContent = async () => {
     setLoadingContent(true);
@@ -62,7 +91,6 @@ const AssetUploadDialog = ({ open, onOpenChange, asset, siteId, onSuccess }: Ass
       if (data.found) {
         setTextContent(data.content);
         setCurrentSha(data.sha);
-        setActiveTab("edit");
       } else {
         setTextContent("");
         setCurrentSha(null);
@@ -72,6 +100,33 @@ const AssetUploadDialog = ({ open, onOpenChange, asset, siteId, onSuccess }: Ass
       toast.error("Failed to load existing content");
     } finally {
       setLoadingContent(false);
+    }
+  };
+
+  const handleDelete = async (filePath: string, sha: string) => {
+    if (!confirm(`Are you sure you want to delete ${filePath}?`)) return;
+    
+    setDeleting(filePath);
+    try {
+      const { error } = await supabase.functions.invoke('delete-site-asset', {
+        body: {
+          site_id: siteId,
+          file_path: filePath,
+          sha: sha,
+          message: `Delete ${filePath}`,
+        },
+      });
+
+      if (error) throw error;
+
+      toast.success("Asset deleted successfully");
+      await loadExistingFiles();
+      onSuccess();
+    } catch (error: any) {
+      console.error('Error deleting asset:', error);
+      toast.error(error.message || "Failed to delete asset");
+    } finally {
+      setDeleting(null);
     }
   };
 
@@ -145,10 +200,10 @@ const AssetUploadDialog = ({ open, onOpenChange, asset, siteId, onSuccess }: Ass
         if (error) throw error;
 
         toast.success("Asset uploaded successfully!");
-        onSuccess();
-        onOpenChange(false);
         setFile(null);
         setPreview(null);
+        await loadExistingFiles();
+        onSuccess();
       };
       reader.readAsDataURL(file);
     } catch (error: any) {
@@ -180,13 +235,11 @@ const AssetUploadDialog = ({ open, onOpenChange, asset, siteId, onSuccess }: Ass
       if (error) throw error;
 
       toast.success("Content saved successfully!");
-      onSuccess();
-      onOpenChange(false);
-      
-      // Reset form
       setTextContent("");
       setCommitMessage(`Update ${asset.path}`);
       setCurrentSha(null);
+      await loadExistingFiles();
+      onSuccess();
     } catch (error: any) {
       console.error("Failed to save content:", error);
       toast.error(error.message || "Failed to save content");
@@ -197,28 +250,90 @@ const AssetUploadDialog = ({ open, onOpenChange, asset, siteId, onSuccess }: Ass
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+      <DialogContent className="max-w-2xl max-h-[90vh] overflow-hidden flex flex-col">
         <DialogHeader>
-          <DialogTitle>{isTextAsset ? "Edit" : "Upload"} {asset.label || asset.path}</DialogTitle>
+          <DialogTitle>Manage {asset.label || asset.path}</DialogTitle>
           <DialogDescription>
-            {asset.description || 'Manage this asset'}
+            {asset.description || 'View, upload, or edit this asset'}
           </DialogDescription>
         </DialogHeader>
 
-        {isTextAsset ? (
-          <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-            <TabsList className="grid w-full grid-cols-2">
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="flex-1 flex flex-col">
+          <TabsList className="grid w-full" style={{ gridTemplateColumns: isTextAsset ? 'repeat(3, 1fr)' : 'repeat(2, 1fr)' }}>
+            <TabsTrigger value="view">
+              <Eye className="mr-2 h-4 w-4" />
+              Current Assets
+            </TabsTrigger>
+            {isTextAsset && (
               <TabsTrigger value="edit">
                 <FileText className="mr-2 h-4 w-4" />
                 Edit Content
               </TabsTrigger>
-              <TabsTrigger value="upload">
-                <Upload className="mr-2 h-4 w-4" />
-                Upload File
-              </TabsTrigger>
-            </TabsList>
+            )}
+            <TabsTrigger value="upload">
+              <Upload className="mr-2 h-4 w-4" />
+              Upload
+            </TabsTrigger>
+          </TabsList>
 
-            <TabsContent value="edit" className="space-y-4">
+          <TabsContent value="view" className="flex-1 space-y-4">
+            {loadingFiles ? (
+              <div className="flex items-center justify-center py-8">
+                <Loader2 className="h-6 w-6 animate-spin" />
+                <span className="ml-2 text-sm text-muted-foreground">Loading assets...</span>
+              </div>
+            ) : existingFiles.length === 0 ? (
+              <div className="text-center py-8 text-muted-foreground">
+                No assets found. Upload one to get started.
+              </div>
+            ) : (
+              <ScrollArea className="h-[400px] pr-4">
+                <div className="space-y-2">
+                  {existingFiles.map((file) => (
+                    <div
+                      key={file.path}
+                      className="flex items-center justify-between p-3 border rounded-lg hover:bg-accent/50 transition-colors"
+                    >
+                      <div className="flex-1 min-w-0">
+                        <p className="font-medium truncate">{file.name}</p>
+                        <p className="text-sm text-muted-foreground">
+                          {(file.size / 1024).toFixed(2)} KB
+                        </p>
+                      </div>
+                      <div className="flex items-center gap-2 ml-4">
+                        {file.download_url && (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => window.open(file.download_url, '_blank')}
+                            title="View in GitHub"
+                          >
+                            <ExternalLink className="h-4 w-4" />
+                          </Button>
+                        )}
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleDelete(file.path, file.sha)}
+                          disabled={deleting === file.path}
+                          title="Delete asset"
+                        >
+                          {deleting === file.path ? (
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                          ) : (
+                            <Trash2 className="h-4 w-4 text-destructive" />
+                          )}
+                        </Button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </ScrollArea>
+            )}
+          </TabsContent>
+
+          {isTextAsset && (
+            <TabsContent value="edit" className="flex-1 space-y-4">
               {loadingContent ? (
                 <div className="flex items-center justify-center py-8">
                   <Loader2 className="h-6 w-6 animate-spin" />
@@ -268,76 +383,9 @@ const AssetUploadDialog = ({ open, onOpenChange, asset, siteId, onSuccess }: Ass
                 </>
               )}
             </TabsContent>
+          )}
 
-            <TabsContent value="upload" className="space-y-4">
-              <div className="text-sm text-muted-foreground space-y-1">
-                {asset.maxSize && (
-                  <p>• Maximum size: {(asset.maxSize / 1024 / 1024).toFixed(1)} MB</p>
-                )}
-                {asset.allowedExtensions && (
-                  <p>• Allowed types: {asset.allowedExtensions.join(', ')}</p>
-                )}
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="file">Select File</Label>
-                <Input
-                  id="file"
-                  type="file"
-                  onChange={handleFileChange}
-                  accept={asset.allowedExtensions?.join(',')}
-                />
-              </div>
-
-              {preview && (
-                <div className="space-y-2">
-                  <Label>Preview</Label>
-                  <div className="border rounded-lg p-4 bg-muted/50">
-                    <pre className="text-xs overflow-x-auto max-h-64">{preview}</pre>
-                  </div>
-                </div>
-              )}
-
-              <div className="space-y-2">
-                <Label htmlFor="message-upload">Commit Message</Label>
-                <Textarea
-                  id="message-upload"
-                  value={commitMessage}
-                  onChange={(e) => setCommitMessage(e.target.value)}
-                  placeholder="Describe your changes..."
-                  rows={2}
-                />
-              </div>
-
-              <div className="flex justify-end gap-2">
-                <Button
-                  variant="outline"
-                  onClick={() => onOpenChange(false)}
-                  disabled={uploading}
-                >
-                  Cancel
-                </Button>
-                <Button
-                  onClick={handleUpload}
-                  disabled={!file || uploading}
-                >
-                  {uploading ? (
-                    <>
-                      <RefreshCw className="mr-2 h-4 w-4 animate-spin" />
-                      Uploading...
-                    </>
-                  ) : (
-                    <>
-                      <Upload className="mr-2 h-4 w-4" />
-                      Upload & Commit
-                    </>
-                  )}
-                </Button>
-              </div>
-            </TabsContent>
-          </Tabs>
-        ) : (
-          <div className="space-y-4">
+          <TabsContent value="upload" className="flex-1 space-y-4">
             <div className="text-sm text-muted-foreground space-y-1">
               {asset.maxSize && (
                 <p>• Maximum size: {(asset.maxSize / 1024 / 1024).toFixed(1)} MB</p>
@@ -377,9 +425,9 @@ const AssetUploadDialog = ({ open, onOpenChange, asset, siteId, onSuccess }: Ass
             )}
 
             <div className="space-y-2">
-              <Label htmlFor="message">Commit Message</Label>
+              <Label htmlFor="message-upload">Commit Message</Label>
               <Textarea
-                id="message"
+                id="message-upload"
                 value={commitMessage}
                 onChange={(e) => setCommitMessage(e.target.value)}
                 placeholder="Describe your changes..."
@@ -412,8 +460,8 @@ const AssetUploadDialog = ({ open, onOpenChange, asset, siteId, onSuccess }: Ass
                 )}
               </Button>
             </div>
-          </div>
-        )}
+          </TabsContent>
+        </Tabs>
       </DialogContent>
     </Dialog>
   );

@@ -18,3 +18,9 @@ verify_jwt = true
 [functions.fetch-asset-content]
 verify_jwt = true
 
+[functions.list-directory-assets]
+verify_jwt = true
+
+[functions.delete-site-asset]
+verify_jwt = true
+
