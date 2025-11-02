@@ -8,11 +8,21 @@ const corsHeaders = {
 
 // Normalize PEM key for Octokit
 function normalizePemKey(pem: string): string {
-  return pem
-    .trim()
-    .replace(/\\n/g, '\n')
-    .replace(/\\r/g, '')
-    .replace(/\r/g, '')
+  let s = pem.trim()
+  // strip wrapping quotes if present
+  if ((s.startsWith('"') && s.endsWith('"')) || (s.startsWith("'") && s.endsWith("'"))) {
+    s = s.slice(1, -1)
+  }
+  s = s.replace(/\\r\\n/g, '\n').replace(/\r\n/g, '\n').replace(/\\n/g, '\n').replace(/\r/g, '')
+  // ensure header/footer on their own lines
+  s = s
+    .replace('-----BEGIN PRIVATE KEY-----', '-----BEGIN PRIVATE KEY-----\n')
+    .replace('-----END PRIVATE KEY-----', '\n-----END PRIVATE KEY-----')
+    .replace('-----BEGIN RSA PRIVATE KEY-----', '-----BEGIN RSA PRIVATE KEY-----\n')
+    .replace('-----END RSA PRIVATE KEY-----', '\n-----END RSA PRIVATE KEY-----')
+  // ensure trailing newline
+  if (!s.endsWith('\n')) s += '\n'
+  return s
 }
 
 
