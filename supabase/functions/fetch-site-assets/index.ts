@@ -6,6 +6,15 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
+// Normalize PEM key for Octokit
+function normalizePemKey(pem: string): string {
+  return pem
+    .trim()
+    .replace(/\\n/g, '\n')
+    .replace(/\\r/g, '')
+    .replace(/\r/g, '')
+}
+
 
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
@@ -88,9 +97,17 @@ Deno.serve(async (req) => {
     }
 
     // Create Octokit App instance
+    const normalizedKey = normalizePemKey(privateKeyPem)
+    console.log('Key format:', {
+      hasBegin: normalizedKey.includes('BEGIN'),
+      hasEnd: normalizedKey.includes('END'),
+      isPKCS8: normalizedKey.includes('BEGIN PRIVATE KEY'),
+      length: normalizedKey.length,
+    })
+    
     const app = new App({
       appId: config.app_id,
-      privateKey: privateKeyPem,
+      privateKey: normalizedKey,
     })
 
     // Get installation-authenticated Octokit
