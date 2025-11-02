@@ -6,7 +6,8 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { Folder, FileText, Image, AlertCircle, RefreshCw, GitPullRequest, ExternalLink } from "lucide-react";
+import { Folder, FileText, Image, AlertCircle, RefreshCw, GitPullRequest, ExternalLink, Upload } from "lucide-react";
+import AssetUploadDialog from "./AssetUploadDialog";
 
 interface AssetConfig {
   path: string;
@@ -31,6 +32,8 @@ const AssetManager = ({ siteId }: AssetManagerProps) => {
   const [creatingPr, setCreatingPr] = useState(false);
   const [config, setConfig] = useState<SiteAssetsConfig | null>(null);
   const [found, setFound] = useState<boolean | null>(null);
+  const [uploadDialogOpen, setUploadDialogOpen] = useState(false);
+  const [selectedAsset, setSelectedAsset] = useState<AssetConfig | null>(null);
 
   const fetchAssets = async () => {
     setLoading(true);
@@ -261,8 +264,16 @@ const AssetManager = ({ siteId }: AssetManagerProps) => {
                       )}
                     </div>
                   </div>
-                  <Button variant="outline" size="sm">
-                    Manage
+                  <Button 
+                    variant="outline" 
+                    size="sm"
+                    onClick={() => {
+                      setSelectedAsset(asset);
+                      setUploadDialogOpen(true);
+                    }}
+                  >
+                    <Upload className="mr-2 h-4 w-4" />
+                    Upload
                   </Button>
                 </div>
               ))}
@@ -275,6 +286,19 @@ const AssetManager = ({ siteId }: AssetManagerProps) => {
           </div>
         )}
       </CardContent>
+
+      {selectedAsset && (
+        <AssetUploadDialog
+          open={uploadDialogOpen}
+          onOpenChange={setUploadDialogOpen}
+          asset={selectedAsset}
+          siteId={siteId}
+          onSuccess={() => {
+            fetchAssets();
+            toast.success("Asset updated successfully!");
+          }}
+        />
+      )}
     </Card>
   );
 };

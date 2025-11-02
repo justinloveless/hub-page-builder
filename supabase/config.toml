@@ -11,3 +11,7 @@ verify_jwt = true
 
 [functions.create-site-assets-pr]
 verify_jwt = true
+
+[functions.upload-site-asset]
+verify_jwt = true
+
