@@ -12,6 +12,7 @@ const Settings = () => {
   const [loading, setLoading] = useState(true);
   const [config, setConfig] = useState<{
     slug: string;
+    app_id: string;
     client_id: string;
     client_secret: string;
   } | null>(null);
@@ -37,6 +38,7 @@ const Settings = () => {
       } else if (data) {
         setConfig({
           slug: data.slug,
+          app_id: data.app_id,
           client_id: data.client_id,
           client_secret: data.client_secret,
         });
@@ -105,6 +107,13 @@ const Settings = () => {
                 </div>
 
                 <div className="space-y-2">
+                  <p className="text-sm font-medium">App ID</p>
+                  <p className="text-sm text-muted-foreground bg-muted/50 p-3 rounded-md font-mono">
+                    {config.app_id || "Not configured"}
+                  </p>
+                </div>
+
+                <div className="space-y-2">
                   <p className="text-sm font-medium">Client ID</p>
                   <p className="text-sm text-muted-foreground bg-muted/50 p-3 rounded-md font-mono">
                     {config.client_id}
@@ -118,6 +127,16 @@ const Settings = () => {
                   </p>
                   <p className="text-xs text-muted-foreground">
                     Client secret is stored securely and cannot be displayed
+                  </p>
+                </div>
+
+                <div className="space-y-2">
+                  <p className="text-sm font-medium">Private Key</p>
+                  <p className="text-sm text-muted-foreground bg-muted/50 p-3 rounded-md font-mono">
+                    ••••••••••••••••
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    Private key is stored in Supabase secrets (GITHUB_APP_PKEY) and cannot be displayed
                   </p>
                 </div>
 
@@ -150,8 +169,9 @@ const Settings = () => {
               <li>Go to GitHub Settings → Developer settings → GitHub Apps</li>
               <li>Click "New GitHub App"</li>
               <li>Set the required permissions (Contents: Read & Write, Metadata: Read)</li>
-              <li>Generate a client secret</li>
-              <li>Copy the App Slug, Client ID, and Client Secret here</li>
+              <li>Generate a client secret and a private key</li>
+              <li>Note the App ID from the GitHub App settings</li>
+              <li>Add the App ID to github_app_config table, store the private key in GITHUB_APP_PKEY secret</li>
             </ol>
           </CardContent>
         </Card>

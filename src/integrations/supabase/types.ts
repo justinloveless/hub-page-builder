@@ -152,6 +152,7 @@ export type Database = {
       }
       github_app_config: {
         Row: {
+          app_id: string | null
           client_id: string
           client_secret: string
           created_at: string
@@ -160,6 +161,7 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          app_id?: string | null
           client_id: string
           client_secret: string
           created_at?: string
@@ -168,6 +170,7 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          app_id?: string | null
           client_id?: string
           client_secret?: string
           created_at?: string

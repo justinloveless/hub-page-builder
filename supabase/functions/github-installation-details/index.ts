@@ -1,8 +1,32 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.78.0'
+import { create as createJWT } from 'https://deno.land/x/djwt@v3.0.2/mod.ts'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+}
+
+// Convert PEM private key to CryptoKey for JWT signing
+async function importPrivateKey(pem: string): Promise<CryptoKey> {
+  // Remove header/footer and whitespace
+  const pemHeader = '-----BEGIN RSA PRIVATE KEY-----'
+  const pemFooter = '-----END RSA PRIVATE KEY-----'
+  const pemContents = pem
+    .replace(pemHeader, '')
+    .replace(pemFooter, '')
+    .replace(/\s/g, '')
+
+  // Convert base64 to binary
+  const binaryDer = Uint8Array.from(atob(pemContents), (c) => c.charCodeAt(0))
+
+  // Import as CryptoKey
+  return await crypto.subtle.importKey(
+    'pkcs8',
+    binaryDer,
+    { name: 'RSASSA-PKCS1-v1_5', hash: 'SHA-256' },
+    false,
+    ['sign']
+  )
 }
 
 Deno.serve(async (req) => {
@@ -46,24 +70,34 @@ Deno.serve(async (req) => {
     // Get GitHub app config
     const { data: config, error: configError } = await supabaseClient
       .from('github_app_config')
-      .select('client_id, client_secret')
+      .select('app_id')
       .single()
 
-    if (configError || !config) {
-      throw new Error('GitHub App not configured')
+    if (configError || !config || !config.app_id) {
+      console.error('GitHub App config error:', configError)
+      throw new Error('GitHub App not configured properly. Please add app_id to github_app_config table.')
     }
 
-    // Generate JWT for GitHub App
+    // Get private key from environment
+    const privateKeyPem = Deno.env.get('GITHUB_APP_PKEY')
+    if (!privateKeyPem) {
+      throw new Error('GITHUB_APP_PKEY environment variable not set')
+    }
+
+    console.log('Getting installation details for:', installation_id)
+
+    // Create JWT for GitHub App authentication
     const now = Math.floor(Date.now() / 1000)
     const payload = {
       iat: now,
       exp: now + 600, // 10 minutes
-      iss: config.client_id,
+      iss: config.app_id,
     }
 
-    // Note: In production, you would need to sign this JWT with your GitHub App's private key
-    // For now, we'll use the installation ID directly
-    console.log('Getting installation details for:', installation_id)
+    const privateKey = await importPrivateKey(privateKeyPem)
+    const jwt = await createJWT({ alg: 'RS256', typ: 'JWT' }, payload, privateKey)
+
+    console.log('Created GitHub App JWT')
 
     // Get installation access token
     const installationTokenResponse = await fetch(
@@ -72,7 +106,7 @@ Deno.serve(async (req) => {
         method: 'POST',
         headers: {
           'Accept': 'application/vnd.github+json',
-          'Authorization': `Bearer ${config.client_secret}`, // This should be a JWT in production
+          'Authorization': `Bearer ${jwt}`,
           'X-GitHub-Api-Version': '2022-11-28',
         },
       }
@@ -85,6 +119,7 @@ Deno.serve(async (req) => {
     }
 
     const installationToken = await installationTokenResponse.json()
+    console.log('Got installation access token')
 
     // Get installation repositories
     const reposResponse = await fetch(
@@ -99,10 +134,13 @@ Deno.serve(async (req) => {
     )
 
     if (!reposResponse.ok) {
+      const errorText = await reposResponse.text()
+      console.error('Failed to fetch repositories:', errorText)
       throw new Error('Failed to fetch repositories')
     }
 
     const reposData = await reposResponse.json()
+    console.log(`Found ${reposData.repositories.length} repositories`)
 
     return new Response(
       JSON.stringify({
