@@ -35,8 +35,16 @@ async function importPrivateKey(pem: string): Promise<CryptoKey> {
       length: formattedPem.length
     })
     
-    // Use Node.js crypto to handle both PKCS#1 and PKCS#8 formats
-    const keyObject = createPrivateKey(formattedPem)
+    // Detect key type for Node's createPrivateKey
+    const isPkcs1 = formattedPem.includes('-----BEGIN RSA PRIVATE KEY-----')
+    const isPkcs8 = formattedPem.includes('-----BEGIN PRIVATE KEY-----')
+
+    // Use Node.js crypto to handle both PKCS#1 and PKCS#8 formats explicitly
+    const keyObject = createPrivateKey({
+      key: formattedPem,
+      format: 'pem',
+      type: isPkcs1 ? 'pkcs1' : 'pkcs8',
+    })
     
     // Export as PKCS#8 PEM
     const pkcs8Pem = keyObject.export({

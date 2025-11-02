@@ -26,7 +26,11 @@ async function importPrivateKey(pem: string): Promise<CryptoKey> {
       }
     }
     
-    const keyObject = createPrivateKey(formattedPem)
+    const keyObject = createPrivateKey({
+      key: formattedPem,
+      format: 'pem',
+      type: formattedPem.includes('-----BEGIN RSA PRIVATE KEY-----') ? 'pkcs1' : 'pkcs8',
+    })
     
     const pkcs8Pem = keyObject.export({
       type: 'pkcs8',
