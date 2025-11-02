@@ -14,7 +14,6 @@ const Settings = () => {
     slug: string;
     app_id: string;
     client_id: string;
-    client_secret: string;
   } | null>(null);
 
   useEffect(() => {
@@ -28,7 +27,7 @@ const Settings = () => {
 
       // Fetch GitHub app config
       const { data, error } = await supabase
-        .from("github_app_config")
+        .from("github_app_public_config")
         .select("*")
         .maybeSingle();
 
@@ -40,7 +39,6 @@ const Settings = () => {
           slug: data.slug,
           app_id: data.app_id,
           client_id: data.client_id,
-          client_secret: data.client_secret,
         });
       }
       

@@ -70,7 +70,7 @@ const AddSiteDialog = ({ onSiteAdded }: AddSiteDialogProps) => {
     try {
       // Fetch GitHub app config
       const { data: config, error } = await supabase
-        .from('github_app_config')
+        .from('github_app_public_config')
         .select('client_id, slug')
         .maybeSingle();
 

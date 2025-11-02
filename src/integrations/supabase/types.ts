@@ -152,9 +152,29 @@ export type Database = {
       }
       github_app_config: {
         Row: {
+          client_secret: string
+          created_at: string
+          id: string
+          updated_at: string
+        }
+        Insert: {
+          client_secret: string
+          created_at?: string
+          id?: string
+          updated_at?: string
+        }
+        Update: {
+          client_secret?: string
+          created_at?: string
+          id?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      github_app_public_config: {
+        Row: {
           app_id: string | null
           client_id: string
-          client_secret: string
           created_at: string
           id: string
           slug: string
@@ -163,7 +183,6 @@ export type Database = {
         Insert: {
           app_id?: string | null
           client_id: string
-          client_secret: string
           created_at?: string
           id?: string
           slug: string
@@ -172,7 +191,6 @@ export type Database = {
         Update: {
           app_id?: string | null
           client_id?: string
-          client_secret?: string
           created_at?: string
           id?: string
           slug?: string

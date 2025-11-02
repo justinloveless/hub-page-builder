@@ -69,7 +69,7 @@ Deno.serve(async (req) => {
 
     // Get GitHub app config
     const { data: config, error: configError } = await supabaseClient
-      .from('github_app_config')
+      .from('github_app_public_config')
       .select('app_id')
       .single()
 
