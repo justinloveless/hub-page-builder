@@ -5,3 +5,6 @@ verify_jwt = true
 
 [functions.github-installation-details]
 verify_jwt = true
+
+[functions.fetch-site-assets]
+verify_jwt = true

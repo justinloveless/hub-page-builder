@@ -8,6 +8,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Skeleton } from "@/components/ui/skeleton";
 import { toast } from "sonner";
 import { ArrowLeft, ExternalLink, GitBranch, Users, FileText, Activity } from "lucide-react";
+import AssetManager from "@/components/AssetManager";
 import type { Tables } from "@/integrations/supabase/types";
 
 type Site = Tables<"sites">;
@@ -228,10 +229,12 @@ const Manage = () => {
           </TabsList>
 
           {/* Assets Tab */}
-          <TabsContent value="assets">
+          <TabsContent value="assets" className="space-y-6">
+            <AssetManager siteId={siteId!} />
+            
             <Card>
               <CardHeader>
-                <CardTitle>Asset Versions</CardTitle>
+                <CardTitle>Asset Version History</CardTitle>
                 <CardDescription>
                   Recent asset uploads and versions for this site
                 </CardDescription>
@@ -240,7 +243,7 @@ const Manage = () => {
                 {assets.length === 0 ? (
                   <div className="text-center py-8 text-muted-foreground">
                     <FileText className="h-12 w-12 mx-auto mb-3 opacity-50" />
-                    <p>No assets found</p>
+                    <p>No asset versions found</p>
                   </div>
                 ) : (
                   <div className="space-y-3">
