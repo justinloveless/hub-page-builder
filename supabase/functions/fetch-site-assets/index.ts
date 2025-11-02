@@ -1,73 +1,34 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.78.0'
 import { create as createJWT } from 'https://deno.land/x/djwt@v3.0.2/mod.ts'
+import { createPrivateKey } from 'node:crypto'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
-// Convert PEM private key to CryptoKey for JWT signing
+// Convert PEM private key to CryptoKey for JWT signing using Node crypto
 async function importPrivateKey(pem: string): Promise<CryptoKey> {
-  // Check if it's PKCS#8 or PKCS#1 format
-  const isPkcs8 = pem.includes('-----BEGIN PRIVATE KEY-----')
-  const isPkcs1 = pem.includes('-----BEGIN RSA PRIVATE KEY-----')
-
-  if (!isPkcs8 && !isPkcs1) {
-    throw new Error('Invalid private key format. Expected PKCS#1 or PKCS#8 PEM format.')
-  }
+  // Use Node.js crypto to handle both PKCS#1 and PKCS#8 formats
+  const keyObject = createPrivateKey(pem)
+  
+  // Export as PKCS#8 PEM
+  const pkcs8Pem = keyObject.export({
+    type: 'pkcs8',
+    format: 'pem',
+  }) as string
 
   // Remove PEM headers/footers and whitespace
-  let pemContents = pem
+  const pemContents = pkcs8Pem
     .replace('-----BEGIN PRIVATE KEY-----', '')
     .replace('-----END PRIVATE KEY-----', '')
-    .replace('-----BEGIN RSA PRIVATE KEY-----', '')
-    .replace('-----END RSA PRIVATE KEY-----', '')
     .replace(/\s/g, '')
 
   const binaryDer = Uint8Array.from(atob(pemContents), (c) => c.charCodeAt(0))
 
-  // PKCS#8 can be imported directly
-  if (isPkcs8) {
-    return await crypto.subtle.importKey(
-      'pkcs8',
-      binaryDer,
-      { name: 'RSASSA-PKCS1-v1_5', hash: 'SHA-256' },
-      false,
-      ['sign']
-    )
-  }
-
-  // For PKCS#1, we need to wrap it in PKCS#8 structure
-  // PKCS#8 structure for RSA private key
-  const pkcs8Header = new Uint8Array([
-    0x30, 0x82, 0x04, 0xbd, // SEQUENCE, length will be adjusted
-    0x02, 0x01, 0x00,       // version: 0
-    0x30, 0x0d,             // SEQUENCE
-    0x06, 0x09,             // OID length
-    0x2a, 0x86, 0x48, 0x86, 0xf7, 0x0d, 0x01, 0x01, 0x01, // RSA OID
-    0x05, 0x00,             // NULL
-    0x04, 0x82, 0x04, 0xa7  // OCTET STRING, length will be adjusted
-  ])
-
-  // Calculate total length
-  const totalLength = pkcs8Header.length + binaryDer.length
-  const pkcs8Der = new Uint8Array(totalLength)
-  
-  // Copy header
-  pkcs8Der.set(pkcs8Header, 0)
-  // Copy PKCS#1 key
-  pkcs8Der.set(binaryDer, pkcs8Header.length)
-
-  // Update lengths in the header
-  const keyLength = binaryDer.length
-  pkcs8Der[2] = ((keyLength + 24) >> 8) & 0xff
-  pkcs8Der[3] = (keyLength + 24) & 0xff
-  pkcs8Der[16] = ((keyLength) >> 8) & 0xff
-  pkcs8Der[17] = keyLength & 0xff
-
   return await crypto.subtle.importKey(
     'pkcs8',
-    pkcs8Der,
+    binaryDer,
     { name: 'RSASSA-PKCS1-v1_5', hash: 'SHA-256' },
     false,
     ['sign']
