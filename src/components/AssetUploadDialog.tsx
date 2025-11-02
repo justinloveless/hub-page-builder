@@ -126,10 +126,17 @@ const AssetUploadDialog = ({ open, onOpenChange, asset, siteId, onSuccess }: Ass
       reader.onloadend = async () => {
         const base64 = (reader.result as string).split(',')[1];
 
+        // For directory assets, append the filename to the path
+        let fullPath = asset.path;
+        if (asset.type === 'directory' || asset.path.endsWith('/')) {
+          const basePath = asset.path.endsWith('/') ? asset.path : asset.path + '/';
+          fullPath = basePath + file.name;
+        }
+
         const { data, error } = await supabase.functions.invoke('upload-site-asset', {
           body: {
             site_id: siteId,
-            file_path: asset.path,
+            file_path: fullPath,
             content: base64,
             message: commitMessage,
           },
