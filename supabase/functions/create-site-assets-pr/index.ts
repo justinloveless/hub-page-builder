@@ -162,6 +162,24 @@ Deno.serve(async (req) => {
 
     const [owner, repo] = site.repo_full_name.split('/')
 
+    // Check if site-assets.json already exists
+    try {
+      await octokit.request('GET /repos/{owner}/{repo}/contents/{path}', {
+        owner,
+        repo,
+        path: 'site-assets.json',
+        ref: site.default_branch,
+      })
+      
+      // If we reach here, file exists
+      throw new Error('site-assets.json already exists in the repository. Please check if you already have a configuration file.')
+    } catch (error: any) {
+      // 404 means file doesn't exist, which is what we want
+      if (error.status !== 404) {
+        throw error // Re-throw if it's not a 404
+      }
+    }
+
     // Get the latest commit SHA from the default branch
     const { data: refData } = await octokit.request('GET /repos/{owner}/{repo}/git/ref/{ref}', {
       owner,
