@@ -3,10 +3,10 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { Folder, FileText, Image, AlertCircle, RefreshCw } from "lucide-react";
+import { Folder, FileText, Image, AlertCircle, RefreshCw, GitPullRequest, ExternalLink } from "lucide-react";
 
 interface AssetConfig {
   path: string;
@@ -28,6 +28,7 @@ interface AssetManagerProps {
 
 const AssetManager = ({ siteId }: AssetManagerProps) => {
   const [loading, setLoading] = useState(false);
+  const [creatingPr, setCreatingPr] = useState(false);
   const [config, setConfig] = useState<SiteAssetsConfig | null>(null);
   const [found, setFound] = useState<boolean | null>(null);
 
@@ -58,6 +59,35 @@ const AssetManager = ({ siteId }: AssetManagerProps) => {
       toast.error(error.message || "Failed to fetch site assets");
     } finally {
       setLoading(false);
+    }
+  };
+
+  const createTemplatePr = async () => {
+    setCreatingPr(true);
+    try {
+      const { data: sessionData } = await supabase.auth.getSession();
+      if (!sessionData.session) {
+        toast.error("Not authenticated");
+        return;
+      }
+
+      const { data, error } = await supabase.functions.invoke('create-site-assets-pr', {
+        body: { site_id: siteId },
+      });
+
+      if (error) throw error;
+
+      toast.success("Pull request created successfully!");
+      
+      // Open the PR in a new tab
+      if (data.pr_url) {
+        window.open(data.pr_url, '_blank');
+      }
+    } catch (error: any) {
+      console.error("Failed to create PR:", error);
+      toast.error(error.message || "Failed to create pull request");
+    } finally {
+      setCreatingPr(false);
     }
   };
 
@@ -116,14 +146,37 @@ const AssetManager = ({ siteId }: AssetManagerProps) => {
         ) : found === false ? (
           <Alert>
             <AlertCircle className="h-4 w-4" />
+            <AlertTitle>No Asset Configuration Found</AlertTitle>
             <AlertDescription>
-              No <code className="bg-muted px-1 py-0.5 rounded">site-assets.json</code> file found in the repository root.
-              Create this file to define manageable assets for your site.
+              <p className="mb-3">
+                No <code className="bg-muted px-1 py-0.5 rounded">site-assets.json</code> file found in the repository root.
+                Create this file to define manageable assets for your site.
+              </p>
+              
+              <Button 
+                onClick={createTemplatePr} 
+                disabled={creatingPr}
+                className="mb-3"
+              >
+                {creatingPr ? (
+                  <>
+                    <RefreshCw className="mr-2 h-4 w-4 animate-spin" />
+                    Creating PR...
+                  </>
+                ) : (
+                  <>
+                    <GitPullRequest className="mr-2 h-4 w-4" />
+                    Create Template PR
+                  </>
+                )}
+              </Button>
+
               <div className="mt-3 p-3 bg-muted/50 rounded-md">
                 <p className="text-xs font-medium mb-2">Example site-assets.json:</p>
                 <pre className="text-xs overflow-x-auto">
 {`{
   "version": "1.0",
+  "description": "Configuration file for site assets",
   "assets": [
     {
       "path": "images/hero.jpg",
@@ -132,6 +185,14 @@ const AssetManager = ({ siteId }: AssetManagerProps) => {
       "description": "Main homepage hero image",
       "maxSize": 2097152,
       "allowedExtensions": [".jpg", ".png", ".webp"]
+    },
+    {
+      "path": "content/about.md",
+      "type": "text",
+      "label": "About Page",
+      "description": "About page content",
+      "maxSize": 51200,
+      "allowedExtensions": [".md"]
     }
   ]
 }`}
