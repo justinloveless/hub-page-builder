@@ -297,6 +297,7 @@ export type Database = {
         Args: { object_name: string }
         Returns: boolean
       }
+      is_site_owner: { Args: { target_site_id: string }; Returns: boolean }
     }
     Enums: {
       [_ in never]: never
