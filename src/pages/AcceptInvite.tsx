@@ -8,12 +8,14 @@ import { Loader2, UserPlus, AlertCircle } from "lucide-react";
 import type { Tables } from "@/integrations/supabase/types";
 
 type Site = Tables<"sites">;
+type Invitation = Tables<"invitations">;
 
 const AcceptInvite = () => {
   const navigate = useNavigate();
   const { token } = useParams<{ token: string }>();
   const [loading, setLoading] = useState(true);
   const [accepting, setAccepting] = useState(false);
+  const [invitation, setInvitation] = useState<Invitation | null>(null);
   const [site, setSite] = useState<Site | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [user, setUser] = useState<any>(null);
@@ -37,7 +39,7 @@ const AcceptInvite = () => {
       // Load invitation details to get site info
       const { data: invitation, error: inviteError } = await supabase
         .from("invitations")
-        .select("*, sites(*)")
+        .select("*")
         .eq("token", token)
         .eq("status", "pending")
         .maybeSingle();
@@ -57,7 +59,7 @@ const AcceptInvite = () => {
         return;
       }
 
-      setSite(invitation.sites as Site);
+      setInvitation(invitation);
       setLoading(false);
     } catch (error: any) {
       console.error("Error loading invitation:", error);
@@ -100,7 +102,7 @@ const AcceptInvite = () => {
     );
   }
 
-  if (error || !site) {
+  if (error) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center p-4">
         <Card className="max-w-md w-full">
@@ -130,15 +132,17 @@ const AcceptInvite = () => {
             <CardTitle>You've Been Invited!</CardTitle>
           </div>
           <CardDescription>
-            You've been invited to join <strong>{site.name}</strong> as a site manager
+            You've been invited to join this site as a site manager.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="p-4 bg-muted rounded-lg space-y-2">
-            <p className="text-sm font-medium">Site Details:</p>
-            <p className="text-sm text-muted-foreground">Name: {site.name}</p>
-            <p className="text-sm text-muted-foreground">Repository: {site.repo_full_name}</p>
-          </div>
+          {site && (
+            <div className="p-4 bg-muted rounded-lg space-y-2">
+              <p className="text-sm font-medium">Site Details:</p>
+              <p className="text-sm text-muted-foreground">Name: {site.name}</p>
+              <p className="text-sm text-muted-foreground">Repository: {site.repo_full_name}</p>
+            </div>
+          )}
 
           {user ? (
             <div className="space-y-2">
