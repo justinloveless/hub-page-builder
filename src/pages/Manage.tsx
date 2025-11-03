@@ -410,9 +410,22 @@ const Manage = () => {
                         <div className="flex-1 min-w-0">
                           <p className="font-medium text-sm">{activity.action}</p>
                           {activity.metadata && typeof activity.metadata === 'object' && (
-                            <pre className="text-xs text-muted-foreground mt-1 overflow-x-auto">
-                              {JSON.stringify(activity.metadata, null, 2)}
-                            </pre>
+                            <div className="space-y-1 mt-1">
+                              {(activity.metadata as any).commit_sha && site && (
+                                <a
+                                  href={`https://github.com/${site.repo_full_name}/commit/${(activity.metadata as any).commit_sha}`}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="inline-flex items-center gap-1 text-xs text-primary hover:underline"
+                                >
+                                  <ExternalLink className="h-3 w-3" />
+                                  View commit {(activity.metadata as any).commit_sha.substring(0, 7)}
+                                </a>
+                              )}
+                              <pre className="text-xs text-muted-foreground overflow-x-auto">
+                                {JSON.stringify(activity.metadata, null, 2)}
+                              </pre>
+                            </div>
                           )}
                           <p className="text-xs text-muted-foreground mt-2">
                             {new Date(activity.created_at).toLocaleString()}
