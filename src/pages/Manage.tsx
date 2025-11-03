@@ -12,6 +12,7 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import AssetManager from "@/components/AssetManager";
 import InviteMemberDialog from "@/components/InviteMemberDialog";
+import ActivityCard from "@/components/ActivityCard";
 import type { Tables } from "@/integrations/supabase/types";
 
 type Site = Tables<"sites">;
@@ -35,6 +36,9 @@ const Manage = () => {
   const [invitations, setInvitations] = useState<Invitation[]>([]);
   const [showLeaveDialog, setShowLeaveDialog] = useState(false);
   const [leaveAction, setLeaveAction] = useState<'leave' | 'delete' | null>(null);
+  const [activitiesPage, setActivitiesPage] = useState(1);
+  const [hasMoreActivities, setHasMoreActivities] = useState(true);
+  const ACTIVITIES_PER_PAGE = 10;
 
   // Get current user's role
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
@@ -101,22 +105,39 @@ const Manage = () => {
     }
   };
 
-  const loadActivities = async () => {
+  const loadActivities = async (page: number = 1, append: boolean = false) => {
     if (!siteId) return;
     
     try {
+      const from = (page - 1) * ACTIVITIES_PER_PAGE;
+      const to = from + ACTIVITIES_PER_PAGE - 1;
+
       const { data, error } = await supabase
         .from("activity_log")
         .select("*")
         .eq("site_id", siteId)
         .order("created_at", { ascending: false })
-        .limit(20);
+        .range(from, to);
 
       if (error) throw error;
-      setActivities(data || []);
+      
+      const newActivities = data || [];
+      setHasMoreActivities(newActivities.length === ACTIVITIES_PER_PAGE);
+      
+      if (append) {
+        setActivities(prev => [...prev, ...newActivities]);
+      } else {
+        setActivities(newActivities);
+      }
     } catch (error: any) {
       console.error("Failed to load activities:", error);
     }
+  };
+
+  const loadMoreActivities = async () => {
+    const nextPage = activitiesPage + 1;
+    setActivitiesPage(nextPage);
+    await loadActivities(nextPage, true);
   };
 
   const loadMembers = async () => {
@@ -487,50 +508,22 @@ const Manage = () => {
                 ) : (
                   <div className="space-y-3">
                     {activities.map((activity) => (
-                      <div
+                      <ActivityCard
                         key={activity.id}
-                        className="flex flex-col sm:flex-row sm:items-start gap-3 sm:gap-4 p-4 border border-border rounded-lg"
-                      >
-                        <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
-                          <Activity className="h-4 w-4 text-primary" />
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <p className="font-medium text-sm break-words">{activity.action}</p>
-                          {activity.metadata && typeof activity.metadata === 'object' && (
-                            <div className="space-y-1 mt-1">
-                              {(activity.metadata as any).pr_url && (
-                                <a
-                                  href={(activity.metadata as any).pr_url}
-                                  target="_blank"
-                                  rel="noopener noreferrer"
-                                  className="inline-flex items-center gap-1 text-xs text-primary hover:underline break-all"
-                                >
-                                  <ExternalLink className="h-3 w-3 flex-shrink-0" />
-                                  View PR #{(activity.metadata as any).pr_number}
-                                </a>
-                              )}
-                              {(activity.metadata as any).commit_sha && site && (
-                                <a
-                                  href={`https://github.com/${site.repo_full_name}/commit/${(activity.metadata as any).commit_sha}`}
-                                  target="_blank"
-                                  rel="noopener noreferrer"
-                                  className="inline-flex items-center gap-1 text-xs text-primary hover:underline break-all"
-                                >
-                                  <ExternalLink className="h-3 w-3 flex-shrink-0" />
-                                  View commit {(activity.metadata as any).commit_sha.substring(0, 7)}
-                                </a>
-                              )}
-                              <pre className="text-xs text-muted-foreground overflow-x-auto">
-                                {JSON.stringify(activity.metadata, null, 2)}
-                              </pre>
-                            </div>
-                          )}
-                          <p className="text-xs text-muted-foreground mt-2">
-                            {new Date(activity.created_at).toLocaleString()}
-                          </p>
-                        </div>
-                      </div>
+                        activity={activity}
+                        repoFullName={site.repo_full_name}
+                      />
                     ))}
+                    {hasMoreActivities && (
+                      <div className="flex justify-center pt-4">
+                        <Button
+                          variant="outline"
+                          onClick={loadMoreActivities}
+                        >
+                          Load More
+                        </Button>
+                      </div>
+                    )}
                   </div>
                 )}
               </CardContent>
