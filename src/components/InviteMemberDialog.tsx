@@ -17,7 +17,9 @@ const InviteMemberDialog = ({ siteId, onInviteCreated }: InviteMemberDialogProps
   const [email, setEmail] = useState("");
   const [loading, setLoading] = useState(false);
   const [inviteUrl, setInviteUrl] = useState("");
+  const [inviteCode, setInviteCode] = useState("");
   const [copied, setCopied] = useState(false);
+  const [codeCopied, setCodeCopied] = useState(false);
 
   const handleCreateInvite = async () => {
     setLoading(true);
@@ -29,6 +31,7 @@ const InviteMemberDialog = ({ siteId, onInviteCreated }: InviteMemberDialogProps
       if (error) throw error;
 
       setInviteUrl(data.invite_url);
+      setInviteCode(data.invite_code);
       toast.success("Invitation created successfully!");
       if (onInviteCreated) onInviteCreated();
     } catch (error: any) {
@@ -50,11 +53,24 @@ const InviteMemberDialog = ({ siteId, onInviteCreated }: InviteMemberDialogProps
     }
   };
 
+  const handleCopyCode = async () => {
+    try {
+      await navigator.clipboard.writeText(inviteCode);
+      setCodeCopied(true);
+      toast.success("Invite code copied to clipboard!");
+      setTimeout(() => setCodeCopied(false), 2000);
+    } catch (error) {
+      toast.error("Failed to copy code");
+    }
+  };
+
   const handleClose = () => {
     setOpen(false);
     setEmail("");
     setInviteUrl("");
+    setInviteCode("");
     setCopied(false);
+    setCodeCopied(false);
   };
 
   return (
@@ -124,7 +140,32 @@ const InviteMemberDialog = ({ siteId, onInviteCreated }: InviteMemberDialogProps
                   </Button>
                 </div>
                 <p className="text-xs text-muted-foreground">
-                  Share this link with the person you want to invite. They'll be added as a manager when they accept.
+                  Share this link with the person you want to invite.
+                </p>
+              </div>
+              
+              <div className="space-y-2">
+                <Label>Invite Code</Label>
+                <div className="flex gap-2">
+                  <Input
+                    value={inviteCode}
+                    readOnly
+                    className="font-mono text-lg font-bold tracking-widest text-center"
+                  />
+                  <Button
+                    size="icon"
+                    variant="outline"
+                    onClick={handleCopyCode}
+                  >
+                    {codeCopied ? (
+                      <Check className="h-4 w-4 text-green-600" />
+                    ) : (
+                      <Copy className="h-4 w-4" />
+                    )}
+                  </Button>
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  Share this code if the link doesn't work. They can enter it on the dashboard.
                 </p>
               </div>
             </div>

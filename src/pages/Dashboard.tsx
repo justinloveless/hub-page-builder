@@ -7,6 +7,7 @@ import { toast } from "sonner";
 import { Loader2, Plus, LogOut, Settings, User as UserIcon } from "lucide-react";
 import SiteCard from "@/components/SiteCard";
 import AddSiteDialog from "@/components/AddSiteDialog";
+import JoinWithCodeDialog from "@/components/JoinWithCodeDialog";
 import type { Tables } from "@/integrations/supabase/types";
 
 type Site = Tables<"sites">;
@@ -133,7 +134,8 @@ const Dashboard = () => {
               Manage all your static sites in one place
             </p>
           </div>
-          <div className="sm:flex-shrink-0">
+          <div className="flex gap-2 sm:flex-shrink-0">
+            <JoinWithCodeDialog />
             <AddSiteDialog onSiteAdded={loadSites} />
           </div>
         </div>
@@ -146,9 +148,12 @@ const Dashboard = () => {
             <h3 className="text-2xl font-semibold mb-2">No sites yet</h3>
             <p className="text-muted-foreground mb-6 max-w-md mx-auto">
               Get started by adding your first static site. Connect your GitHub repository
-              and start managing content with ease.
+              and start managing content with ease. Or join an existing site with an invite code.
             </p>
-            <AddSiteDialog onSiteAdded={loadSites} />
+            <div className="flex gap-2 justify-center">
+              <JoinWithCodeDialog />
+              <AddSiteDialog onSiteAdded={loadSites} />
+            </div>
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">

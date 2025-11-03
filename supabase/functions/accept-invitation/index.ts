@@ -7,7 +7,8 @@ const corsHeaders = {
 };
 
 interface AcceptInvitationRequest {
-  token: string;
+  token?: string;
+  invite_code?: string;
 }
 
 serve(async (req: Request) => {
@@ -34,19 +35,25 @@ serve(async (req: Request) => {
       throw new Error("Unauthorized");
     }
 
-    const { token }: AcceptInvitationRequest = await req.json();
+    const { token, invite_code }: AcceptInvitationRequest = await req.json();
 
-    if (!token) {
-      throw new Error("token is required");
+    if (!token && !invite_code) {
+      throw new Error("token or invite_code is required");
     }
 
-    // Find invitation
-    const { data: invitation, error: inviteError } = await supabase
+    // Find invitation by token or code
+    let query = supabase
       .from("invitations")
       .select("*")
-      .eq("token", token)
-      .eq("status", "pending")
-      .single();
+      .eq("status", "pending");
+    
+    if (token) {
+      query = query.eq("token", token);
+    } else if (invite_code) {
+      query = query.eq("invite_code", invite_code);
+    }
+    
+    const { data: invitation, error: inviteError } = await query.single();
 
     if (inviteError || !invitation) {
       throw new Error("Invalid or expired invitation");

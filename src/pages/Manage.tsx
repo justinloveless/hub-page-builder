@@ -652,6 +652,11 @@ const Manage = () => {
                           <p className="text-xs text-muted-foreground">
                             Expires {new Date(invitation.expires_at).toLocaleDateString()}
                           </p>
+                          {invitation.invite_code && (
+                            <p className="text-xs font-mono font-bold text-primary mt-1">
+                              Code: {invitation.invite_code}
+                            </p>
+                          )}
                         </div>
                         <div className="flex items-center gap-2 flex-wrap">
                           <Badge variant="secondary" className="flex-shrink-0">{invitation.role}</Badge>

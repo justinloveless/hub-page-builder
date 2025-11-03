@@ -56,6 +56,11 @@ serve(async (req: Request) => {
     // Generate unique token
     const token = crypto.randomUUID();
     
+    // Generate short invite code (6 characters, alphanumeric)
+    const inviteCode = Array.from({ length: 6 }, () => 
+      'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789'[Math.floor(Math.random() * 36)]
+    ).join('');
+    
     // Set expiration to 7 days from now
     const expiresAt = new Date();
     expiresAt.setDate(expiresAt.getDate() + 7);
@@ -68,6 +73,7 @@ serve(async (req: Request) => {
         inviter_user_id: user.id,
         email,
         token,
+        invite_code: inviteCode,
         role: "manager",
         status: "pending",
         expires_at: expiresAt.toISOString(),
@@ -90,6 +96,7 @@ serve(async (req: Request) => {
         success: true,
         invitation,
         invite_url: inviteUrl,
+        invite_code: inviteCode,
       }),
       {
         status: 200,

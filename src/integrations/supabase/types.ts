@@ -204,6 +204,7 @@ export type Database = {
           email: string | null
           expires_at: string
           id: string
+          invite_code: string | null
           inviter_user_id: string
           role: string
           site_id: string
@@ -216,6 +217,7 @@ export type Database = {
           email?: string | null
           expires_at: string
           id?: string
+          invite_code?: string | null
           inviter_user_id: string
           role?: string
           site_id: string
@@ -228,6 +230,7 @@ export type Database = {
           email?: string | null
           expires_at?: string
           id?: string
+          invite_code?: string | null
           inviter_user_id?: string
           role?: string
           site_id?: string
