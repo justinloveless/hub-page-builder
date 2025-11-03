@@ -11,27 +11,43 @@ const GithubCallback = () => {
   useEffect(() => {
     const handleCallback = async () => {
       try {
+        console.log('GitHub callback started');
+        console.log('Search params:', Object.fromEntries(searchParams.entries()));
+        
         const installationId = searchParams.get('installation_id');
         const setupAction = searchParams.get('setup_action');
         const state = searchParams.get('state');
 
+        console.log('Parsed params:', { installationId, setupAction, state });
+
         // Verify state
         const savedState = sessionStorage.getItem('github_oauth_state');
+        console.log('State validation:', { received: state, saved: savedState, matches: state === savedState });
+        
         if (state !== savedState) {
-          throw new Error('Invalid state parameter');
+          throw new Error('Invalid state parameter - please try connecting again');
         }
         sessionStorage.removeItem('github_oauth_state');
 
         if (!installationId) {
-          throw new Error('No installation ID received');
+          throw new Error('No installation ID received from GitHub');
         }
 
+        console.log('Calling github-installation-details edge function...');
+        
         // Call edge function to get installation details
         const { data, error } = await supabase.functions.invoke('github-installation-details', {
           body: { installation_id: installationId },
         });
 
-        if (error) throw error;
+        console.log('Edge function response:', { data, error });
+
+        if (error) {
+          console.error('Edge function error:', error);
+          throw error;
+        }
+
+        console.log('Sending success message to opener...');
 
         // Send message to opener window
         if (window.opener) {
@@ -43,9 +59,12 @@ const GithubCallback = () => {
               setup_action: setupAction,
             }
           }, window.location.origin);
-          window.close();
+          
+          console.log('Message sent, closing popup...');
+          setTimeout(() => window.close(), 500);
         } else {
           // If no opener, redirect to dashboard
+          console.log('No opener window found, redirecting to dashboard');
           toast.success('Connected to GitHub successfully!');
           navigate('/dashboard');
         }
@@ -57,7 +76,7 @@ const GithubCallback = () => {
             type: 'GITHUB_OAUTH_ERROR',
             error: error.message || 'Failed to connect to GitHub'
           }, window.location.origin);
-          window.close();
+          setTimeout(() => window.close(), 500);
         } else {
           toast.error(error.message || 'Failed to connect to GitHub');
           navigate('/dashboard');

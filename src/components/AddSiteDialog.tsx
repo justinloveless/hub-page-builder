@@ -23,6 +23,7 @@ const AddSiteDialog = ({ onSiteAdded }: AddSiteDialogProps) => {
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const [connectingGithub, setConnectingGithub] = useState(false);
+  const [popupWindow, setPopupWindow] = useState<Window | null>(null);
   const [formData, setFormData] = useState({
     name: "",
     repoFullName: "",
@@ -33,8 +34,16 @@ const AddSiteDialog = ({ onSiteAdded }: AddSiteDialogProps) => {
   useEffect(() => {
     // Listen for GitHub OAuth callback
     const handleMessage = (event: MessageEvent) => {
+      // Validate origin for security
+      if (event.origin !== window.location.origin) {
+        console.warn('Received message from unexpected origin:', event.origin);
+        return;
+      }
+
       if (event.data?.type === 'GITHUB_OAUTH_SUCCESS') {
         const { installation_id, repositories } = event.data.data;
+        
+        console.log('GitHub connection successful:', { installation_id, repoCount: repositories?.length });
         
         // If we have repositories, use the first one to pre-fill
         if (repositories && repositories.length > 0) {
@@ -46,23 +55,59 @@ const AddSiteDialog = ({ onSiteAdded }: AddSiteDialogProps) => {
             githubInstallationId: installation_id.toString(),
           });
         } else {
-          setFormData({
-            ...formData,
+          setFormData(prev => ({
+            ...prev,
             githubInstallationId: installation_id.toString(),
-          });
+          }));
         }
         
         toast.success("Connected to GitHub successfully!");
         setConnectingGithub(false);
+        setPopupWindow(null);
       } else if (event.data?.type === 'GITHUB_OAUTH_ERROR') {
+        console.error('GitHub OAuth error:', event.data.error);
         toast.error(event.data.error || "Failed to connect to GitHub");
         setConnectingGithub(false);
+        setPopupWindow(null);
       }
     };
 
     window.addEventListener('message', handleMessage);
     return () => window.removeEventListener('message', handleMessage);
-  }, [formData]);
+  }, []);
+
+  // Monitor popup window and handle timeout
+  useEffect(() => {
+    if (!popupWindow || !connectingGithub) return;
+
+    const checkInterval = setInterval(() => {
+      if (popupWindow.closed) {
+        clearInterval(checkInterval);
+        if (connectingGithub) {
+          console.log('Popup was closed');
+          toast.info("GitHub connection window was closed. Please try again.");
+          setConnectingGithub(false);
+          setPopupWindow(null);
+        }
+      }
+    }, 500);
+
+    // Timeout after 3 minutes
+    const timeout = setTimeout(() => {
+      if (connectingGithub && popupWindow && !popupWindow.closed) {
+        popupWindow.close();
+        toast.error("Connection timed out. Please try again.");
+        setConnectingGithub(false);
+        setPopupWindow(null);
+      }
+      clearInterval(checkInterval);
+    }, 180000);
+
+    return () => {
+      clearInterval(checkInterval);
+      clearTimeout(timeout);
+    };
+  }, [popupWindow, connectingGithub]);
 
   const handleConnectGithub = async () => {
     setConnectingGithub(true);
@@ -82,6 +127,8 @@ const AddSiteDialog = ({ onSiteAdded }: AddSiteDialogProps) => {
         throw new Error("GitHub App not configured. Please contact your administrator.");
       }
 
+      console.log('Opening GitHub connection with slug:', config.slug);
+
       // Build OAuth URL
       const redirectUri = `${window.location.origin}/github/callback`;
       const state = crypto.randomUUID();
@@ -95,15 +142,27 @@ const AddSiteDialog = ({ onSiteAdded }: AddSiteDialogProps) => {
       const left = window.screenX + (window.outerWidth - width) / 2;
       const top = window.screenY + (window.outerHeight - height) / 2;
       
-      window.open(
+      const popup = window.open(
         oauthUrl,
         'GitHub OAuth',
-        `width=${width},height=${height},left=${left},top=${top}`
+        `width=${width},height=${height},left=${left},top=${top},noopener,noreferrer`
       );
+
+      if (!popup) {
+        throw new Error("Popup was blocked. Please allow popups for this site and try again.");
+      }
+
+      setPopupWindow(popup);
+      
+      // Focus the popup
+      popup.focus();
+      
+      console.log('GitHub OAuth popup opened');
     } catch (error: any) {
       console.error("Error connecting to GitHub:", error);
       toast.error(error.message || "Failed to connect to GitHub");
       setConnectingGithub(false);
+      setPopupWindow(null);
     }
   };
 
@@ -183,7 +242,7 @@ const AddSiteDialog = ({ onSiteAdded }: AddSiteDialogProps) => {
                 {connectingGithub ? (
                   <>
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Connecting...
+                    Waiting for GitHub...
                   </>
                 ) : (
                   <>
@@ -192,6 +251,11 @@ const AddSiteDialog = ({ onSiteAdded }: AddSiteDialogProps) => {
                   </>
                 )}
               </Button>
+              {connectingGithub && (
+                <p className="text-xs text-center text-muted-foreground mt-2">
+                  Complete the GitHub installation in the popup window
+                </p>
+              )}
             </div>
 
             <div className="relative">
