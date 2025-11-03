@@ -17,6 +17,7 @@ interface AssetConfig {
   description?: string;
   maxSize?: number;
   allowedExtensions?: string[];
+  schema?: Record<string, any>;
 }
 
 interface AssetFile {
@@ -49,13 +50,15 @@ const AssetUploadDialog = ({ open, onOpenChange, asset, siteId, onSuccess }: Ass
   const [loadingFiles, setLoadingFiles] = useState(false);
   const [deleting, setDeleting] = useState<string | null>(null);
   const [showConfirmation, setShowConfirmation] = useState(false);
+  const [jsonFormData, setJsonFormData] = useState<Record<string, any>>({});
 
   const isTextAsset = asset.type === "text" || asset.type === "markdown";
+  const isJsonAsset = asset.type === "json" && asset.schema;
 
   useEffect(() => {
     if (open) {
       loadExistingFiles();
-      if (isTextAsset && activeTab === 'edit') {
+      if ((isTextAsset || isJsonAsset) && activeTab === 'edit') {
         loadExistingContent();
       }
     }
@@ -92,9 +95,21 @@ const AssetUploadDialog = ({ open, onOpenChange, asset, siteId, onSuccess }: Ass
       if (data.found) {
         setTextContent(data.content);
         setCurrentSha(data.sha);
+        
+        // Parse JSON for schema-based editing
+        if (isJsonAsset) {
+          try {
+            const parsed = JSON.parse(data.content);
+            setJsonFormData(parsed);
+          } catch (e) {
+            console.error("Failed to parse JSON:", e);
+            setJsonFormData({});
+          }
+        }
       } else {
         setTextContent("");
         setCurrentSha(null);
+        setJsonFormData({});
       }
     } catch (error: any) {
       console.error("Failed to load content:", error);
@@ -222,7 +237,19 @@ const AssetUploadDialog = ({ open, onOpenChange, asset, siteId, onSuccess }: Ass
   };
 
   const uploadTextContent = async () => {
-    if (!textContent.trim()) {
+    let contentToUpload = textContent;
+    
+    // For JSON assets with schema, use form data
+    if (isJsonAsset) {
+      try {
+        contentToUpload = JSON.stringify(jsonFormData, null, 2);
+      } catch (e) {
+        toast.error("Invalid JSON data");
+        return;
+      }
+    }
+    
+    if (!contentToUpload.trim()) {
       toast.error("Content cannot be empty");
       return;
     }
@@ -233,7 +260,7 @@ const AssetUploadDialog = ({ open, onOpenChange, asset, siteId, onSuccess }: Ass
         body: {
           site_id: siteId,
           file_path: asset.path,
-          content: btoa(textContent),
+          content: btoa(contentToUpload),
           message: commitMessage,
           sha: currentSha,
         },
@@ -243,6 +270,7 @@ const AssetUploadDialog = ({ open, onOpenChange, asset, siteId, onSuccess }: Ass
 
       toast.success("Content saved successfully!");
       setTextContent("");
+      setJsonFormData({});
       setCommitMessage(`Update ${asset.path}`);
       setCurrentSha(null);
       await loadExistingFiles();
@@ -252,6 +280,134 @@ const AssetUploadDialog = ({ open, onOpenChange, asset, siteId, onSuccess }: Ass
       toast.error(error.message || "Failed to save content");
     } finally {
       setUploading(false);
+    }
+  };
+
+  const updateJsonField = (key: string, value: any) => {
+    setJsonFormData(prev => ({ ...prev, [key]: value }));
+  };
+
+  const renderSchemaField = (key: string, fieldSchema: any) => {
+    const value = jsonFormData[key] ?? fieldSchema.default ?? '';
+    
+    switch (fieldSchema.type) {
+      case 'string':
+        if (fieldSchema.enum) {
+          return (
+            <div key={key} className="space-y-2">
+              <Label htmlFor={key}>
+                {fieldSchema.title || key}
+                {fieldSchema.description && (
+                  <span className="text-xs text-muted-foreground ml-2">
+                    {fieldSchema.description}
+                  </span>
+                )}
+              </Label>
+              <select
+                id={key}
+                value={value}
+                onChange={(e) => updateJsonField(key, e.target.value)}
+                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+              >
+                <option value="">Select...</option>
+                {fieldSchema.enum.map((option: string) => (
+                  <option key={option} value={option}>{option}</option>
+                ))}
+              </select>
+            </div>
+          );
+        }
+        return (
+          <div key={key} className="space-y-2">
+            <Label htmlFor={key}>
+              {fieldSchema.title || key}
+              {fieldSchema.description && (
+                <span className="text-xs text-muted-foreground ml-2">
+                  {fieldSchema.description}
+                </span>
+              )}
+            </Label>
+            {fieldSchema.multiline ? (
+              <Textarea
+                id={key}
+                value={value}
+                onChange={(e) => updateJsonField(key, e.target.value)}
+                placeholder={fieldSchema.placeholder}
+                className="min-h-[100px]"
+              />
+            ) : (
+              <Input
+                id={key}
+                value={value}
+                onChange={(e) => updateJsonField(key, e.target.value)}
+                placeholder={fieldSchema.placeholder}
+              />
+            )}
+          </div>
+        );
+      
+      case 'number':
+      case 'integer':
+        return (
+          <div key={key} className="space-y-2">
+            <Label htmlFor={key}>
+              {fieldSchema.title || key}
+              {fieldSchema.description && (
+                <span className="text-xs text-muted-foreground ml-2">
+                  {fieldSchema.description}
+                </span>
+              )}
+            </Label>
+            <Input
+              id={key}
+              type="number"
+              value={value}
+              onChange={(e) => updateJsonField(key, fieldSchema.type === 'integer' ? parseInt(e.target.value) || 0 : parseFloat(e.target.value) || 0)}
+              placeholder={fieldSchema.placeholder}
+              min={fieldSchema.minimum}
+              max={fieldSchema.maximum}
+            />
+          </div>
+        );
+      
+      case 'boolean':
+        return (
+          <div key={key} className="flex items-center space-x-2 py-2">
+            <input
+              id={key}
+              type="checkbox"
+              checked={!!value}
+              onChange={(e) => updateJsonField(key, e.target.checked)}
+              className="h-4 w-4 rounded border-input"
+            />
+            <Label htmlFor={key} className="cursor-pointer">
+              {fieldSchema.title || key}
+              {fieldSchema.description && (
+                <span className="text-xs text-muted-foreground ml-2">
+                  {fieldSchema.description}
+                </span>
+              )}
+            </Label>
+          </div>
+        );
+      
+      default:
+        return (
+          <div key={key} className="space-y-2">
+            <Label htmlFor={key}>{fieldSchema.title || key}</Label>
+            <Input
+              id={key}
+              value={typeof value === 'object' ? JSON.stringify(value) : value}
+              onChange={(e) => {
+                try {
+                  updateJsonField(key, JSON.parse(e.target.value));
+                } catch {
+                  updateJsonField(key, e.target.value);
+                }
+              }}
+            />
+          </div>
+        );
     }
   };
 
@@ -266,12 +422,12 @@ const AssetUploadDialog = ({ open, onOpenChange, asset, siteId, onSuccess }: Ass
         </DialogHeader>
 
         <Tabs value={activeTab} onValueChange={setActiveTab} className="flex-1 flex flex-col overflow-hidden">
-          <TabsList className="grid w-full flex-shrink-0" style={{ gridTemplateColumns: isTextAsset ? 'repeat(3, 1fr)' : 'repeat(2, 1fr)' }}>
+          <TabsList className="grid w-full flex-shrink-0" style={{ gridTemplateColumns: (isTextAsset || isJsonAsset) ? 'repeat(3, 1fr)' : 'repeat(2, 1fr)' }}>
             <TabsTrigger value="view">
               <Eye className="mr-2 h-4 w-4" />
               Current Assets
             </TabsTrigger>
-            {isTextAsset && (
+            {(isTextAsset || isJsonAsset) && (
               <TabsTrigger value="edit">
                 <FileText className="mr-2 h-4 w-4" />
                 Edit Content
@@ -351,7 +507,7 @@ const AssetUploadDialog = ({ open, onOpenChange, asset, siteId, onSuccess }: Ass
             )}
           </TabsContent>
 
-          {isTextAsset && (
+          {(isTextAsset || isJsonAsset) && (
             <TabsContent value="edit" className="mt-0 h-full">
               {loadingContent ? (
                 <div className="flex items-center justify-center py-8">
@@ -360,16 +516,26 @@ const AssetUploadDialog = ({ open, onOpenChange, asset, siteId, onSuccess }: Ass
                 </div>
               ) : (
                 <div className="space-y-4 pb-4 px-1">
-                  <div className="space-y-2">
-                    <Label htmlFor="content">Content</Label>
-                    <Textarea
-                      id="content"
-                      value={textContent}
-                      onChange={(e) => setTextContent(e.target.value)}
-                      placeholder="Enter your content here..."
-                      className="min-h-[200px] font-mono text-sm"
-                    />
-                  </div>
+                  {isJsonAsset && asset.schema ? (
+                    <>
+                      <div className="space-y-4">
+                        {Object.entries(asset.schema.properties || {}).map(([key, fieldSchema]: [string, any]) => 
+                          renderSchemaField(key, fieldSchema)
+                        )}
+                      </div>
+                    </>
+                  ) : (
+                    <div className="space-y-2">
+                      <Label htmlFor="content">Content</Label>
+                      <Textarea
+                        id="content"
+                        value={textContent}
+                        onChange={(e) => setTextContent(e.target.value)}
+                        placeholder="Enter your content here..."
+                        className="min-h-[200px] font-mono text-sm"
+                      />
+                    </div>
+                  )}
 
                   <div className="space-y-2">
                     <Label htmlFor="message-edit">Commit Message</Label>
