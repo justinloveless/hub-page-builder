@@ -21,6 +21,7 @@ export const SitePreview = ({ siteId, pendingChanges }: SitePreviewProps) => {
   const [previewUrl, setPreviewUrl] = useState<string>("");
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const filesRef = useRef<Record<string, { content: string; encoding: string }>>({});
+  const objectUrlsRef = useRef<string[]>([]);
 
   // Add message listener for debug logs from iframe
   useEffect(() => {
@@ -132,6 +133,13 @@ export const SitePreview = ({ siteId, pendingChanges }: SitePreviewProps) => {
 
     // Create blob URLs for all files
     const blobUrls: Record<string, string> = {};
+    // Revoke previous object URLs to avoid stale references
+    if (objectUrlsRef.current.length) {
+      try {
+        objectUrlsRef.current.forEach((u) => URL.revokeObjectURL(u));
+      } catch (e) {}
+      objectUrlsRef.current = [];
+    }
     Object.keys(virtualFiles).forEach(path => {
       const file = virtualFiles[path];
       const mimeType = getMimeType(path);
@@ -156,7 +164,9 @@ export const SitePreview = ({ siteId, pendingChanges }: SitePreviewProps) => {
         blob = new Blob([file.content], { type: mimeType });
       }
       
-      blobUrls[path] = URL.createObjectURL(blob);
+      const urlObj = URL.createObjectURL(blob);
+      blobUrls[path] = urlObj;
+      objectUrlsRef.current.push(urlObj);
     });
 
     // Create fetch interceptor script
@@ -215,6 +225,18 @@ export const SitePreview = ({ siteId, pendingChanges }: SitePreviewProps) => {
             }
             console.warn('[Site Preview] Could not resolve path:', path);
             return path;
+          }
+
+          function resolveSrcset(value) {
+            if (!value) return value;
+            return value.split(',').map(function(part) {
+              var trimmed = part.trim();
+              if (!trimmed) return trimmed;
+              var pieces = trimmed.split(/\s+/);
+              var url = pieces.shift();
+              var resolved = resolvePath(url);
+              return [resolved].concat(pieces).join(' ');
+            }).join(', ');
           }
 
           // Intercept fetch
@@ -278,13 +300,18 @@ export const SitePreview = ({ siteId, pendingChanges }: SitePreviewProps) => {
             return xhr;
           };
 
-          // Intercept element attribute setting for src/href
+          // Intercept element attribute setting for src/href/srcset
           const originalSetAttribute = Element.prototype.setAttribute;
           Element.prototype.setAttribute = function(name, value) {
-            if (name === 'src' || name === 'href' || name === 'srcset') {
+            if (name === 'src' || name === 'href') {
               const resolved = resolvePath(value);
               if (resolved !== value) { try { console.log('[Site Preview] Attribute resolved:', name, value, '->', resolved); } catch {} }
               return originalSetAttribute.call(this, name, resolved);
+            }
+            if (name === 'srcset') {
+              const resolvedSet = resolveSrcset(value);
+              if (resolvedSet !== value) { try { console.log('[Site Preview] Srcset resolved:', value, '->', resolvedSet); } catch {} }
+              return originalSetAttribute.call(this, name, resolvedSet);
             }
             return originalSetAttribute.call(this, name, value);
           };
@@ -303,8 +330,33 @@ export const SitePreview = ({ siteId, pendingChanges }: SitePreviewProps) => {
                 return this.getAttribute('src');
               }
             });
+            // Also handle srcset property
+            var imgSrcsetDesc = Object.getOwnPropertyDescriptor(OriginalImage.prototype, 'srcset');
+            if (imgSrcsetDesc && imgSrcsetDesc.set) {
+              Object.defineProperty(img, 'srcset', {
+                set: function(value) {
+                  var resolvedSet = resolveSrcset(value);
+                  imgSrcsetDesc.set.call(this, resolvedSet);
+                },
+                get: function() { return this.getAttribute('srcset'); }
+              });
+            }
             return img;
           };
+
+          // Intercept <source> srcset property
+          if (window.HTMLSourceElement && HTMLSourceElement.prototype) {
+            var sourceDesc = Object.getOwnPropertyDescriptor(HTMLSourceElement.prototype, 'srcset');
+            if (sourceDesc && sourceDesc.set) {
+              Object.defineProperty(HTMLSourceElement.prototype, 'srcset', {
+                set: function(value) {
+                  var resolvedSet = resolveSrcset(value);
+                  sourceDesc.set.call(this, resolvedSet);
+                },
+                get: function() { return this.getAttribute('srcset'); }
+              });
+            }
+          }
 
           document.addEventListener('DOMContentLoaded', function() { console.log('[Site Preview] DOMContentLoaded'); });
           window.addEventListener('load', function() { console.log('[Site Preview] Window load'); });
@@ -320,7 +372,21 @@ export const SitePreview = ({ siteId, pendingChanges }: SitePreviewProps) => {
         const cssPath = hrefMatch[1].replace(/^\.\//, '');
         const cssContent = getFileContent(cssPath);
         if (cssContent) {
-          return `<style>${cssContent}</style>`;
+          // Rewrite url(...) references to blob URLs
+          const rewritten = cssContent.replace(/url\(([^)]+)\)/gi, (m, p1) => {
+            let raw = (p1 || '').trim().replace(/^['"]|['"]$/g, '');
+            if (!raw || raw.startsWith('data:') || raw.startsWith('http://') || raw.startsWith('https://') || raw.startsWith('blob:')) {
+              return m;
+            }
+            const key = raw.replace(/^\.\//, '').replace(/^\//, '');
+            const mapped = blobUrls[key];
+            if (mapped) {
+              try { console.log('[Site Preview] CSS url resolved:', raw, '->', mapped); } catch {}
+              return `url("${mapped}")`;
+            }
+            return m;
+          });
+          return `<style>${rewritten}</style>`;
         }
       }
       return match;
@@ -376,6 +442,10 @@ export const SitePreview = ({ siteId, pendingChanges }: SitePreviewProps) => {
     return () => {
       if (previewUrl) {
         URL.revokeObjectURL(previewUrl);
+      }
+      if (objectUrlsRef.current.length) {
+        try { objectUrlsRef.current.forEach((u) => URL.revokeObjectURL(u)); } catch (e) {}
+        objectUrlsRef.current = [];
       }
     };
   }, [previewUrl]);
