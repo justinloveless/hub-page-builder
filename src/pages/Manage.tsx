@@ -10,6 +10,7 @@ import { toast } from "sonner";
 import { ArrowLeft, ExternalLink, GitBranch, Users, FileText, Activity } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import AssetManager from "@/components/AssetManager";
+import InviteMemberDialog from "@/components/InviteMemberDialog";
 import type { Tables } from "@/integrations/supabase/types";
 
 type Site = Tables<"sites">;
@@ -17,6 +18,7 @@ type AssetVersion = Tables<"asset_versions">;
 type ActivityLog = Tables<"activity_log">;
 type SiteMember = Tables<"site_members">;
 type Profile = Tables<"profiles">;
+type Invitation = Tables<"invitations">;
 
 interface MemberWithProfile extends SiteMember {
   profile?: Profile | null;
@@ -30,6 +32,7 @@ const Manage = () => {
   const [assets, setAssets] = useState<AssetVersion[]>([]);
   const [activities, setActivities] = useState<ActivityLog[]>([]);
   const [members, setMembers] = useState<MemberWithProfile[]>([]);
+  const [invitations, setInvitations] = useState<Invitation[]>([]);
 
   // Generate URLs from repo_full_name
   const getGithubPagesUrl = (repoFullName: string) => {
@@ -55,6 +58,7 @@ const Manage = () => {
           loadAssets(),
           loadActivities(),
           loadMembers(),
+          loadInvitations(),
         ]);
       }
       setLoading(false);
@@ -158,6 +162,24 @@ const Manage = () => {
       }
     } catch (error: any) {
       console.error("Failed to load members:", error);
+    }
+  };
+
+  const loadInvitations = async () => {
+    if (!siteId) return;
+    
+    try {
+      const { data, error } = await supabase
+        .from("invitations")
+        .select("*")
+        .eq("site_id", siteId)
+        .eq("status", "pending")
+        .order("created_at", { ascending: false });
+
+      if (error) throw error;
+      setInvitations(data || []);
+    } catch (error: any) {
+      console.error("Failed to load invitations:", error);
     }
   };
 
@@ -365,13 +387,18 @@ const Manage = () => {
           </TabsContent>
 
           {/* Members Tab */}
-          <TabsContent value="members">
+          <TabsContent value="members" className="space-y-6">
             <Card>
               <CardHeader>
-                <CardTitle>Site Members</CardTitle>
-                <CardDescription>
-                  Users who have access to manage this site
-                </CardDescription>
+                <div className="flex items-center justify-between">
+                  <div>
+                    <CardTitle>Site Members</CardTitle>
+                    <CardDescription>
+                      Users who have access to manage this site
+                    </CardDescription>
+                  </div>
+                  <InviteMemberDialog siteId={siteId!} onInviteCreated={loadInvitations} />
+                </div>
               </CardHeader>
               <CardContent>
                 {members.length === 0 ? (
@@ -414,6 +441,38 @@ const Manage = () => {
                 )}
               </CardContent>
             </Card>
+
+            {/* Pending Invitations */}
+            {invitations.length > 0 && (
+              <Card>
+                <CardHeader>
+                  <CardTitle>Pending Invitations</CardTitle>
+                  <CardDescription>
+                    Invitations waiting to be accepted
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-3">
+                    {invitations.map((invitation) => (
+                      <div
+                        key={invitation.id}
+                        className="flex items-center justify-between p-4 border border-border rounded-lg"
+                      >
+                        <div className="flex-1">
+                          <p className="font-medium text-sm">
+                            {invitation.email || "Invitation link"}
+                          </p>
+                          <p className="text-xs text-muted-foreground">
+                            Expires {new Date(invitation.expires_at).toLocaleDateString()}
+                          </p>
+                        </div>
+                        <Badge variant="secondary">{invitation.role}</Badge>
+                      </div>
+                    ))}
+                  </div>
+                </CardContent>
+              </Card>
+            )}
           </TabsContent>
         </Tabs>
       </main>

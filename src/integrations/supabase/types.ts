@@ -198,6 +198,53 @@ export type Database = {
         }
         Relationships: []
       }
+      invitations: {
+        Row: {
+          created_at: string
+          email: string | null
+          expires_at: string
+          id: string
+          inviter_user_id: string
+          role: string
+          site_id: string
+          status: string
+          token: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          email?: string | null
+          expires_at: string
+          id?: string
+          inviter_user_id: string
+          role?: string
+          site_id: string
+          status?: string
+          token: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          email?: string | null
+          expires_at?: string
+          id?: string
+          inviter_user_id?: string
+          role?: string
+          site_id?: string
+          status?: string
+          token?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "invitations_site_id_fkey"
+            columns: ["site_id"]
+            isOneToOne: false
+            referencedRelation: "sites"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       profiles: {
         Row: {
           avatar_url: string | null
