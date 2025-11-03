@@ -15,6 +15,7 @@ import { format } from "date-fns";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import AssetManager from "@/components/AssetManager";
+import PendingBatchChanges from "@/components/PendingBatchChanges";
 import InviteMemberDialog from "@/components/InviteMemberDialog";
 import ActivityCard from "@/components/ActivityCard";
 import type { Tables } from "@/integrations/supabase/types";
@@ -557,6 +558,7 @@ const Manage = () => {
 
           {/* Assets Tab */}
           <TabsContent value="assets" className="space-y-6">
+            <PendingBatchChanges siteId={siteId!} />
             <AssetManager siteId={siteId!} />
           </TabsContent>
 

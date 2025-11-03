@@ -8,7 +8,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { Upload, RefreshCw, FileText, Loader2, Trash2, ExternalLink, Eye } from "lucide-react";
+import { Upload, RefreshCw, FileText, Loader2, Trash2, ExternalLink, Eye, Package } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 
 interface AssetConfig {
@@ -42,6 +42,7 @@ const AssetUploadDialog = ({ open, onOpenChange, asset, siteId, onSuccess }: Ass
   const [file, setFile] = useState<File | null>(null);
   const [preview, setPreview] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
+  const [stagingToBatch, setStagingToBatch] = useState(false);
   const [commitMessage, setCommitMessage] = useState(`Update ${asset.path}`);
   const [textContent, setTextContent] = useState("");
   const [loadingContent, setLoadingContent] = useState(false);
@@ -238,7 +239,7 @@ const AssetUploadDialog = ({ open, onOpenChange, asset, siteId, onSuccess }: Ass
     }
   };
 
-  const uploadTextContent = async () => {
+  const uploadTextContent = async (saveToBatch: boolean = false) => {
     let contentToUpload = textContent;
     
     // For JSON assets with schema, use form data
@@ -256,25 +257,47 @@ const AssetUploadDialog = ({ open, onOpenChange, asset, siteId, onSuccess }: Ass
       return;
     }
 
-    setUploading(true);
+    if (saveToBatch) {
+      setStagingToBatch(true);
+    } else {
+      setUploading(true);
+    }
+    
     try {
       // Encode UTF-8 content to base64 properly (supports emojis and other UTF-8 characters)
       const utf8Bytes = new TextEncoder().encode(contentToUpload);
       const base64Content = btoa(String.fromCharCode(...utf8Bytes));
       
-      const { data, error } = await supabase.functions.invoke('upload-site-asset', {
-        body: {
-          site_id: siteId,
-          file_path: asset.path,
-          content: base64Content,
-          message: commitMessage,
-          sha: currentSha,
-        },
-      });
+      if (saveToBatch) {
+        // Save to batch without committing
+        const { data, error } = await supabase.functions.invoke('upload-asset-to-batch', {
+          body: {
+            site_id: siteId,
+            file_path: asset.path,
+            content: base64Content,
+          },
+        });
 
-      if (error) throw error;
+        if (error) throw error;
 
-      toast.success("Content saved successfully!");
+        toast.success("Change staged successfully! Commit all changes when ready.");
+      } else {
+        // Commit immediately
+        const { data, error } = await supabase.functions.invoke('upload-site-asset', {
+          body: {
+            site_id: siteId,
+            file_path: asset.path,
+            content: base64Content,
+            message: commitMessage,
+            sha: currentSha,
+          },
+        });
+
+        if (error) throw error;
+
+        toast.success("Content saved and committed successfully!");
+      }
+      
       setTextContent("");
       setJsonFormData({});
       setCommitMessage(`Update ${asset.path}`);
@@ -286,6 +309,7 @@ const AssetUploadDialog = ({ open, onOpenChange, asset, siteId, onSuccess }: Ass
       toast.error(error.message || "Failed to save content");
     } finally {
       setUploading(false);
+      setStagingToBatch(false);
     }
   };
 
@@ -597,10 +621,27 @@ const AssetUploadDialog = ({ open, onOpenChange, asset, siteId, onSuccess }: Ass
                   </div>
 
                   <div className="flex justify-end gap-2 pt-2">
-                    <Button variant="outline" onClick={() => onOpenChange(false)} disabled={uploading}>
+                    <Button variant="outline" onClick={() => onOpenChange(false)} disabled={uploading || stagingToBatch}>
                       Cancel
                     </Button>
-                    <Button onClick={uploadTextContent} disabled={uploading}>
+                    <Button 
+                      variant="secondary" 
+                      onClick={() => uploadTextContent(true)} 
+                      disabled={uploading || stagingToBatch}
+                    >
+                      {stagingToBatch ? (
+                        <>
+                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                          Staging...
+                        </>
+                      ) : (
+                        <>
+                          <Package className="mr-2 h-4 w-4" />
+                          Save to Batch
+                        </>
+                      )}
+                    </Button>
+                    <Button onClick={() => uploadTextContent(false)} disabled={uploading || stagingToBatch}>
                       {uploading ? (
                         <>
                           <Loader2 className="mr-2 h-4 w-4 animate-spin" />
