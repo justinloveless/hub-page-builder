@@ -9,6 +9,7 @@ import { toast } from "sonner";
 import { Folder, FileText, Image, AlertCircle, RefreshCw, GitPullRequest, ExternalLink, Upload } from "lucide-react";
 import AssetUploadDialog from "./AssetUploadDialog";
 import CreateShareDialog from "./CreateShareDialog";
+import type { PendingAssetChange } from "@/pages/Manage";
 
 interface AssetConfig {
   path: string;
@@ -30,7 +31,7 @@ interface AssetManagerProps {
   setPendingChanges: (changes: PendingAssetChange[]) => void;
 }
 
-const AssetManager = ({ siteId }: AssetManagerProps) => {
+const AssetManager = ({ siteId, pendingChanges, setPendingChanges }: AssetManagerProps) => {
   const [loading, setLoading] = useState(false);
   const [creatingPr, setCreatingPr] = useState(false);
   const [config, setConfig] = useState<SiteAssetsConfig | null>(null);

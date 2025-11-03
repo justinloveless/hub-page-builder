@@ -10,6 +10,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { Upload, RefreshCw, FileText, Loader2, Trash2, ExternalLink, Eye, Package } from "lucide-react";
 import ReactMarkdown from "react-markdown";
+import type { PendingAssetChange } from "@/pages/Manage";
 
 interface AssetConfig {
   path: string;
@@ -40,7 +41,7 @@ interface AssetUploadDialogProps {
   onSuccess: () => void;
 }
 
-const AssetUploadDialog = ({ open, onOpenChange, asset, siteId, onSuccess }: AssetUploadDialogProps) => {
+const AssetUploadDialog = ({ open, onOpenChange, asset, siteId, pendingChanges, setPendingChanges, onSuccess }: AssetUploadDialogProps) => {
   const [file, setFile] = useState<File | null>(null);
   const [preview, setPreview] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
@@ -611,27 +612,18 @@ const AssetUploadDialog = ({ open, onOpenChange, asset, siteId, onSuccess }: Ass
                   </div>
 
                   <div className="flex justify-end gap-2 pt-2">
-                    <Button variant="outline" onClick={() => onOpenChange(false)} disabled={uploading || stagingToBatch}>
+                    <Button variant="outline" onClick={() => onOpenChange(false)} disabled={uploading}>
                       Cancel
                     </Button>
                     <Button 
                       variant="secondary" 
                       onClick={() => uploadTextContent(true)} 
-                      disabled={uploading || stagingToBatch}
+                      disabled={uploading}
                     >
-                      {stagingToBatch ? (
-                        <>
-                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                          Staging...
-                        </>
-                      ) : (
-                        <>
-                          <Package className="mr-2 h-4 w-4" />
-                          Save to Batch
-                        </>
-                      )}
+                      <Package className="mr-2 h-4 w-4" />
+                      Save to Batch
                     </Button>
-                    <Button onClick={() => uploadTextContent(false)} disabled={uploading || stagingToBatch}>
+                    <Button onClick={() => uploadTextContent(false)} disabled={uploading}>
                       {uploading ? (
                         <>
                           <Loader2 className="mr-2 h-4 w-4 animate-spin" />
