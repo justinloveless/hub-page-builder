@@ -25,6 +25,16 @@ const Manage = () => {
   const [activities, setActivities] = useState<ActivityLog[]>([]);
   const [members, setMembers] = useState<SiteMember[]>([]);
 
+  // Generate URLs from repo_full_name
+  const getGithubPagesUrl = (repoFullName: string) => {
+    const [username, repoName] = repoFullName.split('/');
+    return `https://${username}.github.io/${repoName}/`;
+  };
+
+  const getRepositoryUrl = (repoFullName: string) => {
+    return `https://github.com/${repoFullName}`;
+  };
+
   useEffect(() => {
     const checkAuthAndLoad = async () => {
       const { data: { session } } = await supabase.auth.getSession();
@@ -170,7 +180,11 @@ const Manage = () => {
             <h1 className="text-xl font-bold">{site.name}</h1>
             <p className="text-sm text-muted-foreground">{site.repo_full_name}</p>
           </div>
-          <Button variant="outline" size="sm">
+          <Button 
+            variant="outline" 
+            size="sm"
+            onClick={() => window.open(getGithubPagesUrl(site.repo_full_name), '_blank')}
+          >
             <ExternalLink className="mr-2 h-4 w-4" />
             View Site
           </Button>
@@ -189,10 +203,13 @@ const Manage = () => {
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
               <div>
                 <p className="text-sm font-medium mb-1">Repository</p>
-                <p className="text-sm text-muted-foreground flex items-center gap-2">
+                <button
+                  onClick={() => window.open(getRepositoryUrl(site.repo_full_name), '_blank')}
+                  className="text-sm text-muted-foreground flex items-center gap-2 hover:text-primary transition-colors cursor-pointer"
+                >
                   <ExternalLink className="h-4 w-4" />
                   {site.repo_full_name}
-                </p>
+                </button>
               </div>
               <div>
                 <p className="text-sm font-medium mb-1">Default Branch</p>

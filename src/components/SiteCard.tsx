@@ -14,6 +14,12 @@ interface SiteCardProps {
 const SiteCard = ({ site }: SiteCardProps) => {
   const navigate = useNavigate();
 
+  // Generate GitHub Pages URL from repo_full_name
+  const getGithubPagesUrl = () => {
+    const [username, repoName] = site.repo_full_name.split('/');
+    return `https://${username}.github.io/${repoName}/`;
+  };
+
   return (
     <Card className="group hover:shadow-[var(--shadow-card-hover)] transition-[box-shadow] duration-300 border-border">
       <CardHeader className="pb-3">
@@ -54,7 +60,11 @@ const SiteCard = ({ site }: SiteCardProps) => {
           <Settings className="mr-2 h-4 w-4" />
           Manage
         </Button>
-        <Button variant="outline" size="sm">
+        <Button 
+          variant="outline" 
+          size="sm"
+          onClick={() => window.open(getGithubPagesUrl(), '_blank')}
+        >
           <ExternalLink className="h-4 w-4" />
         </Button>
       </CardFooter>
