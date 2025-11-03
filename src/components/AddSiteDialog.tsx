@@ -16,7 +16,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
-import { Loader2, Plus, Github, BookOpen, Settings } from "lucide-react";
+import { Loader2, Plus, Github, BookOpen, Settings, CheckCircle2 } from "lucide-react";
 
 interface AddSiteDialogProps {
   onSiteAdded: () => void;
@@ -40,6 +40,14 @@ interface Installation {
   repositories: Repository[];
 }
 
+interface Site {
+  id: string;
+  name: string;
+  repo_full_name: string;
+  default_branch: string;
+  github_installation_id: number;
+}
+
 const AddSiteDialog = ({ onSiteAdded }: AddSiteDialogProps) => {
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -47,12 +55,38 @@ const AddSiteDialog = ({ onSiteAdded }: AddSiteDialogProps) => {
   const [popupWindow, setPopupWindow] = useState<Window | null>(null);
   const [activeTab, setActiveTab] = useState("github");
   const [installations, setInstallations] = useState<Installation[]>([]);
+  const [existingSites, setExistingSites] = useState<Site[]>([]);
   const [formData, setFormData] = useState({
     name: "",
     repoFullName: "",
     defaultBranch: "main",
     githubInstallationId: "",
   });
+
+  // Load existing sites when dialog opens
+  useEffect(() => {
+    if (open) {
+      loadExistingSites();
+    }
+  }, [open]);
+
+  const loadExistingSites = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('sites')
+        .select('*')
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+      setExistingSites(data || []);
+    } catch (error: any) {
+      console.error('Error loading sites:', error);
+    }
+  };
+
+  const isRepositoryAdded = (repoFullName: string): boolean => {
+    return existingSites.some(site => site.repo_full_name === repoFullName);
+  };
 
   useEffect(() => {
     // Listen for GitHub OAuth callback
@@ -376,37 +410,48 @@ const AddSiteDialog = ({ onSiteAdded }: AddSiteDialogProps) => {
                         </div>
 
                         <div className="space-y-2">
-                          {installation.repositories.map((repo) => (
-                            <Card key={repo.full_name} className="hover:bg-accent/50 transition-colors">
-                              <CardHeader className="pb-3">
-                                <CardTitle className="text-sm flex items-center gap-2">
-                                  <Github className="h-4 w-4" />
-                                  {repo.name}
-                                  {repo.private && (
-                                    <Badge variant="secondary" className="text-xs">Private</Badge>
+                          {installation.repositories.map((repo) => {
+                            const isAdded = isRepositoryAdded(repo.full_name);
+                            
+                            return (
+                              <Card key={repo.full_name} className="hover:bg-accent/50 transition-colors">
+                                <CardHeader className="pb-3">
+                                  <CardTitle className="text-sm flex items-center gap-2">
+                                    <Github className="h-4 w-4" />
+                                    {repo.name}
+                                    {repo.private && (
+                                      <Badge variant="secondary" className="text-xs">Private</Badge>
+                                    )}
+                                  </CardTitle>
+                                  <CardDescription className="text-xs">
+                                    {repo.full_name}
+                                  </CardDescription>
+                                </CardHeader>
+                                <CardContent className="pb-3">
+                                  <p className="text-xs text-muted-foreground">
+                                    Default branch: <span className="font-mono">{repo.default_branch}</span>
+                                  </p>
+                                </CardContent>
+                                <CardFooter className="flex-col gap-2">
+                                  <Button
+                                    size="sm"
+                                    onClick={() => handleSelectRepository(repo, installation.id)}
+                                    className="w-full"
+                                    disabled={isAdded}
+                                  >
+                                    <Plus className="mr-2 h-4 w-4" />
+                                    Add This Repository
+                                  </Button>
+                                  {isAdded && (
+                                    <p className="text-xs text-green-600 dark:text-green-400 flex items-center gap-1 w-full justify-center">
+                                      <CheckCircle2 className="h-3 w-3" />
+                                      Repository already added
+                                    </p>
                                   )}
-                                </CardTitle>
-                                <CardDescription className="text-xs">
-                                  {repo.full_name}
-                                </CardDescription>
-                              </CardHeader>
-                              <CardContent className="pb-3">
-                                <p className="text-xs text-muted-foreground">
-                                  Default branch: <span className="font-mono">{repo.default_branch}</span>
-                                </p>
-                              </CardContent>
-                              <CardFooter>
-                                <Button
-                                  size="sm"
-                                  onClick={() => handleSelectRepository(repo, installation.id)}
-                                  className="w-full"
-                                >
-                                  <Plus className="mr-2 h-4 w-4" />
-                                  Add This Repository
-                                </Button>
-                              </CardFooter>
-                            </Card>
-                          ))}
+                                </CardFooter>
+                              </Card>
+                            );
+                          })}
                         </div>
                       </div>
                     ))}
