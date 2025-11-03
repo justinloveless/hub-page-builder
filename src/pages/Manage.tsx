@@ -7,7 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Skeleton } from "@/components/ui/skeleton";
 import { toast } from "sonner";
-import { ArrowLeft, ExternalLink, GitBranch, Users, FileText, Activity } from "lucide-react";
+import { ArrowLeft, ExternalLink, GitBranch, Users, FileText, Activity, Copy, Trash2, Check } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import AssetManager from "@/components/AssetManager";
 import InviteMemberDialog from "@/components/InviteMemberDialog";
@@ -28,11 +28,22 @@ const Manage = () => {
   const navigate = useNavigate();
   const { siteId } = useParams<{ siteId: string }>();
   const [loading, setLoading] = useState(true);
+  const [copiedInviteId, setCopiedInviteId] = useState<string | null>(null);
   const [site, setSite] = useState<Site | null>(null);
   const [assets, setAssets] = useState<AssetVersion[]>([]);
   const [activities, setActivities] = useState<ActivityLog[]>([]);
   const [members, setMembers] = useState<MemberWithProfile[]>([]);
   const [invitations, setInvitations] = useState<Invitation[]>([]);
+
+  // Get current user's role
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
+  const currentUserRole = members.find(m => m.user_id === currentUserId)?.role || null;
+
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setCurrentUserId(session?.user?.id || null);
+    });
+  }, []);
 
   // Generate URLs from repo_full_name
   const getGithubPagesUrl = (repoFullName: string) => {
@@ -180,6 +191,35 @@ const Manage = () => {
       setInvitations(data || []);
     } catch (error: any) {
       console.error("Failed to load invitations:", error);
+    }
+  };
+
+  const handleCopyInviteLink = async (token: string, inviteId: string) => {
+    const inviteUrl = `${window.location.origin}/invite/${token}`;
+    try {
+      await navigator.clipboard.writeText(inviteUrl);
+      setCopiedInviteId(inviteId);
+      toast.success("Invite link copied to clipboard!");
+      setTimeout(() => setCopiedInviteId(null), 2000);
+    } catch (error) {
+      toast.error("Failed to copy link");
+    }
+  };
+
+  const handleDeleteInvitation = async (invitationId: string) => {
+    try {
+      const { error } = await supabase
+        .from("invitations")
+        .delete()
+        .eq("id", invitationId);
+
+      if (error) throw error;
+      
+      toast.success("Invitation deleted");
+      loadInvitations();
+    } catch (error: any) {
+      console.error("Failed to delete invitation:", error);
+      toast.error("Failed to delete invitation");
     }
   };
 
@@ -466,7 +506,31 @@ const Manage = () => {
                             Expires {new Date(invitation.expires_at).toLocaleDateString()}
                           </p>
                         </div>
-                        <Badge variant="secondary">{invitation.role}</Badge>
+                        <div className="flex items-center gap-2">
+                          <Badge variant="secondary">{invitation.role}</Badge>
+                          <Button
+                            size="icon"
+                            variant="ghost"
+                            onClick={() => handleCopyInviteLink(invitation.token, invitation.id)}
+                            title="Copy invite link"
+                          >
+                            {copiedInviteId === invitation.id ? (
+                              <Check className="h-4 w-4 text-green-600" />
+                            ) : (
+                              <Copy className="h-4 w-4" />
+                            )}
+                          </Button>
+                          {currentUserRole === "owner" && (
+                            <Button
+                              size="icon"
+                              variant="ghost"
+                              onClick={() => handleDeleteInvitation(invitation.id)}
+                              title="Delete invitation"
+                            >
+                              <Trash2 className="h-4 w-4 text-destructive" />
+                            </Button>
+                          )}
+                        </div>
                       </div>
                     ))}
                   </div>
