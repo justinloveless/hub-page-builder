@@ -48,6 +48,7 @@ const AssetUploadDialog = ({ open, onOpenChange, asset, siteId, onSuccess }: Ass
   const [existingFiles, setExistingFiles] = useState<AssetFile[]>([]);
   const [loadingFiles, setLoadingFiles] = useState(false);
   const [deleting, setDeleting] = useState<string | null>(null);
+  const [showConfirmation, setShowConfirmation] = useState(false);
 
   const isTextAsset = asset.type === "text" || asset.type === "markdown";
 
@@ -148,20 +149,26 @@ const AssetUploadDialog = ({ open, onOpenChange, asset, siteId, onSuccess }: Ass
     }
 
     setFile(selectedFile);
+    setShowConfirmation(false);
 
     // Create preview for images and text
     if (asset.type === 'image' || selectedFile.type.startsWith('image/')) {
       const reader = new FileReader();
       reader.onloadend = () => {
         setPreview(reader.result as string);
+        setShowConfirmation(true);
       };
       reader.readAsDataURL(selectedFile);
     } else if (selectedFile.type.startsWith('text/') || fileExt === '.md') {
       const reader = new FileReader();
       reader.onloadend = () => {
         setPreview(reader.result as string);
+        setShowConfirmation(true);
       };
       reader.readAsText(selectedFile);
+    } else {
+      // For other file types, show confirmation without preview
+      setShowConfirmation(true);
     }
   };
 
@@ -399,80 +406,118 @@ const AssetUploadDialog = ({ open, onOpenChange, asset, siteId, onSuccess }: Ass
 
           <TabsContent value="upload" className="mt-0 h-full">
             <div className="space-y-4 pb-4 px-1">
-              <div className="text-sm text-muted-foreground space-y-1">
-                {asset.maxSize && (
-                  <p>• Maximum size: {(asset.maxSize / 1024 / 1024).toFixed(1)} MB</p>
-                )}
-                {asset.allowedExtensions && (
-                  <p>• Allowed types: {asset.allowedExtensions.join(', ')}</p>
-                )}
-              </div>
+              {!showConfirmation ? (
+                <>
+                  <div className="text-sm text-muted-foreground space-y-1">
+                    {asset.maxSize && (
+                      <p>• Maximum size: {(asset.maxSize / 1024 / 1024).toFixed(1)} MB</p>
+                    )}
+                    {asset.allowedExtensions && (
+                      <p>• Allowed types: {asset.allowedExtensions.join(', ')}</p>
+                    )}
+                  </div>
 
-              <div className="space-y-2">
-                <Label htmlFor="file">Select File</Label>
-                <Input
-                  id="file"
-                  type="file"
-                  onChange={handleFileChange}
-                  accept={asset.allowedExtensions?.join(',')}
-                />
-              </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="file">Select File</Label>
+                    <Input
+                      id="file"
+                      type="file"
+                      onChange={handleFileChange}
+                      accept={asset.allowedExtensions?.join(',')}
+                    />
+                  </div>
 
-              <div className="space-y-2">
-                <Label htmlFor="message-upload">Commit Message</Label>
-                <Textarea
-                  id="message-upload"
-                  value={commitMessage}
-                  onChange={(e) => setCommitMessage(e.target.value)}
-                  placeholder="Describe your changes..."
-                  rows={2}
-                />
-              </div>
+                  <div className="flex justify-end">
+                    <Button
+                      variant="outline"
+                      onClick={() => onOpenChange(false)}
+                    >
+                      Cancel
+                    </Button>
+                  </div>
+                </>
+              ) : (
+                <>
+                  <div className="space-y-3">
+                    <div className="rounded-lg border-2 border-primary/20 bg-primary/5 p-4">
+                      <div className="flex items-center gap-2 mb-3">
+                        <Eye className="h-5 w-5 text-primary" />
+                        <h3 className="font-semibold text-lg">Preview</h3>
+                      </div>
+                      
+                      {preview && (
+                        <>
+                          {asset.type === 'image' || file?.type.startsWith('image/') ? (
+                            <div className="rounded-lg border bg-background p-4">
+                              <img
+                                src={preview}
+                                alt="Preview"
+                                className="max-w-full max-h-96 mx-auto object-contain rounded"
+                              />
+                            </div>
+                          ) : file?.type.startsWith('text/') || file?.name.endsWith('.md') ? (
+                            <div className="rounded-lg border bg-background p-4 max-h-96 overflow-auto">
+                              <pre className="text-sm whitespace-pre-wrap font-mono">{preview}</pre>
+                            </div>
+                          ) : null}
+                        </>
+                      )}
 
-              {/* Actions moved above the preview for better mobile access */}
-              <div className="flex justify-end gap-2 pt-1">
-                <Button
-                  variant="outline"
-                  onClick={() => onOpenChange(false)}
-                  disabled={uploading}
-                >
-                  Cancel
-                </Button>
-                <Button
-                  onClick={handleUpload}
-                  disabled={!file || uploading}
-                >
-                  {uploading ? (
-                    <>
-                      <RefreshCw className="mr-2 h-4 w-4 animate-spin" />
-                      Uploading...
-                    </>
-                  ) : (
-                    <>
-                      <Upload className="mr-2 h-4 w-4" />
-                      Upload & Commit
-                    </>
-                  )}
-                </Button>
-              </div>
+                      <div className="mt-3 pt-3 border-t text-sm space-y-1">
+                        <p><span className="font-medium">File:</span> {file?.name}</p>
+                        <p><span className="font-medium">Size:</span> {file ? (file.size / 1024).toFixed(2) : 0} KB</p>
+                        <p><span className="font-medium">Type:</span> {file?.type || 'Unknown'}</p>
+                        {asset.type === 'directory' && (
+                          <p className="text-muted-foreground text-xs mt-2">
+                            Will be uploaded to: {asset.path}/{file?.name}
+                          </p>
+                        )}
+                      </div>
+                    </div>
 
-              {preview && (
-                <div className="space-y-2">
-                  <Label>Preview</Label>
-                  {asset.type === 'image' || file?.type.startsWith('image/') ? (
-                    <div className="border rounded-lg p-4 bg-muted/50">
-                      <img
-                        src={preview}
-                        alt="Preview"
-                        className="max-w-full max-h-64 mx-auto object-contain"
+                    <div className="space-y-2">
+                      <Label htmlFor="message-upload">Commit Message</Label>
+                      <Textarea
+                        id="message-upload"
+                        value={commitMessage}
+                        onChange={(e) => setCommitMessage(e.target.value)}
+                        placeholder="Describe your changes..."
+                        rows={2}
                       />
                     </div>
-                  ) : (
-                    <div className="border rounded-lg p-4 bg-muted/50">
-                      <pre className="text-xs overflow-x-auto max-h-48">{preview}</pre>
+
+                    <div className="flex justify-end gap-2 pt-2">
+                      <Button
+                        variant="outline"
+                        onClick={() => {
+                          setFile(null);
+                          setPreview(null);
+                          setShowConfirmation(false);
+                        }}
+                        disabled={uploading}
+                      >
+                        Back
+                      </Button>
+                      <Button
+                        onClick={handleUpload}
+                        disabled={!file || uploading}
+                        className="bg-primary"
+                      >
+                        {uploading ? (
+                          <>
+                            <RefreshCw className="mr-2 h-4 w-4 animate-spin" />
+                            Uploading...
+                          </>
+                        ) : (
+                          <>
+                            <Upload className="mr-2 h-4 w-4" />
+                            Confirm & Upload
+                          </>
+                        )}
+                      </Button>
                     </div>
-                  )}
-                </div>
+                  </div>
+                </>
               )}
             </div>
           </TabsContent>
