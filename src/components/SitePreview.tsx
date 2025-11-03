@@ -331,6 +331,7 @@ export const SitePreview = ({ siteId, pendingChanges }: SitePreviewProps) => {
               return originalSetAttribute.call(this, name, resolvedStyle);
             }
             return originalSetAttribute.call(this, name, value);
+          };
 
           // Intercept style property changes (background/background-image)
           if (window.CSSStyleDeclaration && CSSStyleDeclaration.prototype && CSSStyleDeclaration.prototype.setProperty) {
