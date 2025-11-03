@@ -62,7 +62,6 @@ export const SitePreview = ({ siteId, pendingChanges }: SitePreviewProps) => {
 
     // Apply pending changes
     pendingChanges.forEach(change => {
-      // Encode content as base64 for consistency
       const encoded = btoa(unescape(encodeURIComponent(change.content)));
       virtualFiles[change.repoPath] = {
         content: encoded,
@@ -70,8 +69,7 @@ export const SitePreview = ({ siteId, pendingChanges }: SitePreviewProps) => {
       };
     });
 
-    // Process HTML and inject base tag + file resolver
-    let indexHtml = '';
+    // Find index.html
     const indexPath = Object.keys(virtualFiles).find(path => 
       path.endsWith('index.html') || path === 'index.html'
     );
@@ -82,61 +80,64 @@ export const SitePreview = ({ siteId, pendingChanges }: SitePreviewProps) => {
     }
 
     const indexFile = virtualFiles[indexPath];
-    const decodedContent = indexFile.encoding === 'base64' 
+    let indexHtml = indexFile.encoding === 'base64' 
       ? decodeURIComponent(escape(atob(indexFile.content)))
       : indexFile.content;
 
-    // Create a file resolver script
-    const fileMap = JSON.stringify(
-      Object.fromEntries(
-        Object.entries(virtualFiles).map(([path, file]) => [
-          path,
-          file.encoding === 'base64' 
-            ? `data:application/octet-stream;base64,${file.content}`
-            : file.content
-        ])
-      )
-    );
+    // Helper to decode file content
+    const getFileContent = (path: string): string => {
+      const file = virtualFiles[path];
+      if (!file) return '';
+      return file.encoding === 'base64'
+        ? decodeURIComponent(escape(atob(file.content)))
+        : file.content;
+    };
 
-    const resolverScript = `
-      <script>
-        window.__VIRTUAL_FILES__ = ${fileMap};
-        
-        // Intercept fetch requests
-        const originalFetch = window.fetch;
-        window.fetch = function(url, options) {
-          const path = url.toString().replace(/^.\\//, '');
-          if (window.__VIRTUAL_FILES__[path]) {
-            return Promise.resolve(new Response(window.__VIRTUAL_FILES__[path]));
-          }
-          return originalFetch(url, options);
-        };
+    // Helper to get MIME type
+    const getMimeType = (path: string): string => {
+      if (path.endsWith('.css')) return 'text/css';
+      if (path.endsWith('.js')) return 'text/javascript';
+      if (path.endsWith('.json')) return 'application/json';
+      if (path.endsWith('.png')) return 'image/png';
+      if (path.endsWith('.jpg') || path.endsWith('.jpeg')) return 'image/jpeg';
+      if (path.endsWith('.gif')) return 'image/gif';
+      if (path.endsWith('.svg')) return 'image/svg+xml';
+      return 'application/octet-stream';
+    };
 
-        // Intercept image loading
-        const originalImage = window.Image;
-        window.Image = function() {
-          const img = new originalImage();
-          const originalSrcSetter = Object.getOwnPropertyDescriptor(HTMLImageElement.prototype, 'src').set;
-          Object.defineProperty(img, 'src', {
-            set: function(value) {
-              const path = value.replace(/^.\\//, '');
-              if (window.__VIRTUAL_FILES__[path]) {
-                originalSrcSetter.call(this, window.__VIRTUAL_FILES__[path]);
-              } else {
-                originalSrcSetter.call(this, value);
-              }
-            },
-            get: function() {
-              return this.getAttribute('src');
-            }
-          });
-          return img;
-        };
-      </script>
-    `;
+    // Replace CSS links with inline styles
+    indexHtml = indexHtml.replace(/<link[^>]*rel=["']stylesheet["'][^>]*>/gi, (match) => {
+      const hrefMatch = match.match(/href=["']([^"']+)["']/);
+      if (hrefMatch) {
+        const cssPath = hrefMatch[1].replace(/^\.\//, '');
+        const cssContent = getFileContent(cssPath);
+        if (cssContent) {
+          return `<style>${cssContent}</style>`;
+        }
+      }
+      return match;
+    });
 
-    // Inject the resolver script before closing head tag
-    indexHtml = decodedContent.replace('</head>', `${resolverScript}</head>`);
+    // Replace script tags with inline scripts
+    indexHtml = indexHtml.replace(/<script([^>]*)src=["']([^"']+)["']([^>]*)><\/script>/gi, (match, before, src, after) => {
+      const jsPath = src.replace(/^\.\//, '');
+      const jsContent = getFileContent(jsPath);
+      if (jsContent) {
+        return `<script${before}${after}>${jsContent}</script>`;
+      }
+      return match;
+    });
+
+    // Replace image src attributes with data URLs
+    indexHtml = indexHtml.replace(/(<img[^>]*src=["'])([^"']+)(["'][^>]*>)/gi, (match, before, src, after) => {
+      const imgPath = src.replace(/^\.\//, '');
+      const file = virtualFiles[imgPath];
+      if (file && file.encoding === 'base64') {
+        const mimeType = getMimeType(imgPath);
+        return `${before}data:${mimeType};base64,${file.content}${after}`;
+      }
+      return match;
+    });
 
     // Create blob URL
     const blob = new Blob([indexHtml], { type: 'text/html' });
