@@ -133,13 +133,9 @@ export const SitePreview = ({ siteId, pendingChanges }: SitePreviewProps) => {
 
     // Create blob URLs for all files
     const blobUrls: Record<string, string> = {};
-    // Revoke previous object URLs to avoid stale references
-    if (objectUrlsRef.current.length) {
-      try {
-        objectUrlsRef.current.forEach((u) => URL.revokeObjectURL(u));
-      } catch (e) {}
-      objectUrlsRef.current = [];
-    }
+    // Capture previous batch URLs; revoke after new iframe loads
+    const prevBatchUrls = objectUrlsRef.current.slice();
+    objectUrlsRef.current = [];
     Object.keys(virtualFiles).forEach(path => {
       const file = virtualFiles[path];
       const mimeType = getMimeType(path);
@@ -477,7 +473,7 @@ export const SitePreview = ({ siteId, pendingChanges }: SitePreviewProps) => {
 
     // Defer cleanup of previous URLs until iframe loads the new doc
     const oldPreviewUrl = previewUrl;
-    const oldBatchUrls = objectUrlsRef.current.slice();
+    const oldBatchUrls = prevBatchUrls;
 
     setPreviewUrl(newUrl);
 
