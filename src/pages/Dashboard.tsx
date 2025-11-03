@@ -77,6 +77,7 @@ const Dashboard = () => {
   const handleSignOut = async () => {
     await supabase.auth.signOut();
     toast.success("Signed out successfully");
+    navigate("/auth");
   };
 
   if (loading || !user) {
