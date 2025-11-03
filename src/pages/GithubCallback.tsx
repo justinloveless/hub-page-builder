@@ -49,7 +49,7 @@ const GithubCallback = () => {
 
         console.log('Sending success message to opener...');
 
-        // Send message to opener window
+        // Send message to opener window (desktop popup flow)
         if (window.opener) {
           window.opener.postMessage({
             type: 'GITHUB_OAUTH_SUCCESS',
@@ -63,8 +63,13 @@ const GithubCallback = () => {
           console.log('Message sent, closing popup...');
           setTimeout(() => window.close(), 500);
         } else {
-          // If no opener, redirect to dashboard
-          console.log('No opener window found, redirecting to dashboard');
+          // Mobile redirect flow: Store data in sessionStorage
+          console.log('No opener window found, storing data for mobile flow');
+          sessionStorage.setItem('github_connection_data', JSON.stringify({
+            installation_id: installationId,
+            repositories: data?.repositories || [],
+            setup_action: setupAction,
+          }));
           toast.success('Connected to GitHub successfully!');
           navigate('/dashboard');
         }
@@ -78,6 +83,8 @@ const GithubCallback = () => {
           }, window.location.origin);
           setTimeout(() => window.close(), 500);
         } else {
+          // Mobile flow: store error
+          sessionStorage.setItem('github_connection_error', error.message || 'Failed to connect to GitHub');
           toast.error(error.message || 'Failed to connect to GitHub');
           navigate('/dashboard');
         }
