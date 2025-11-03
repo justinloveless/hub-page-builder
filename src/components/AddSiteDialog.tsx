@@ -1,6 +1,5 @@
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import { useIsMobile } from "@/hooks/use-mobile";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -21,7 +20,6 @@ interface AddSiteDialogProps {
 }
 
 const AddSiteDialog = ({ onSiteAdded }: AddSiteDialogProps) => {
-  const isMobile = useIsMobile();
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const [connectingGithub, setConnectingGithub] = useState(false);
@@ -32,48 +30,6 @@ const AddSiteDialog = ({ onSiteAdded }: AddSiteDialogProps) => {
     defaultBranch: "main",
     githubInstallationId: "",
   });
-
-  useEffect(() => {
-    // Check for GitHub connection data from mobile redirect flow
-    const connectionData = sessionStorage.getItem('github_connection_data');
-    const connectionError = sessionStorage.getItem('github_connection_error');
-    
-    if (connectionData) {
-      try {
-        const data = JSON.parse(connectionData);
-        const { installation_id, repositories } = data;
-        
-        // Pre-fill form with the first repository
-        if (repositories && repositories.length > 0) {
-          const repo = repositories[0];
-          setFormData({
-            name: repo.name,
-            repoFullName: repo.full_name,
-            defaultBranch: repo.default_branch || "main",
-            githubInstallationId: installation_id.toString(),
-          });
-        } else {
-          setFormData(prev => ({
-            ...prev,
-            githubInstallationId: installation_id.toString(),
-          }));
-        }
-        
-        // Open the dialog automatically
-        setOpen(true);
-        toast.success("Connected to GitHub successfully!");
-      } catch (e) {
-        console.error('Failed to parse GitHub connection data:', e);
-      } finally {
-        sessionStorage.removeItem('github_connection_data');
-      }
-    }
-    
-    if (connectionError) {
-      toast.error(connectionError);
-      sessionStorage.removeItem('github_connection_error');
-    }
-  }, []);
 
   useEffect(() => {
     // Listen for GitHub OAuth callback
@@ -180,16 +136,7 @@ const AddSiteDialog = ({ onSiteAdded }: AddSiteDialogProps) => {
       
       const oauthUrl = `https://github.com/apps/${config.slug}/installations/new?state=${state}`;
       
-      // On mobile, use full-page redirect instead of popup
-      if (isMobile) {
-        // Store that we're in the middle of connecting
-        sessionStorage.setItem('github_connecting', 'true');
-        // Redirect to GitHub OAuth
-        window.location.href = oauthUrl;
-        return;
-      }
-      
-      // Desktop: Use popup
+      // Open in popup
       const width = 600;
       const height = 700;
       const left = window.screenX + (window.outerWidth - width) / 2;
@@ -198,7 +145,7 @@ const AddSiteDialog = ({ onSiteAdded }: AddSiteDialogProps) => {
       const popup = window.open(
         oauthUrl,
         'GitHub OAuth',
-        `width=${width},height=${height},left=${left},top=${top}`
+        `width=${width},height=${height},left=${left},top=${top},noopener,noreferrer`
       );
 
       if (!popup) {
@@ -206,6 +153,8 @@ const AddSiteDialog = ({ onSiteAdded }: AddSiteDialogProps) => {
       }
 
       setPopupWindow(popup);
+      
+      // Focus the popup
       popup.focus();
       
       console.log('GitHub OAuth popup opened');
