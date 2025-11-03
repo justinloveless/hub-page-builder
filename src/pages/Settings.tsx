@@ -25,6 +25,25 @@ const Settings = () => {
         return;
       }
 
+      // Check if user is admin
+      const { data: isAdmin, error: roleError } = await supabase.rpc('has_role', {
+        _user_id: session.user.id,
+        _role: 'admin'
+      });
+
+      if (roleError) {
+        console.error("Error checking admin role:", roleError);
+        toast.error("Failed to verify permissions");
+        navigate("/dashboard");
+        return;
+      }
+
+      if (!isAdmin) {
+        toast.error("You don't have permission to access this page");
+        navigate("/dashboard");
+        return;
+      }
+
       // Fetch GitHub app config
       const { data, error } = await supabase
         .from("github_app_public_config")
