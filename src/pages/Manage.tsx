@@ -8,6 +8,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Skeleton } from "@/components/ui/skeleton";
 import { toast } from "sonner";
 import { ArrowLeft, ExternalLink, GitBranch, Users, FileText, Activity } from "lucide-react";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import AssetManager from "@/components/AssetManager";
 import type { Tables } from "@/integrations/supabase/types";
 
@@ -15,6 +16,11 @@ type Site = Tables<"sites">;
 type AssetVersion = Tables<"asset_versions">;
 type ActivityLog = Tables<"activity_log">;
 type SiteMember = Tables<"site_members">;
+type Profile = Tables<"profiles">;
+
+interface MemberWithProfile extends SiteMember {
+  profile?: Profile | null;
+}
 
 const Manage = () => {
   const navigate = useNavigate();
@@ -23,7 +29,7 @@ const Manage = () => {
   const [site, setSite] = useState<Site | null>(null);
   const [assets, setAssets] = useState<AssetVersion[]>([]);
   const [activities, setActivities] = useState<ActivityLog[]>([]);
-  const [members, setMembers] = useState<SiteMember[]>([]);
+  const [members, setMembers] = useState<MemberWithProfile[]>([]);
 
   // Generate URLs from repo_full_name
   const getGithubPagesUrl = (repoFullName: string) => {
@@ -120,13 +126,36 @@ const Manage = () => {
     if (!siteId) return;
     
     try {
-      const { data, error } = await supabase
+      // First get site members
+      const { data: membersData, error: membersError } = await supabase
         .from("site_members")
         .select("*")
         .eq("site_id", siteId);
 
-      if (error) throw error;
-      setMembers(data || []);
+      if (membersError) throw membersError;
+
+      // Then get profiles for each member
+      if (membersData && membersData.length > 0) {
+        const userIds = membersData.map(m => m.user_id);
+        const { data: profilesData, error: profilesError } = await supabase
+          .from("profiles")
+          .select("*")
+          .in("id", userIds);
+
+        if (profilesError) {
+          console.error("Failed to load profiles:", profilesError);
+        }
+
+        // Merge profiles with members
+        const membersWithProfiles = membersData.map(member => ({
+          ...member,
+          profile: profilesData?.find(p => p.id === member.user_id) || null
+        }));
+
+        setMembers(membersWithProfiles);
+      } else {
+        setMembers([]);
+      }
     } catch (error: any) {
       console.error("Failed to load members:", error);
     }
@@ -352,27 +381,35 @@ const Manage = () => {
                   </div>
                 ) : (
                   <div className="space-y-3">
-                    {members.map((member) => (
-                      <div
-                        key={`${member.site_id}-${member.user_id}`}
-                        className="flex items-center justify-between p-4 border border-border rounded-lg"
-                      >
-                        <div className="flex items-center gap-3">
-                          <div className="w-10 h-10 rounded-full bg-gradient-to-br from-primary to-accent flex items-center justify-center">
-                            <span className="text-primary-foreground font-semibold text-sm">
-                              {member.user_id.slice(0, 2).toUpperCase()}
-                            </span>
+                    {members.map((member) => {
+                      const displayName = member.profile?.full_name || `User ${member.user_id.slice(0, 8)}`;
+                      const initials = member.profile?.full_name
+                        ? member.profile.full_name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2)
+                        : member.user_id.slice(0, 2).toUpperCase();
+                      
+                      return (
+                        <div
+                          key={`${member.site_id}-${member.user_id}`}
+                          className="flex items-center justify-between p-4 border border-border rounded-lg"
+                        >
+                          <div className="flex items-center gap-3">
+                            <Avatar className="h-10 w-10">
+                              <AvatarImage src={member.profile?.avatar_url || undefined} alt={displayName} />
+                              <AvatarFallback className="bg-gradient-to-br from-primary to-accent text-primary-foreground">
+                                {initials}
+                              </AvatarFallback>
+                            </Avatar>
+                            <div>
+                              <p className="font-medium text-sm">{displayName}</p>
+                              <p className="text-xs text-muted-foreground">
+                                Added {new Date(member.created_at).toLocaleDateString()}
+                              </p>
+                            </div>
                           </div>
-                          <div>
-                            <p className="font-medium text-sm">User ID: {member.user_id.slice(0, 8)}...</p>
-                            <p className="text-xs text-muted-foreground">
-                              Added {new Date(member.created_at).toLocaleDateString()}
-                            </p>
-                          </div>
+                          <Badge variant="secondary">{member.role}</Badge>
                         </div>
-                        <Badge variant="secondary">{member.role}</Badge>
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 )}
               </CardContent>
