@@ -110,32 +110,52 @@ export const SitePreview = ({ siteId, pendingChanges }: SitePreviewProps) => {
       if (path.endsWith('.css')) return 'text/css';
       if (path.endsWith('.js')) return 'text/javascript';
       if (path.endsWith('.json')) return 'application/json';
+      if (path.endsWith('.md')) return 'text/markdown';
+      if (path.endsWith('.txt')) return 'text/plain';
+      if (path.endsWith('.html')) return 'text/html';
       if (path.endsWith('.png')) return 'image/png';
       if (path.endsWith('.jpg') || path.endsWith('.jpeg')) return 'image/jpeg';
       if (path.endsWith('.gif')) return 'image/gif';
       if (path.endsWith('.svg')) return 'image/svg+xml';
+      if (path.endsWith('.webp')) return 'image/webp';
       if (path.endsWith('.woff') || path.endsWith('.woff2')) return 'font/woff2';
       if (path.endsWith('.ttf')) return 'font/ttf';
       if (path.endsWith('.otf')) return 'font/otf';
       return 'application/octet-stream';
     };
 
+    // Helper to check if file is text-based
+    const isTextFile = (path: string): boolean => {
+      return path.endsWith('.json') || path.endsWith('.md') || path.endsWith('.txt') || 
+             path.endsWith('.html') || path.endsWith('.css') || path.endsWith('.js');
+    };
+
     // Create blob URLs for all files
     const blobUrls: Record<string, string> = {};
     Object.keys(virtualFiles).forEach(path => {
       const file = virtualFiles[path];
-      const content = file.encoding === 'base64' 
-        ? atob(file.content)
-        : file.content;
       const mimeType = getMimeType(path);
       
-      // Convert to Uint8Array for binary files
-      const bytes = new Uint8Array(content.length);
-      for (let i = 0; i < content.length; i++) {
-        bytes[i] = content.charCodeAt(i);
+      let blob: Blob;
+      if (file.encoding === 'base64') {
+        if (isTextFile(path)) {
+          // Decode base64 to UTF-8 text for text files
+          const decoded = decodeURIComponent(escape(atob(file.content)));
+          blob = new Blob([decoded], { type: mimeType });
+        } else {
+          // Binary files - convert to Uint8Array
+          const binaryString = atob(file.content);
+          const bytes = new Uint8Array(binaryString.length);
+          for (let i = 0; i < binaryString.length; i++) {
+            bytes[i] = binaryString.charCodeAt(i);
+          }
+          blob = new Blob([bytes], { type: mimeType });
+        }
+      } else {
+        // Already decoded text
+        blob = new Blob([file.content], { type: mimeType });
       }
       
-      const blob = new Blob([bytes], { type: mimeType });
       blobUrls[path] = URL.createObjectURL(blob);
     });
 
