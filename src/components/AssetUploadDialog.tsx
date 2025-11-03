@@ -35,6 +35,8 @@ interface AssetUploadDialogProps {
   onOpenChange: (open: boolean) => void;
   asset: AssetConfig;
   siteId: string;
+  pendingChanges: PendingAssetChange[];
+  setPendingChanges: (changes: PendingAssetChange[]) => void;
   onSuccess: () => void;
 }
 
@@ -42,7 +44,7 @@ const AssetUploadDialog = ({ open, onOpenChange, asset, siteId, onSuccess }: Ass
   const [file, setFile] = useState<File | null>(null);
   const [preview, setPreview] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
-  const [stagingToBatch, setStagingToBatch] = useState(false);
+  
   const [commitMessage, setCommitMessage] = useState(`Update ${asset.path}`);
   const [textContent, setTextContent] = useState("");
   const [loadingContent, setLoadingContent] = useState(false);
@@ -242,7 +244,6 @@ const AssetUploadDialog = ({ open, onOpenChange, asset, siteId, onSuccess }: Ass
   const uploadTextContent = async (saveToBatch: boolean = false) => {
     let contentToUpload = textContent;
     
-    // For JSON assets with schema, use form data
     if (isJsonAsset) {
       try {
         contentToUpload = JSON.stringify(jsonFormData, null, 2);
@@ -257,33 +258,24 @@ const AssetUploadDialog = ({ open, onOpenChange, asset, siteId, onSuccess }: Ass
       return;
     }
 
-    if (saveToBatch) {
-      setStagingToBatch(true);
-    } else {
-      setUploading(true);
-    }
+    setUploading(true);
     
     try {
-      // Encode UTF-8 content to base64 properly (supports emojis and other UTF-8 characters)
-      const utf8Bytes = new TextEncoder().encode(contentToUpload);
-      const base64Content = btoa(String.fromCharCode(...utf8Bytes));
+      const base64Content = btoa(unescape(encodeURIComponent(contentToUpload)));
       
       if (saveToBatch) {
-        // Save to batch without committing
-        const { data, error } = await supabase.functions.invoke('upload-asset-to-batch', {
-          body: {
-            site_id: siteId,
-            file_path: asset.path,
-            content: base64Content,
-          },
-        });
-
-        if (error) throw error;
-
-        toast.success("Change staged successfully! Commit all changes when ready.");
+        const fileName = asset.path.split('/').pop() || 'file';
+        const newChange: PendingAssetChange = {
+          repoPath: asset.path,
+          content: base64Content,
+          fileName
+        };
+        
+        const updatedChanges = pendingChanges.filter(c => c.repoPath !== asset.path);
+        setPendingChanges([...updatedChanges, newChange]);
+        toast.success("Added to batch");
       } else {
-        // Commit immediately
-        const { data, error } = await supabase.functions.invoke('upload-site-asset', {
+        const { error } = await supabase.functions.invoke('upload-site-asset', {
           body: {
             site_id: siteId,
             file_path: asset.path,
@@ -294,8 +286,7 @@ const AssetUploadDialog = ({ open, onOpenChange, asset, siteId, onSuccess }: Ass
         });
 
         if (error) throw error;
-
-        toast.success("Content saved and committed successfully!");
+        toast.success("Content saved and committed!");
       }
       
       setTextContent("");
@@ -303,13 +294,12 @@ const AssetUploadDialog = ({ open, onOpenChange, asset, siteId, onSuccess }: Ass
       setCommitMessage(`Update ${asset.path}`);
       setCurrentSha(null);
       await loadExistingFiles();
-      onSuccess();
+      onOpenChange(false);
+      if (onSuccess) onSuccess();
     } catch (error: any) {
-      console.error("Failed to save content:", error);
       toast.error(error.message || "Failed to save content");
     } finally {
       setUploading(false);
-      setStagingToBatch(false);
     }
   };
 

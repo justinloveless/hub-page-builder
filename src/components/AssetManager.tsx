@@ -26,6 +26,8 @@ interface SiteAssetsConfig {
 
 interface AssetManagerProps {
   siteId: string;
+  pendingChanges: PendingAssetChange[];
+  setPendingChanges: (changes: PendingAssetChange[]) => void;
 }
 
 const AssetManager = ({ siteId }: AssetManagerProps) => {
@@ -308,6 +310,8 @@ const AssetManager = ({ siteId }: AssetManagerProps) => {
           onOpenChange={setUploadDialogOpen}
           asset={selectedAsset}
           siteId={siteId}
+          pendingChanges={pendingChanges}
+          setPendingChanges={setPendingChanges}
           onSuccess={() => {
             fetchAssets();
             toast.success("Asset updated successfully!");

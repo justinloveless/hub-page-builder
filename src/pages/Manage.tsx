@@ -20,6 +20,12 @@ import InviteMemberDialog from "@/components/InviteMemberDialog";
 import ActivityCard from "@/components/ActivityCard";
 import type { Tables } from "@/integrations/supabase/types";
 
+export interface PendingAssetChange {
+  repoPath: string;
+  content: string;
+  fileName: string;
+}
+
 type Site = Tables<"sites">;
 type ActivityLog = Tables<"activity_log">;
 type SiteMember = Tables<"site_members">;
@@ -47,6 +53,7 @@ const Manage = () => {
   const [leaveAction, setLeaveAction] = useState<'leave' | 'delete' | null>(null);
   const [activitiesPage, setActivitiesPage] = useState(1);
   const [hasMoreActivities, setHasMoreActivities] = useState(true);
+  const [pendingChanges, setPendingChanges] = useState<PendingAssetChange[]>([]);
   const ACTIVITIES_PER_PAGE = 10;
   
   // Activity filters
@@ -558,8 +565,17 @@ const Manage = () => {
 
           {/* Assets Tab */}
           <TabsContent value="assets" className="space-y-6">
-            <PendingBatchChanges siteId={siteId!} />
-            <AssetManager siteId={siteId!} />
+            <PendingBatchChanges 
+              siteId={siteId!} 
+              pendingChanges={pendingChanges}
+              setPendingChanges={setPendingChanges}
+              onRefresh={loadActivities}
+            />
+            <AssetManager 
+              siteId={siteId!} 
+              pendingChanges={pendingChanges}
+              setPendingChanges={setPendingChanges}
+            />
           </TabsContent>
 
           {/* Activity Tab */}
@@ -829,6 +845,7 @@ const Manage = () => {
         </Tabs>
       </main>
 
+      {/* Alert Dialog for leaving site */}
       <AlertDialog open={showLeaveDialog} onOpenChange={setShowLeaveDialog}>
         <AlertDialogContent>
           <AlertDialogHeader>
@@ -837,8 +854,8 @@ const Manage = () => {
             </AlertDialogTitle>
             <AlertDialogDescription>
               {leaveAction === 'delete' 
-                ? "You are the last member of this site. Leaving will permanently delete the site and all its data. This action cannot be undone."
-                : "Are you sure you want to leave this site? You will lose access to manage it."}
+                ? 'You are the last member of this site. Leaving will delete the site. This action cannot be undone.'
+                : 'Are you sure you want to leave this site? You will need to be invited again to regain access.'}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

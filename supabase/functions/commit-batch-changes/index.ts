@@ -54,10 +54,10 @@ Deno.serve(async (req) => {
       });
     }
 
-    const { site_id, commit_message } = await req.json();
+    const { site_id, commit_message, asset_changes } = await req.json();
 
-    if (!site_id || !commit_message) {
-      return new Response(JSON.stringify({ error: 'site_id and commit_message are required' }), {
+    if (!site_id || !commit_message || !asset_changes) {
+      return new Response(JSON.stringify({ error: 'site_id, commit_message, and asset_changes are required' }), {
         status: 400,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
@@ -94,24 +94,7 @@ Deno.serve(async (req) => {
       });
     }
 
-    // Get all pending asset versions for this site
-    const { data: pendingVersions, error: versionsError } = await supabase
-      .from('asset_versions')
-      .select('*')
-      .eq('site_id', site_id)
-      .eq('status', 'pending')
-      .order('created_at', { ascending: true });
-
-    if (versionsError) throw versionsError;
-
-    if (!pendingVersions || pendingVersions.length === 0) {
-      return new Response(JSON.stringify({ error: 'No pending changes to commit' }), {
-        status: 400,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      });
-    }
-
-    console.log(`Found ${pendingVersions.length} pending changes to commit`);
+    console.log(`Committing ${asset_changes.length} asset changes`);
 
     // GitHub App configuration
     const { data: config, error: configError } = await supabase
@@ -159,38 +142,21 @@ Deno.serve(async (req) => {
 
     const baseTreeSha = commitData.tree.sha;
 
-    // Create blobs and tree entries for all pending changes
+    // Create blobs for each asset change
     const treeEntries = [];
     
-    for (const version of pendingVersions) {
-      // Download the file content from Supabase storage
-      const { data: fileData, error: downloadError } = await supabase
-        .storage
-        .from('asset-versions')
-        .download(version.storage_path);
-
-      if (downloadError) {
-        console.error(`Failed to download ${version.storage_path}:`, downloadError);
-        throw new Error(`Failed to download file: ${version.repo_path}`);
-      }
-
-      // Read file content as base64
-      const arrayBuffer = await fileData.arrayBuffer();
-      const uint8Array = new Uint8Array(arrayBuffer);
-      const content = btoa(String.fromCharCode(...uint8Array));
-
-      // Create a blob for this file
+    for (const change of asset_changes) {
       const { data: blobData } = await octokit.request('POST /repos/{owner}/{repo}/git/blobs', {
         owner,
         repo,
-        content,
+        content: change.content,
         encoding: 'base64',
       });
 
-      console.log(`Created blob for ${version.repo_path}: ${blobData.sha}`);
+      console.log(`Created blob for ${change.repo_path}: ${blobData.sha}`);
 
       treeEntries.push({
-        path: version.repo_path,
+        path: change.repo_path,
         mode: '100644' as const,
         type: 'blob' as const,
         sha: blobData.sha,
@@ -228,17 +194,6 @@ Deno.serve(async (req) => {
 
     console.log('Updated branch reference');
 
-    // Update all pending versions to committed status
-    const { error: updateError } = await supabase
-      .from('asset_versions')
-      .update({ status: 'committed' })
-      .eq('site_id', site_id)
-      .eq('status', 'pending');
-
-    if (updateError) {
-      console.error('Failed to update version statuses:', updateError);
-    }
-
     // Log the activity
     await supabase.from('activity_log').insert({
       site_id,
@@ -247,8 +202,8 @@ Deno.serve(async (req) => {
       metadata: {
         commit_sha: newCommit.sha,
         commit_message,
-        files_count: pendingVersions.length,
-        files: pendingVersions.map(v => v.repo_path),
+        files_count: asset_changes.length,
+        files: asset_changes.map((c: any) => c.repo_path),
       },
     });
 
@@ -256,7 +211,7 @@ Deno.serve(async (req) => {
       success: true,
       commit_sha: newCommit.sha,
       commit_url: newCommit.html_url,
-      files_committed: pendingVersions.length,
+      files_committed: asset_changes.length,
     }), {
       status: 200,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
