@@ -289,44 +289,57 @@ const AssetUploadDialog = ({ open, onOpenChange, asset, siteId, onSuccess }: Ass
             ) : (
               <ScrollArea className="flex-1 pr-4">
                 <div className="space-y-2 pb-4">
-                  {existingFiles.map((file) => (
-                    <div
-                      key={file.path}
-                      className="flex items-center justify-between p-3 border rounded-lg hover:bg-accent/50 transition-colors"
-                    >
-                      <div className="flex-1 min-w-0">
-                        <p className="font-medium truncate">{file.name}</p>
-                        <p className="text-sm text-muted-foreground">
-                          {(file.size / 1024).toFixed(2)} KB
-                        </p>
-                      </div>
-                      <div className="flex items-center gap-2 ml-4">
-                        {file.download_url && (
+                  {existingFiles.map((file) => {
+                    const isImage = file.name.match(/\.(jpg|jpeg|png|gif|webp|svg)$/i);
+                    
+                    return (
+                      <div
+                        key={file.path}
+                        className="flex items-center gap-3 p-3 border rounded-lg hover:bg-accent/50 transition-colors"
+                      >
+                        {isImage && file.download_url && (
+                          <div className="flex-shrink-0">
+                            <img
+                              src={file.download_url}
+                              alt={file.name}
+                              className="w-16 h-16 object-cover rounded border"
+                            />
+                          </div>
+                        )}
+                        <div className="flex-1 min-w-0">
+                          <p className="font-medium truncate">{file.name}</p>
+                          <p className="text-sm text-muted-foreground">
+                            {(file.size / 1024).toFixed(2)} KB
+                          </p>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          {file.download_url && (
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => window.open(file.download_url, '_blank')}
+                              title="View in GitHub"
+                            >
+                              <ExternalLink className="h-4 w-4" />
+                            </Button>
+                          )}
                           <Button
                             variant="ghost"
                             size="sm"
-                            onClick={() => window.open(file.download_url, '_blank')}
-                            title="View in GitHub"
+                            onClick={() => handleDelete(file.path, file.sha)}
+                            disabled={deleting === file.path}
+                            title="Delete asset"
                           >
-                            <ExternalLink className="h-4 w-4" />
+                            {deleting === file.path ? (
+                              <Loader2 className="h-4 w-4 animate-spin" />
+                            ) : (
+                              <Trash2 className="h-4 w-4 text-destructive" />
+                            )}
                           </Button>
-                        )}
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => handleDelete(file.path, file.sha)}
-                          disabled={deleting === file.path}
-                          title="Delete asset"
-                        >
-                          {deleting === file.path ? (
-                            <Loader2 className="h-4 w-4 animate-spin" />
-                          ) : (
-                            <Trash2 className="h-4 w-4 text-destructive" />
-                          )}
-                        </Button>
+                        </div>
                       </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               </ScrollArea>
             )}
