@@ -7,14 +7,12 @@ import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Skeleton } from "@/components/ui/skeleton";
 import { toast } from "sonner";
-import { ArrowLeft, ExternalLink, GitBranch, Users, FileText, Activity, Copy, Trash2, Check } from "lucide-react";
+import { ArrowLeft, ExternalLink, GitBranch, Users, Activity, Copy, Trash2, Check } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import AssetManager from "@/components/AssetManager";
 import InviteMemberDialog from "@/components/InviteMemberDialog";
 import type { Tables } from "@/integrations/supabase/types";
 
 type Site = Tables<"sites">;
-type AssetVersion = Tables<"asset_versions">;
 type ActivityLog = Tables<"activity_log">;
 type SiteMember = Tables<"site_members">;
 type Profile = Tables<"profiles">;
@@ -30,7 +28,6 @@ const Manage = () => {
   const [loading, setLoading] = useState(true);
   const [copiedInviteId, setCopiedInviteId] = useState<string | null>(null);
   const [site, setSite] = useState<Site | null>(null);
-  const [assets, setAssets] = useState<AssetVersion[]>([]);
   const [activities, setActivities] = useState<ActivityLog[]>([]);
   const [members, setMembers] = useState<MemberWithProfile[]>([]);
   const [invitations, setInvitations] = useState<Invitation[]>([]);
@@ -66,7 +63,6 @@ const Manage = () => {
       if (siteId) {
         await Promise.all([
           loadSite(),
-          loadAssets(),
           loadActivities(),
           loadMembers(),
           loadInvitations(),
@@ -101,23 +97,6 @@ const Manage = () => {
     }
   };
 
-  const loadAssets = async () => {
-    if (!siteId) return;
-    
-    try {
-      const { data, error } = await supabase
-        .from("asset_versions")
-        .select("*")
-        .eq("site_id", siteId)
-        .order("created_at", { ascending: false })
-        .limit(10);
-
-      if (error) throw error;
-      setAssets(data || []);
-    } catch (error: any) {
-      console.error("Failed to load assets:", error);
-    }
-  };
 
   const loadActivities = async () => {
     if (!siteId) return;
@@ -320,12 +299,8 @@ const Manage = () => {
         </Card>
 
         {/* Tabs */}
-        <Tabs defaultValue="assets" className="space-y-6">
-          <TabsList className="grid w-full grid-cols-3 lg:w-[400px]">
-            <TabsTrigger value="assets">
-              <FileText className="mr-2 h-4 w-4" />
-              Assets
-            </TabsTrigger>
+        <Tabs defaultValue="activity" className="space-y-6">
+          <TabsList className="grid w-full grid-cols-2 lg:w-[300px]">
             <TabsTrigger value="activity">
               <Activity className="mr-2 h-4 w-4" />
               Activity
@@ -335,60 +310,6 @@ const Manage = () => {
               Members
             </TabsTrigger>
           </TabsList>
-
-          {/* Assets Tab */}
-          <TabsContent value="assets" className="space-y-6">
-            <AssetManager siteId={siteId!} />
-            
-            <Card>
-              <CardHeader>
-                <CardTitle>Asset Version History</CardTitle>
-                <CardDescription>
-                  Recent asset uploads and versions for this site
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                {assets.length === 0 ? (
-                  <div className="text-center py-8 text-muted-foreground">
-                    <FileText className="h-12 w-12 mx-auto mb-3 opacity-50" />
-                    <p>No asset versions found</p>
-                  </div>
-                ) : (
-                  <div className="space-y-3">
-                    {assets.map((asset) => (
-                      <div
-                        key={asset.id}
-                        className="flex items-start gap-4 p-4 border border-border rounded-lg hover:bg-muted/50 transition-colors"
-                      >
-                        <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
-                          <FileText className="h-4 w-4 text-primary" />
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <p className="font-medium text-sm truncate">{asset.repo_path}</p>
-                          <div className="flex flex-wrap items-center gap-2 mt-1">
-                            <Badge variant={asset.status === "active" ? "default" : "secondary"} className="text-xs">
-                              {asset.status}
-                            </Badge>
-                            <span className="text-xs text-muted-foreground">
-                              {(asset.file_size_bytes / 1024).toFixed(2)} KB
-                            </span>
-                            {asset.checksum && (
-                              <span className="text-xs text-muted-foreground font-mono">
-                                {asset.checksum.substring(0, 8)}
-                              </span>
-                            )}
-                          </div>
-                          <p className="text-xs text-muted-foreground mt-2">
-                            {new Date(asset.created_at).toLocaleString()}
-                          </p>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-          </TabsContent>
 
           {/* Activity Tab */}
           <TabsContent value="activity">
