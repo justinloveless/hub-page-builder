@@ -109,6 +109,65 @@ const AddSiteDialog = ({ onSiteAdded }: AddSiteDialogProps) => {
     };
   }, [popupWindow, connectingGithub]);
 
+  const handleFetchInstallations = async () => {
+    setConnectingGithub(true);
+    
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) throw new Error("Not authenticated");
+
+      // Call edge function to list installations
+      const { data, error } = await supabase.functions.invoke('list-github-installations');
+
+      if (error) throw error;
+      if (!data?.installations || data.installations.length === 0) {
+        throw new Error("No GitHub App installations found. Please install the app first.");
+      }
+
+      console.log('Found installations:', data.installations);
+
+      // If only one installation, auto-select it
+      if (data.installations.length === 1) {
+        const installation = data.installations[0];
+        if (installation.repositories && installation.repositories.length > 0) {
+          const repo = installation.repositories[0];
+          setFormData({
+            name: repo.name,
+            repoFullName: repo.full_name,
+            defaultBranch: repo.default_branch || "main",
+            githubInstallationId: installation.id.toString(),
+          });
+          toast.success(`Connected to ${installation.account.login} with ${installation.repository_count} repositories`);
+        } else {
+          setFormData(prev => ({
+            ...prev,
+            githubInstallationId: installation.id.toString(),
+          }));
+          toast.success(`Connected to ${installation.account.login}`);
+        }
+      } else {
+        // Multiple installations - let user choose
+        // For now, use the first one with repositories
+        const installationWithRepos = data.installations.find((i: any) => i.repositories?.length > 0);
+        if (installationWithRepos) {
+          const repo = installationWithRepos.repositories[0];
+          setFormData({
+            name: repo.name,
+            repoFullName: repo.full_name,
+            defaultBranch: repo.default_branch || "main",
+            githubInstallationId: installationWithRepos.id.toString(),
+          });
+          toast.success(`Found ${data.installations.length} installations. Using ${installationWithRepos.account.login}.`);
+        }
+      }
+    } catch (error: any) {
+      console.error("Error fetching installations:", error);
+      toast.error(error.message || "Failed to fetch GitHub installations");
+    } finally {
+      setConnectingGithub(false);
+    }
+  };
+
   const handleConnectGithub = async () => {
     setConnectingGithub(true);
     
@@ -231,7 +290,7 @@ const AddSiteDialog = ({ onSiteAdded }: AddSiteDialogProps) => {
           </DialogHeader>
 
           <div className="space-y-4 py-4">
-            <div className="flex justify-center pb-2">
+            <div className="space-y-2 pb-2">
               <Button
                 type="button"
                 variant="outline"
@@ -247,10 +306,31 @@ const AddSiteDialog = ({ onSiteAdded }: AddSiteDialogProps) => {
                 ) : (
                   <>
                     <Github className="mr-2 h-4 w-4" />
-                    Connect with GitHub
+                    Install GitHub App
                   </>
                 )}
               </Button>
+              
+              <Button
+                type="button"
+                variant="secondary"
+                onClick={handleFetchInstallations}
+                disabled={connectingGithub}
+                className="w-full"
+              >
+                {connectingGithub ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Fetching...
+                  </>
+                ) : (
+                  <>
+                    <Github className="mr-2 h-4 w-4" />
+                    I've Already Installed - Fetch Details
+                  </>
+                )}
+              </Button>
+              
               {connectingGithub && (
                 <p className="text-xs text-center text-muted-foreground mt-2">
                   Complete the GitHub installation in the popup window
