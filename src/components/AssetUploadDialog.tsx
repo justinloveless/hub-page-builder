@@ -276,7 +276,7 @@ const AssetUploadDialog = ({ open, onOpenChange, asset, siteId, onSuccess }: Ass
             </TabsTrigger>
           </TabsList>
 
-          <ScrollArea className="flex-1">
+          <div className="flex-1 overflow-y-auto pr-2">
             <TabsContent value="view" className="mt-0 h-full">
             {loadingFiles ? (
               <div className="flex items-center justify-center py-8">
@@ -476,7 +476,7 @@ const AssetUploadDialog = ({ open, onOpenChange, asset, siteId, onSuccess }: Ass
               )}
             </div>
           </TabsContent>
-          </ScrollArea>
+          </div>
         </Tabs>
       </DialogContent>
     </Dialog>
