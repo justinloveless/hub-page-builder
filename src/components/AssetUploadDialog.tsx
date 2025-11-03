@@ -258,11 +258,15 @@ const AssetUploadDialog = ({ open, onOpenChange, asset, siteId, onSuccess }: Ass
 
     setUploading(true);
     try {
+      // Encode UTF-8 content to base64 properly (supports emojis and other UTF-8 characters)
+      const utf8Bytes = new TextEncoder().encode(contentToUpload);
+      const base64Content = btoa(String.fromCharCode(...utf8Bytes));
+      
       const { data, error } = await supabase.functions.invoke('upload-site-asset', {
         body: {
           site_id: siteId,
           file_path: asset.path,
-          content: btoa(contentToUpload),
+          content: base64Content,
           message: commitMessage,
           sha: currentSha,
         },
