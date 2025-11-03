@@ -79,11 +79,8 @@ Deno.serve(async (req) => {
       privateKey: normalizedKey,
     })
 
-    // Get all installations
-    const octokit = await app.getInstallationOctokit(0) // Use 0 to get app-level token
-    
-    // List all installations
-    const { data: installations } = await octokit.request('GET /app/installations')
+    // Use app-level authentication to list all installations
+    const { data: installations } = await app.octokit.request('GET /app/installations')
     console.log(`Found ${installations.length} total installations`)
 
     // For each installation, get basic info
