@@ -223,6 +223,12 @@ export const SitePreview = ({ siteId, pendingChanges }: SitePreviewProps) => {
                 return fileMap[v];
               }
             }
+            // If path looks like assets/<file>, try filename-only match
+            var fileName = base.split('/').pop();
+            if (fileName && fileMap['assets/' + fileName]) {
+              console.log('[Site Preview] Resolved by filename:', path, '->', fileMap['assets/' + fileName]);
+              return fileMap['assets/' + fileName];
+            }
             console.warn('[Site Preview] Could not resolve path:', path);
             return path;
           }
@@ -237,6 +243,16 @@ export const SitePreview = ({ siteId, pendingChanges }: SitePreviewProps) => {
               var resolved = resolvePath(url);
               return [resolved].concat(pieces).join(' ');
             }).join(', ');
+          }
+
+          function resolveCssUrls(value) {
+            if (!value) return value;
+            return value.replace(/url\(([^)]+)\)/gi, function(m, p1) {
+              var raw = (p1 || '').trim().replace(/^['"]|['"]$/g, '');
+              if (!raw || raw.indexOf('data:') === 0 || raw.indexOf('http://') === 0 || raw.indexOf('https://') === 0 || raw.indexOf('blob:') === 0) return m;
+              var resolved = resolvePath(raw);
+              return 'url("' + resolved + '")';
+            });
           }
 
           // Intercept fetch
@@ -300,7 +316,7 @@ export const SitePreview = ({ siteId, pendingChanges }: SitePreviewProps) => {
             return xhr;
           };
 
-          // Intercept element attribute setting for src/href/srcset
+          // Intercept element attribute setting for src/href/srcset/style
           const originalSetAttribute = Element.prototype.setAttribute;
           Element.prototype.setAttribute = function(name, value) {
             if (name === 'src' || name === 'href') {
@@ -313,8 +329,37 @@ export const SitePreview = ({ siteId, pendingChanges }: SitePreviewProps) => {
               if (resolvedSet !== value) { try { console.log('[Site Preview] Srcset resolved:', value, '->', resolvedSet); } catch {} }
               return originalSetAttribute.call(this, name, resolvedSet);
             }
+            if (name === 'style' && typeof value === 'string') {
+              const resolvedStyle = resolveCssUrls(value);
+              if (resolvedStyle !== value) { try { console.log('[Site Preview] Style url() resolved'); } catch {} }
+              return originalSetAttribute.call(this, name, resolvedStyle);
+            }
             return originalSetAttribute.call(this, name, value);
-          };
+
+          // Intercept style property changes (background/background-image)
+          if (window.CSSStyleDeclaration && CSSStyleDeclaration.prototype && CSSStyleDeclaration.prototype.setProperty) {
+            const originalSetProperty = CSSStyleDeclaration.prototype.setProperty;
+            CSSStyleDeclaration.prototype.setProperty = function(name, value, priority) {
+              try {
+                if (typeof value === 'string' && (name === 'background' || name === 'background-image' || name === 'content')) {
+                  value = resolveCssUrls(value);
+                }
+              } catch (e) {}
+              return originalSetProperty.call(this, name, value, priority);
+            };
+          }
+
+          // backgroundImage direct property
+          if (window.CSSStyleDeclaration) {
+            const desc = Object.getOwnPropertyDescriptor(CSSStyleDeclaration.prototype, 'backgroundImage');
+            if (desc && desc.set) {
+              Object.defineProperty(CSSStyleDeclaration.prototype, 'backgroundImage', {
+                set: function(val) { try { desc.set.call(this, resolveCssUrls(val)); } catch (e) { desc.set.call(this, val); } },
+                get: function() { return desc.get ? desc.get.call(this) : this.getPropertyValue('background-image'); }
+              });
+            }
+          }
+
 
           // Intercept Image constructor
           const OriginalImage = window.Image;
@@ -426,16 +471,27 @@ export const SitePreview = ({ siteId, pendingChanges }: SitePreviewProps) => {
     // Inject interceptor script before any other scripts
     indexHtml = indexHtml.replace(/<head>/i, `<head>${interceptorScript}`);
 
-    // Create blob URL
+    // Create blob URL for HTML
     const blob = new Blob([indexHtml], { type: 'text/html' });
-    const url = URL.createObjectURL(blob);
+    const newUrl = URL.createObjectURL(blob);
 
-    // Clean up previous URLs
-    if (previewUrl) {
-      URL.revokeObjectURL(previewUrl);
+    // Defer cleanup of previous URLs until iframe loads the new doc
+    const oldPreviewUrl = previewUrl;
+    const oldBatchUrls = objectUrlsRef.current.slice();
+
+    setPreviewUrl(newUrl);
+
+    const iframeEl = iframeRef.current;
+    if (iframeEl) {
+      const onLoad = () => {
+        try {
+          if (oldPreviewUrl) URL.revokeObjectURL(oldPreviewUrl);
+          if (oldBatchUrls.length) oldBatchUrls.forEach((u) => URL.revokeObjectURL(u));
+        } catch (e) {}
+        iframeEl.removeEventListener('load', onLoad);
+      };
+      iframeEl.addEventListener('load', onLoad);
     }
-
-    setPreviewUrl(url);
   };
 
   useEffect(() => {
