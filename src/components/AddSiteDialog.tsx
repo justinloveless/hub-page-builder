@@ -192,15 +192,45 @@ const AddSiteDialog = ({ onSiteAdded }: AddSiteDialogProps) => {
     }
   };
 
-  const handleSelectRepository = (repo: Repository, installationId: number) => {
-    setFormData({
-      name: repo.name,
-      repoFullName: repo.full_name,
-      defaultBranch: repo.default_branch || "main",
-      githubInstallationId: installationId.toString(),
-    });
-    setActiveTab("manual");
-    toast.success("Repository selected. Review and add the site.");
+  const handleSelectRepository = async (repo: Repository, installationId: number) => {
+    setLoading(true);
+    
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) throw new Error("Not authenticated");
+
+      // Call the edge function to create the site
+      const { data, error } = await supabase.functions.invoke('create-site', {
+        body: {
+          name: repo.name,
+          repo_full_name: repo.full_name,
+          default_branch: repo.default_branch || "main",
+          github_installation_id: installationId,
+        },
+      });
+
+      if (error) throw error;
+      if (!data?.site) throw new Error("Failed to create site");
+
+      toast.success(`Site "${repo.name}" added successfully!`);
+      setOpen(false);
+      
+      // Reset form and installations
+      setFormData({
+        name: "",
+        repoFullName: "",
+        defaultBranch: "main",
+        githubInstallationId: "",
+      });
+      setInstallations([]);
+      
+      onSiteAdded();
+    } catch (error: any) {
+      console.error("Error adding site:", error);
+      toast.error(error.message || "Failed to add site");
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleConnectGithub = async () => {
@@ -437,10 +467,19 @@ const AddSiteDialog = ({ onSiteAdded }: AddSiteDialogProps) => {
                                     size="sm"
                                     onClick={() => handleSelectRepository(repo, installation.id)}
                                     className="w-full"
-                                    disabled={isAdded}
+                                    disabled={isAdded || loading}
                                   >
-                                    <Plus className="mr-2 h-4 w-4" />
-                                    Add This Repository
+                                    {loading ? (
+                                      <>
+                                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                        Adding...
+                                      </>
+                                    ) : (
+                                      <>
+                                        <Plus className="mr-2 h-4 w-4" />
+                                        Add This Repository
+                                      </>
+                                    )}
                                   </Button>
                                   {isAdded && (
                                     <p className="text-xs text-green-600 dark:text-green-400 flex items-center gap-1 w-full justify-center">
