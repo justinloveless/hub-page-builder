@@ -4,7 +4,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { User } from "@supabase/supabase-js";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
-import { Loader2, Plus, LogOut, Settings } from "lucide-react";
+import { Loader2, Plus, LogOut, Settings, User as UserIcon } from "lucide-react";
 import SiteCard from "@/components/SiteCard";
 import AddSiteDialog from "@/components/AddSiteDialog";
 import type { Tables } from "@/integrations/supabase/types";
@@ -85,11 +85,20 @@ const Dashboard = () => {
             <Button
               variant="ghost"
               size="icon"
+              onClick={() => navigate("/profile")}
+              title="Profile"
+            >
+              <UserIcon className="h-5 w-5" />
+            </Button>
+            <Button
+              variant="ghost"
+              size="icon"
               onClick={() => navigate("/settings")}
+              title="Settings"
             >
               <Settings className="h-5 w-5" />
             </Button>
-            <Button variant="ghost" size="icon" onClick={handleSignOut}>
+            <Button variant="ghost" size="icon" onClick={handleSignOut} title="Sign Out">
               <LogOut className="h-5 w-5" />
             </Button>
           </div>

@@ -7,7 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Skeleton } from "@/components/ui/skeleton";
 import { toast } from "sonner";
-import { ArrowLeft, ExternalLink, GitBranch, Users, FileText, Activity, Copy, Trash2, Check } from "lucide-react";
+import { ArrowLeft, ExternalLink, GitBranch, Users, FileText, Activity, Copy, Trash2, Check, User as UserIcon, Settings } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import AssetManager from "@/components/AssetManager";
 import InviteMemberDialog from "@/components/InviteMemberDialog";
@@ -250,14 +250,24 @@ const Manage = () => {
             <h1 className="text-xl font-bold">{site.name}</h1>
             <p className="text-sm text-muted-foreground">{site.repo_full_name}</p>
           </div>
-          <Button 
-            variant="outline" 
-            size="sm"
-            onClick={() => window.open(getGithubPagesUrl(site.repo_full_name), '_blank')}
-          >
-            <ExternalLink className="mr-2 h-4 w-4" />
-            View Site
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button 
+              variant="ghost"
+              size="icon"
+              onClick={() => navigate("/profile")}
+              title="Profile"
+            >
+              <UserIcon className="h-5 w-5" />
+            </Button>
+            <Button 
+              variant="outline" 
+              size="sm"
+              onClick={() => window.open(getGithubPagesUrl(site.repo_full_name), '_blank')}
+            >
+              <ExternalLink className="mr-2 h-4 w-4" />
+              View Site
+            </Button>
+          </div>
         </div>
       </header>
 
