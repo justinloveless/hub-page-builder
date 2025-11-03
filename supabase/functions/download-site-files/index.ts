@@ -72,7 +72,7 @@ Deno.serve(async (req) => {
       throw new Error('GitHub App not configured')
     }
 
-    const privateKey = normalizePemKey(Deno.env.get('GITHUB_PRIVATE_KEY') || '')
+    const privateKey = normalizePemKey(Deno.env.get('GITHUB_APP_PKEY') || '')
     if (!privateKey) {
       throw new Error('GitHub private key not configured')
     }
