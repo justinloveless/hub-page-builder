@@ -7,7 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Skeleton } from "@/components/ui/skeleton";
 import { toast } from "sonner";
-import { ArrowLeft, ExternalLink, GitBranch, Users, FileText, Activity, Copy, Trash2, Check, User as UserIcon, Settings } from "lucide-react";
+import { ArrowLeft, ExternalLink, GitBranch, Users, FileText, Activity, Copy, Trash2, Check, User as UserIcon, Settings, UserCog, Crown } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import AssetManager from "@/components/AssetManager";
 import InviteMemberDialog from "@/components/InviteMemberDialog";
@@ -186,6 +186,8 @@ const Manage = () => {
   };
 
   const handleDeleteInvitation = async (invitationId: string) => {
+    if (!confirm(`Are you sure you want to delete this invitation?`)) return;
+    
     try {
       const { error } = await supabase
         .from("invitations")
@@ -199,6 +201,46 @@ const Manage = () => {
     } catch (error: any) {
       console.error("Failed to delete invitation:", error);
       toast.error("Failed to delete invitation");
+    }
+  };
+
+  const handleRemoveMember = async (memberUserId: string, memberName: string) => {
+    if (!confirm(`Are you sure you want to remove ${memberName} from this site?`)) return;
+    
+    try {
+      const { error } = await supabase
+        .from("site_members")
+        .delete()
+        .eq("site_id", siteId)
+        .eq("user_id", memberUserId);
+
+      if (error) throw error;
+      
+      toast.success("Member removed successfully");
+      loadMembers();
+    } catch (error: any) {
+      console.error("Failed to remove member:", error);
+      toast.error(error.message || "Failed to remove member");
+    }
+  };
+
+  const handlePromoteToOwner = async (memberUserId: string, memberName: string) => {
+    if (!confirm(`Are you sure you want to promote ${memberName} to owner? This will give them full control over the site.`)) return;
+    
+    try {
+      const { error } = await supabase
+        .from("site_members")
+        .update({ role: "owner" })
+        .eq("site_id", siteId)
+        .eq("user_id", memberUserId);
+
+      if (error) throw error;
+      
+      toast.success(`${memberName} promoted to owner`);
+      loadMembers();
+    } catch (error: any) {
+      console.error("Failed to promote member:", error);
+      toast.error(error.message || "Failed to promote member");
     }
   };
 
@@ -425,6 +467,8 @@ const Manage = () => {
                       const initials = member.profile?.full_name
                         ? member.profile.full_name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2)
                         : member.user_id.slice(0, 2).toUpperCase();
+                      const isCurrentUser = member.user_id === currentUserId;
+                      const canManage = currentUserRole === "owner" && !isCurrentUser && member.role !== "owner";
                       
                       return (
                         <div
@@ -439,13 +483,46 @@ const Manage = () => {
                               </AvatarFallback>
                             </Avatar>
                             <div>
-                              <p className="font-medium text-sm">{displayName}</p>
+                              <div className="flex items-center gap-2">
+                                <p className="font-medium text-sm">{displayName}</p>
+                                {isCurrentUser && (
+                                  <Badge variant="secondary" className="text-xs">You</Badge>
+                                )}
+                              </div>
                               <p className="text-xs text-muted-foreground">
                                 Added {new Date(member.created_at).toLocaleDateString()}
                               </p>
                             </div>
                           </div>
-                          <Badge variant="secondary">{member.role}</Badge>
+                          <div className="flex items-center gap-2">
+                            <Badge variant={member.role === "owner" ? "default" : "secondary"}>
+                              {member.role === "owner" && <Crown className="mr-1 h-3 w-3" />}
+                              {member.role}
+                            </Badge>
+                            {canManage && (
+                              <>
+                                {member.role === "manager" && (
+                                  <Button
+                                    size="sm"
+                                    variant="outline"
+                                    onClick={() => handlePromoteToOwner(member.user_id, displayName)}
+                                    title="Promote to owner"
+                                  >
+                                    <UserCog className="h-4 w-4 mr-1" />
+                                    Promote
+                                  </Button>
+                                )}
+                                <Button
+                                  size="sm"
+                                  variant="ghost"
+                                  onClick={() => handleRemoveMember(member.user_id, displayName)}
+                                  title="Remove member"
+                                >
+                                  <Trash2 className="h-4 w-4 text-destructive" />
+                                </Button>
+                              </>
+                            )}
+                          </div>
                         </div>
                       );
                     })}
