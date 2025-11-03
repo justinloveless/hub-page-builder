@@ -15,6 +15,7 @@ const Dashboard = () => {
   const [user, setUser] = useState<User | null>(null);
   const [sites, setSites] = useState<Site[]>([]);
   const [loading, setLoading] = useState(true);
+  const [isAdmin, setIsAdmin] = useState(false);
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -32,12 +33,28 @@ const Dashboard = () => {
         navigate("/auth");
       } else {
         setUser(session.user);
+        checkAdminRole(session.user.id);
         loadSites();
       }
     });
 
     return () => subscription.unsubscribe();
   }, [navigate]);
+
+  const checkAdminRole = async (userId: string) => {
+    try {
+      const { data, error } = await supabase.rpc('has_role', {
+        _user_id: userId,
+        _role: 'admin'
+      });
+      
+      if (!error && data) {
+        setIsAdmin(true);
+      }
+    } catch (error) {
+      console.error("Error checking admin role:", error);
+    }
+  };
 
   const loadSites = async () => {
     try {
@@ -90,14 +107,16 @@ const Dashboard = () => {
             >
               <UserIcon className="h-5 w-5" />
             </Button>
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={() => navigate("/settings")}
-              title="Settings"
-            >
-              <Settings className="h-5 w-5" />
-            </Button>
+            {isAdmin && (
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => navigate("/settings")}
+                title="Settings"
+              >
+                <Settings className="h-5 w-5" />
+              </Button>
+            )}
             <Button variant="ghost" size="icon" onClick={handleSignOut} title="Sign Out">
               <LogOut className="h-5 w-5" />
             </Button>
