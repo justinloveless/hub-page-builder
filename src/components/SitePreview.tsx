@@ -221,17 +221,47 @@ export const SitePreview = ({ siteId, pendingChanges }: SitePreviewProps) => {
           const originalFetch = window.fetch;
           window.fetch = function(input, init) {
             try { console.log('[Site Preview] Fetch intercepted:', input); } catch {}
+            var promise;
             if (typeof input === 'string' || input instanceof URL) {
               const resolved = resolvePath(input);
-              return originalFetch.call(this, resolved, init);
-            }
-            // Request object
-            if (input && typeof input === 'object' && 'url' in input) {
+              promise = originalFetch.call(this, resolved, init);
+            } else if (input && typeof input === 'object' && 'url' in input) {
+              // Request object
               const resolvedUrl = resolvePath(input.url);
               const cloned = new Request(resolvedUrl, input);
-              return originalFetch.call(this, cloned, init);
+              promise = originalFetch.call(this, cloned, init);
+            } else {
+              promise = originalFetch.call(this, input, init);
             }
-            return originalFetch.call(this, input, init);
+            
+            // Transform response to replace asset paths with blob URLs
+            return promise.then(function(response) {
+              const contentType = response.headers.get('content-type') || '';
+              if (contentType.includes('application/json') || contentType.includes('text/')) {
+                return response.text().then(function(text) {
+                  // Replace all asset paths in the text with blob URLs
+                  var transformed = text;
+                  Object.keys(fileMap).forEach(function(path) {
+                    // Simple string replacements for various path formats
+                    var blobUrl = fileMap[path];
+                    // Match exact path in quotes
+                    transformed = transformed.split('"' + path + '"').join('"' + blobUrl + '"');
+                    // Match with leading ./
+                    transformed = transformed.split('"./' + path + '"').join('"' + blobUrl + '"');
+                    // Match with leading /
+                    transformed = transformed.split('"/' + path + '"').join('"' + blobUrl + '"');
+                  });
+                  
+                  // Create new response with transformed content
+                  return new Response(transformed, {
+                    status: response.status,
+                    statusText: response.statusText,
+                    headers: response.headers
+                  });
+                });
+              }
+              return response;
+            });
           };
 
           // Intercept XMLHttpRequest
