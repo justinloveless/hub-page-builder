@@ -85,7 +85,7 @@ const CreateShareDialog = ({ siteId, assetPath }: CreateShareDialogProps) => {
           Share for Uploads
         </Button>
       </DialogTrigger>
-      <DialogContent className="sm:max-w-md">
+      <DialogContent className="sm:max-w-md max-h-[90vh] overflow-hidden flex flex-col">
         <DialogHeader>
           <DialogTitle>Share Asset for Guest Uploads</DialogTitle>
           <DialogDescription>
@@ -93,8 +93,9 @@ const CreateShareDialog = ({ siteId, assetPath }: CreateShareDialogProps) => {
           </DialogDescription>
         </DialogHeader>
 
-        {!shareToken ? (
-          <div className="space-y-4">
+        <div className="flex-1 overflow-y-auto pr-2">
+          {!shareToken ? (
+            <div className="space-y-4 pb-4 px-1">
             <div>
               <Label>Upload Location</Label>
               <p className="text-sm text-muted-foreground font-mono bg-muted p-2 rounded mt-1">
@@ -154,12 +155,12 @@ const CreateShareDialog = ({ siteId, assetPath }: CreateShareDialogProps) => {
               />
             </div>
 
-            <Button onClick={handleCreateShare} disabled={loading} className="w-full">
-              {loading ? "Creating..." : "Create Share Link"}
-            </Button>
-          </div>
-        ) : (
-          <div className="space-y-4">
+              <Button onClick={handleCreateShare} disabled={loading} className="w-full">
+                {loading ? "Creating..." : "Create Share Link"}
+              </Button>
+            </div>
+          ) : (
+            <div className="space-y-4 pb-4 px-1">
             <div>
               <Label>Share Link</Label>
               <div className="flex gap-2 mt-2">
@@ -189,11 +190,12 @@ const CreateShareDialog = ({ siteId, assetPath }: CreateShareDialogProps) => {
               {allowedExtensions && <p><strong>Allowed Types:</strong> {allowedExtensions}</p>}
             </div>
 
-            <Button onClick={handleClose} variant="outline" className="w-full">
-              Done
-            </Button>
-          </div>
-        )}
+              <Button onClick={handleClose} variant="outline" className="w-full">
+                Done
+              </Button>
+            </div>
+          )}
+        </div>
       </DialogContent>
     </Dialog>
   );
