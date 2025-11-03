@@ -122,14 +122,14 @@ const AssetManager = ({ siteId }: AssetManagerProps) => {
   return (
     <Card>
       <CardHeader>
-          <div className="flex items-center justify-between">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
             <div>
               <CardTitle>Asset Manager</CardTitle>
               <CardDescription>
                 Manage site assets defined in site-assets.json
               </CardDescription>
             </div>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 flex-wrap">
               <Button
                 variant="outline"
                 size="sm"
@@ -141,22 +141,25 @@ const AssetManager = ({ siteId }: AssetManagerProps) => {
                 ) : (
                   <RefreshCw className="h-4 w-4" />
                 )}
-                <span className="ml-2">Load Assets</span>
+                <span className="ml-2">Load</span>
               </Button>
               <Button
                 size="sm"
                 onClick={createTemplatePr}
                 disabled={creatingPr}
+                className="text-xs sm:text-sm"
               >
                 {creatingPr ? (
                   <>
-                    <RefreshCw className="mr-2 h-4 w-4 animate-spin" />
-                    Creating PR...
+                    <RefreshCw className="mr-1 sm:mr-2 h-4 w-4 animate-spin" />
+                    <span className="hidden sm:inline">Creating...</span>
+                    <span className="sm:hidden">PR...</span>
                   </>
                 ) : (
                   <>
-                    <GitPullRequest className="mr-2 h-4 w-4" />
-                    Create Template PR
+                    <GitPullRequest className="mr-1 sm:mr-2 h-4 w-4" />
+                    <span className="hidden sm:inline">Create Template PR</span>
+                    <span className="sm:hidden">Template PR</span>
                   </>
                 )}
               </Button>
@@ -239,19 +242,19 @@ const AssetManager = ({ siteId }: AssetManagerProps) => {
               {config.assets.map((asset, index) => (
                 <div
                   key={index}
-                  className="flex items-start gap-4 p-4 border border-border rounded-lg hover:bg-muted/50 transition-colors"
+                  className="flex flex-col sm:flex-row sm:items-start gap-3 sm:gap-4 p-4 border border-border rounded-lg hover:bg-muted/50 transition-colors"
                 >
                   <div className="flex-shrink-0 mt-1">
                     {getAssetIcon(asset.type)}
                   </div>
                   <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 mb-1">
-                      <p className="font-medium text-sm">{asset.label || asset.path}</p>
-                      <Badge variant="outline" className="text-xs">
+                    <div className="flex items-center gap-2 mb-1 flex-wrap">
+                      <p className="font-medium text-sm truncate">{asset.label || asset.path}</p>
+                      <Badge variant="outline" className="text-xs flex-shrink-0">
                         {asset.type}
                       </Badge>
                     </div>
-                    <p className="text-xs text-muted-foreground font-mono mb-1">
+                    <p className="text-xs text-muted-foreground font-mono mb-1 break-all">
                       {asset.path}
                     </p>
                     {asset.description && (
@@ -259,10 +262,10 @@ const AssetManager = ({ siteId }: AssetManagerProps) => {
                         {asset.description}
                       </p>
                     )}
-                    <div className="flex items-center gap-4 mt-2 text-xs text-muted-foreground">
-                      <span>Max size: {formatFileSize(asset.maxSize)}</span>
+                    <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4 mt-2 text-xs text-muted-foreground">
+                      <span>Max: {formatFileSize(asset.maxSize)}</span>
                       {asset.allowedExtensions && (
-                        <span>
+                        <span className="break-all">
                           Allowed: {asset.allowedExtensions.join(', ')}
                         </span>
                       )}
@@ -275,6 +278,7 @@ const AssetManager = ({ siteId }: AssetManagerProps) => {
                       setSelectedAsset(asset);
                       setUploadDialogOpen(true);
                     }}
+                    className="w-full sm:w-auto flex-shrink-0"
                   >
                     <Upload className="mr-2 h-4 w-4" />
                     Upload

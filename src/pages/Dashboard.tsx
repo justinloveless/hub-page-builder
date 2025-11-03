@@ -74,14 +74,14 @@ const Dashboard = () => {
       {/* Header */}
       <header className="border-b border-border bg-card/50 backdrop-blur-sm sticky top-0 z-50">
         <div className="container mx-auto px-4 h-16 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-primary to-accent flex items-center justify-center">
+          <div className="flex items-center gap-2 sm:gap-3 min-w-0">
+            <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-primary to-accent flex items-center justify-center flex-shrink-0">
               <span className="text-primary-foreground font-bold text-lg">SH</span>
             </div>
-            <h1 className="text-xl font-bold">Static Hub</h1>
+            <h1 className="text-lg sm:text-xl font-bold truncate">Static Hub</h1>
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-shrink-0">
             <Button
               variant="ghost"
               size="icon"
@@ -107,14 +107,16 @@ const Dashboard = () => {
 
       {/* Main Content */}
       <main className="container mx-auto px-4 py-8">
-        <div className="flex items-center justify-between mb-8">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-8">
           <div>
-            <h2 className="text-3xl font-bold mb-2">Your Sites</h2>
-            <p className="text-muted-foreground">
+            <h2 className="text-2xl sm:text-3xl font-bold mb-2">Your Sites</h2>
+            <p className="text-sm sm:text-base text-muted-foreground">
               Manage all your static sites in one place
             </p>
           </div>
-          <AddSiteDialog onSiteAdded={loadSites} />
+          <div className="sm:flex-shrink-0">
+            <AddSiteDialog onSiteAdded={loadSites} />
+          </div>
         </div>
 
         {sites.length === 0 ? (

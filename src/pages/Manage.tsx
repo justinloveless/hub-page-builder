@@ -279,36 +279,48 @@ const Manage = () => {
     <div className="min-h-screen bg-background">
       {/* Header */}
       <header className="border-b border-border bg-card/50 backdrop-blur-sm sticky top-0 z-50">
-        <div className="container mx-auto px-4 h-16 flex items-center">
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={() => navigate("/dashboard")}
-            className="mr-4"
-          >
-            <ArrowLeft className="h-5 w-5" />
-          </Button>
-          <div className="flex-1">
-            <h1 className="text-xl font-bold">{site.name}</h1>
-            <p className="text-sm text-muted-foreground">{site.repo_full_name}</p>
-          </div>
-          <div className="flex items-center gap-2">
-            <Button 
+        <div className="container mx-auto px-4 py-3">
+          <div className="flex items-start gap-3">
+            <Button
               variant="ghost"
               size="icon"
-              onClick={() => navigate("/profile")}
-              title="Profile"
+              onClick={() => navigate("/dashboard")}
+              className="flex-shrink-0"
             >
-              <UserIcon className="h-5 w-5" />
+              <ArrowLeft className="h-5 w-5" />
             </Button>
-            <Button 
-              variant="outline" 
-              size="sm"
-              onClick={() => window.open(getGithubPagesUrl(site.repo_full_name), '_blank')}
-            >
-              <ExternalLink className="mr-2 h-4 w-4" />
-              View Site
-            </Button>
+            <div className="flex-1 min-w-0">
+              <h1 className="text-lg sm:text-xl font-bold truncate">{site.name}</h1>
+              <p className="text-xs sm:text-sm text-muted-foreground truncate">{site.repo_full_name}</p>
+            </div>
+            <div className="flex items-center gap-2 flex-shrink-0">
+              <Button 
+                variant="ghost"
+                size="icon"
+                onClick={() => navigate("/profile")}
+                title="Profile"
+              >
+                <UserIcon className="h-5 w-5" />
+              </Button>
+              <Button 
+                variant="outline" 
+                size="sm"
+                onClick={() => window.open(getGithubPagesUrl(site.repo_full_name), '_blank')}
+                className="hidden sm:flex"
+              >
+                <ExternalLink className="mr-2 h-4 w-4" />
+                View Site
+              </Button>
+              <Button 
+                variant="outline" 
+                size="icon"
+                onClick={() => window.open(getGithubPagesUrl(site.repo_full_name), '_blank')}
+                className="sm:hidden"
+                title="View Site"
+              >
+                <ExternalLink className="h-4 w-4" />
+              </Button>
+            </div>
           </div>
         </div>
       </header>
@@ -322,15 +334,15 @@ const Manage = () => {
             <CardDescription>General information about this site</CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-              <div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
+              <div className="min-w-0">
                 <p className="text-sm font-medium mb-1">Repository</p>
                 <button
                   onClick={() => window.open(getRepositoryUrl(site.repo_full_name), '_blank')}
-                  className="text-sm text-muted-foreground flex items-center gap-2 hover:text-primary transition-colors cursor-pointer"
+                  className="text-sm text-muted-foreground flex items-center gap-2 hover:text-primary transition-colors cursor-pointer truncate w-full text-left"
                 >
-                  <ExternalLink className="h-4 w-4" />
-                  {site.repo_full_name}
+                  <ExternalLink className="h-4 w-4 flex-shrink-0" />
+                  <span className="truncate">{site.repo_full_name}</span>
                 </button>
               </div>
               <div>
@@ -352,17 +364,19 @@ const Manage = () => {
 
         {/* Tabs */}
         <Tabs defaultValue="assets" className="space-y-6">
-          <TabsList className="grid w-full grid-cols-3 lg:w-[400px]">
-            <TabsTrigger value="assets">
-              <FileText className="mr-2 h-4 w-4" />
-              Assets
+          <TabsList className="grid w-full grid-cols-3">
+            <TabsTrigger value="assets" className="text-xs sm:text-sm">
+              <FileText className="mr-1 sm:mr-2 h-3 w-3 sm:h-4 sm:w-4" />
+              <span className="hidden sm:inline">Assets</span>
+              <span className="sm:hidden">Files</span>
             </TabsTrigger>
-            <TabsTrigger value="activity">
-              <Activity className="mr-2 h-4 w-4" />
-              Activity
+            <TabsTrigger value="activity" className="text-xs sm:text-sm">
+              <Activity className="mr-1 sm:mr-2 h-3 w-3 sm:h-4 sm:w-4" />
+              <span className="hidden sm:inline">Activity</span>
+              <span className="sm:hidden">Log</span>
             </TabsTrigger>
-            <TabsTrigger value="members">
-              <Users className="mr-2 h-4 w-4" />
+            <TabsTrigger value="members" className="text-xs sm:text-sm">
+              <Users className="mr-1 sm:mr-2 h-3 w-3 sm:h-4 sm:w-4" />
               Members
             </TabsTrigger>
           </TabsList>
@@ -392,13 +406,13 @@ const Manage = () => {
                     {activities.map((activity) => (
                       <div
                         key={activity.id}
-                        className="flex items-start gap-4 p-4 border border-border rounded-lg"
+                        className="flex flex-col sm:flex-row sm:items-start gap-3 sm:gap-4 p-4 border border-border rounded-lg"
                       >
                         <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
                           <Activity className="h-4 w-4 text-primary" />
                         </div>
                         <div className="flex-1 min-w-0">
-                          <p className="font-medium text-sm">{activity.action}</p>
+                          <p className="font-medium text-sm break-words">{activity.action}</p>
                           {activity.metadata && typeof activity.metadata === 'object' && (
                             <div className="space-y-1 mt-1">
                               {(activity.metadata as any).pr_url && (
@@ -406,9 +420,9 @@ const Manage = () => {
                                   href={(activity.metadata as any).pr_url}
                                   target="_blank"
                                   rel="noopener noreferrer"
-                                  className="inline-flex items-center gap-1 text-xs text-primary hover:underline"
+                                  className="inline-flex items-center gap-1 text-xs text-primary hover:underline break-all"
                                 >
-                                  <ExternalLink className="h-3 w-3" />
+                                  <ExternalLink className="h-3 w-3 flex-shrink-0" />
                                   View PR #{(activity.metadata as any).pr_number}
                                 </a>
                               )}
@@ -417,9 +431,9 @@ const Manage = () => {
                                   href={`https://github.com/${site.repo_full_name}/commit/${(activity.metadata as any).commit_sha}`}
                                   target="_blank"
                                   rel="noopener noreferrer"
-                                  className="inline-flex items-center gap-1 text-xs text-primary hover:underline"
+                                  className="inline-flex items-center gap-1 text-xs text-primary hover:underline break-all"
                                 >
-                                  <ExternalLink className="h-3 w-3" />
+                                  <ExternalLink className="h-3 w-3 flex-shrink-0" />
                                   View commit {(activity.metadata as any).commit_sha.substring(0, 7)}
                                 </a>
                               )}
@@ -473,20 +487,20 @@ const Manage = () => {
                       return (
                         <div
                           key={`${member.site_id}-${member.user_id}`}
-                          className="flex items-center justify-between p-4 border border-border rounded-lg"
+                          className="flex flex-col sm:flex-row sm:items-center gap-3 p-4 border border-border rounded-lg"
                         >
-                          <div className="flex items-center gap-3">
-                            <Avatar className="h-10 w-10">
+                          <div className="flex items-center gap-3 flex-1 min-w-0">
+                            <Avatar className="h-10 w-10 flex-shrink-0">
                               <AvatarImage src={member.profile?.avatar_url || undefined} alt={displayName} />
                               <AvatarFallback className="bg-gradient-to-br from-primary to-accent text-primary-foreground">
                                 {initials}
                               </AvatarFallback>
                             </Avatar>
-                            <div>
-                              <div className="flex items-center gap-2">
-                                <p className="font-medium text-sm">{displayName}</p>
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center gap-2 flex-wrap">
+                                <p className="font-medium text-sm truncate">{displayName}</p>
                                 {isCurrentUser && (
-                                  <Badge variant="secondary" className="text-xs">You</Badge>
+                                  <Badge variant="secondary" className="text-xs flex-shrink-0">You</Badge>
                                 )}
                               </div>
                               <p className="text-xs text-muted-foreground">
@@ -494,8 +508,8 @@ const Manage = () => {
                               </p>
                             </div>
                           </div>
-                          <div className="flex items-center gap-2">
-                            <Badge variant={member.role === "owner" ? "default" : "secondary"}>
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <Badge variant={member.role === "owner" ? "default" : "secondary"} className="flex-shrink-0">
                               {member.role === "owner" && <Crown className="mr-1 h-3 w-3" />}
                               {member.role}
                             </Badge>
@@ -507,9 +521,10 @@ const Manage = () => {
                                     variant="outline"
                                     onClick={() => handlePromoteToOwner(member.user_id, displayName)}
                                     title="Promote to owner"
+                                    className="text-xs"
                                   >
-                                    <UserCog className="h-4 w-4 mr-1" />
-                                    Promote
+                                    <UserCog className="h-3 w-3 sm:mr-1" />
+                                    <span className="hidden sm:inline">Promote</span>
                                   </Button>
                                 )}
                                 <Button
@@ -545,23 +560,24 @@ const Manage = () => {
                     {invitations.map((invitation) => (
                       <div
                         key={invitation.id}
-                        className="flex items-center justify-between p-4 border border-border rounded-lg"
+                        className="flex flex-col sm:flex-row sm:items-center gap-3 p-4 border border-border rounded-lg"
                       >
-                        <div className="flex-1">
-                          <p className="font-medium text-sm">
+                        <div className="flex-1 min-w-0">
+                          <p className="font-medium text-sm truncate">
                             {invitation.email || "Invitation link"}
                           </p>
                           <p className="text-xs text-muted-foreground">
                             Expires {new Date(invitation.expires_at).toLocaleDateString()}
                           </p>
                         </div>
-                        <div className="flex items-center gap-2">
-                          <Badge variant="secondary">{invitation.role}</Badge>
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <Badge variant="secondary" className="flex-shrink-0">{invitation.role}</Badge>
                           <Button
                             size="icon"
                             variant="ghost"
                             onClick={() => handleCopyInviteLink(invitation.token, invitation.id)}
                             title="Copy invite link"
+                            className="flex-shrink-0"
                           >
                             {copiedInviteId === invitation.id ? (
                               <Check className="h-4 w-4 text-green-600" />
@@ -575,6 +591,7 @@ const Manage = () => {
                               variant="ghost"
                               onClick={() => handleDeleteInvitation(invitation.id)}
                               title="Delete invitation"
+                              className="flex-shrink-0"
                             >
                               <Trash2 className="h-4 w-4 text-destructive" />
                             </Button>
