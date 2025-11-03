@@ -12,11 +12,32 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
-import { Loader2, Plus, Github } from "lucide-react";
+import { Loader2, Plus, Github, BookOpen, Settings } from "lucide-react";
 
 interface AddSiteDialogProps {
   onSiteAdded: () => void;
+}
+
+interface Repository {
+  name: string;
+  full_name: string;
+  default_branch: string;
+  private: boolean;
+}
+
+interface Installation {
+  id: number;
+  account: {
+    login: string;
+    type: string;
+    avatar_url: string;
+  };
+  repository_count: number;
+  repositories: Repository[];
 }
 
 const AddSiteDialog = ({ onSiteAdded }: AddSiteDialogProps) => {
@@ -24,6 +45,8 @@ const AddSiteDialog = ({ onSiteAdded }: AddSiteDialogProps) => {
   const [loading, setLoading] = useState(false);
   const [connectingGithub, setConnectingGithub] = useState(false);
   const [popupWindow, setPopupWindow] = useState<Window | null>(null);
+  const [activeTab, setActiveTab] = useState("github");
+  const [installations, setInstallations] = useState<Installation[]>([]);
   const [formData, setFormData] = useState({
     name: "",
     repoFullName: "",
@@ -125,47 +148,25 @@ const AddSiteDialog = ({ onSiteAdded }: AddSiteDialogProps) => {
       }
 
       console.log('Found installations:', data.installations);
-
-      // If only one installation, auto-select it
-      if (data.installations.length === 1) {
-        const installation = data.installations[0];
-        if (installation.repositories && installation.repositories.length > 0) {
-          const repo = installation.repositories[0];
-          setFormData({
-            name: repo.name,
-            repoFullName: repo.full_name,
-            defaultBranch: repo.default_branch || "main",
-            githubInstallationId: installation.id.toString(),
-          });
-          toast.success(`Connected to ${installation.account.login} with ${installation.repository_count} repositories`);
-        } else {
-          setFormData(prev => ({
-            ...prev,
-            githubInstallationId: installation.id.toString(),
-          }));
-          toast.success(`Connected to ${installation.account.login}`);
-        }
-      } else {
-        // Multiple installations - let user choose
-        // For now, use the first one with repositories
-        const installationWithRepos = data.installations.find((i: any) => i.repositories?.length > 0);
-        if (installationWithRepos) {
-          const repo = installationWithRepos.repositories[0];
-          setFormData({
-            name: repo.name,
-            repoFullName: repo.full_name,
-            defaultBranch: repo.default_branch || "main",
-            githubInstallationId: installationWithRepos.id.toString(),
-          });
-          toast.success(`Found ${data.installations.length} installations. Using ${installationWithRepos.account.login}.`);
-        }
-      }
+      setInstallations(data.installations);
+      toast.success(`Found ${data.installations.length} installation(s) with repositories`);
     } catch (error: any) {
       console.error("Error fetching installations:", error);
       toast.error(error.message || "Failed to fetch GitHub installations");
     } finally {
       setConnectingGithub(false);
     }
+  };
+
+  const handleSelectRepository = (repo: Repository, installationId: number) => {
+    setFormData({
+      name: repo.name,
+      repoFullName: repo.full_name,
+      defaultBranch: repo.default_branch || "main",
+      githubInstallationId: installationId.toString(),
+    });
+    setActiveTab("manual");
+    toast.success("Repository selected. Review and add the site.");
   };
 
   const handleConnectGithub = async () => {
@@ -277,145 +278,224 @@ const AddSiteDialog = ({ onSiteAdded }: AddSiteDialogProps) => {
           Add Site
         </Button>
       </DialogTrigger>
-      <DialogContent className="sm:max-w-[500px]">
-        <form onSubmit={handleSubmit}>
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <Github className="h-5 w-5" />
-              Add New Site
-            </DialogTitle>
-            <DialogDescription>
-              Connect a GitHub repository to start managing your static site
-            </DialogDescription>
-          </DialogHeader>
+      <DialogContent className="sm:max-w-[700px] max-h-[90vh] overflow-hidden flex flex-col">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <Github className="h-5 w-5" />
+            Add New Site
+          </DialogTitle>
+          <DialogDescription>
+            Connect a GitHub repository to start managing your static site
+          </DialogDescription>
+        </DialogHeader>
 
-          <div className="space-y-4 py-4">
-            <div className="space-y-2 pb-2">
-              <Button
-                type="button"
-                variant="outline"
-                onClick={handleConnectGithub}
-                disabled={connectingGithub}
-                className="w-full"
-              >
-                {connectingGithub ? (
-                  <>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Waiting for GitHub...
-                  </>
-                ) : (
-                  <>
-                    <Github className="mr-2 h-4 w-4" />
-                    Install GitHub App
-                  </>
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="flex-1 flex flex-col overflow-hidden">
+          <TabsList className="grid w-full flex-shrink-0 grid-cols-2">
+            <TabsTrigger value="github">
+              <Github className="mr-2 h-4 w-4" />
+              From GitHub
+            </TabsTrigger>
+            <TabsTrigger value="manual">
+              <Settings className="mr-2 h-4 w-4" />
+              Manual
+            </TabsTrigger>
+          </TabsList>
+
+          <div className="flex-1 overflow-y-auto pr-2">
+            <TabsContent value="github" className="mt-0 h-full">
+              <div className="space-y-4 pb-4 px-1">
+                <div className="space-y-2">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={handleConnectGithub}
+                    disabled={connectingGithub}
+                    className="w-full"
+                  >
+                    {connectingGithub ? (
+                      <>
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        Waiting for GitHub...
+                      </>
+                    ) : (
+                      <>
+                        <Github className="mr-2 h-4 w-4" />
+                        Install GitHub App
+                      </>
+                    )}
+                  </Button>
+                  
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    onClick={handleFetchInstallations}
+                    disabled={connectingGithub}
+                    className="w-full"
+                  >
+                    {connectingGithub ? (
+                      <>
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        Fetching...
+                      </>
+                    ) : (
+                      <>
+                        <BookOpen className="mr-2 h-4 w-4" />
+                        I've Already Installed - Fetch Repositories
+                      </>
+                    )}
+                  </Button>
+                  
+                  {connectingGithub && (
+                    <p className="text-xs text-center text-muted-foreground mt-2">
+                      Complete the GitHub installation in the popup window
+                    </p>
+                  )}
+                </div>
+
+                {installations.length > 0 && (
+                  <div className="space-y-4">
+                    <div className="flex items-center justify-between">
+                      <h3 className="text-sm font-medium">Available Repositories</h3>
+                      <Badge variant="secondary">
+                        {installations.reduce((total, inst) => total + inst.repository_count, 0)} repos
+                      </Badge>
+                    </div>
+
+                    {installations.map((installation) => (
+                      <div key={installation.id} className="space-y-2">
+                        <div className="flex items-center gap-2 text-sm font-medium">
+                          <img
+                            src={installation.account.avatar_url}
+                            alt={installation.account.login}
+                            className="w-5 h-5 rounded-full"
+                          />
+                          <span>{installation.account.login}</span>
+                          <Badge variant="outline" className="text-xs">
+                            {installation.account.type}
+                          </Badge>
+                        </div>
+
+                        <div className="space-y-2">
+                          {installation.repositories.map((repo) => (
+                            <Card key={repo.full_name} className="hover:bg-accent/50 transition-colors">
+                              <CardHeader className="pb-3">
+                                <CardTitle className="text-sm flex items-center gap-2">
+                                  <Github className="h-4 w-4" />
+                                  {repo.name}
+                                  {repo.private && (
+                                    <Badge variant="secondary" className="text-xs">Private</Badge>
+                                  )}
+                                </CardTitle>
+                                <CardDescription className="text-xs">
+                                  {repo.full_name}
+                                </CardDescription>
+                              </CardHeader>
+                              <CardContent className="pb-3">
+                                <p className="text-xs text-muted-foreground">
+                                  Default branch: <span className="font-mono">{repo.default_branch}</span>
+                                </p>
+                              </CardContent>
+                              <CardFooter>
+                                <Button
+                                  size="sm"
+                                  onClick={() => handleSelectRepository(repo, installation.id)}
+                                  className="w-full"
+                                >
+                                  <Plus className="mr-2 h-4 w-4" />
+                                  Add This Repository
+                                </Button>
+                              </CardFooter>
+                            </Card>
+                          ))}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
                 )}
-              </Button>
-              
-              <Button
-                type="button"
-                variant="secondary"
-                onClick={handleFetchInstallations}
-                disabled={connectingGithub}
-                className="w-full"
-              >
-                {connectingGithub ? (
-                  <>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Fetching...
-                  </>
-                ) : (
-                  <>
-                    <Github className="mr-2 h-4 w-4" />
-                    I've Already Installed - Fetch Details
-                  </>
+
+                {installations.length === 0 && !connectingGithub && (
+                  <div className="text-center py-8 text-muted-foreground text-sm">
+                    <Github className="h-12 w-12 mx-auto mb-3 opacity-50" />
+                    <p>No repositories found yet.</p>
+                    <p className="text-xs mt-2">Install the GitHub App or fetch your installations to see available repositories.</p>
+                  </div>
                 )}
-              </Button>
-              
-              {connectingGithub && (
-                <p className="text-xs text-center text-muted-foreground mt-2">
-                  Complete the GitHub installation in the popup window
-                </p>
-              )}
-            </div>
-
-            <div className="relative">
-              <div className="absolute inset-0 flex items-center">
-                <span className="w-full border-t" />
               </div>
-              <div className="relative flex justify-center text-xs uppercase">
-                <span className="bg-background px-2 text-muted-foreground">
-                  Or enter manually
-                </span>
-              </div>
-            </div>
+            </TabsContent>
 
-            <div className="space-y-2">
-              <Label htmlFor="name">Site Name</Label>
-              <Input
-                id="name"
-                placeholder="My Awesome Site"
-                value={formData.name}
-                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                required
-              />
-            </div>
+            <TabsContent value="manual" className="mt-0 h-full">
+              <form onSubmit={handleSubmit}>
+                <div className="space-y-4 pb-4 px-1">
+                  <div className="space-y-2">
+                    <Label htmlFor="name">Site Name</Label>
+                    <Input
+                      id="name"
+                      placeholder="My Awesome Site"
+                      value={formData.name}
+                      onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                      required
+                    />
+                  </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="repo">Repository</Label>
-              <Input
-                id="repo"
-                placeholder="username/repository"
-                value={formData.repoFullName}
-                onChange={(e) => setFormData({ ...formData, repoFullName: e.target.value })}
-                required
-              />
-              <p className="text-xs text-muted-foreground">
-                Format: owner/repo-name
-              </p>
-            </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="repo">Repository</Label>
+                    <Input
+                      id="repo"
+                      placeholder="username/repository"
+                      value={formData.repoFullName}
+                      onChange={(e) => setFormData({ ...formData, repoFullName: e.target.value })}
+                      required
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      Format: owner/repo-name
+                    </p>
+                  </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="branch">Default Branch</Label>
-              <Input
-                id="branch"
-                placeholder="main"
-                value={formData.defaultBranch}
-                onChange={(e) => setFormData({ ...formData, defaultBranch: e.target.value })}
-                required
-              />
-            </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="branch">Default Branch</Label>
+                    <Input
+                      id="branch"
+                      placeholder="main"
+                      value={formData.defaultBranch}
+                      onChange={(e) => setFormData({ ...formData, defaultBranch: e.target.value })}
+                      required
+                    />
+                  </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="installation">GitHub Installation ID</Label>
-              <Input
-                id="installation"
-                type="number"
-                placeholder="12345678"
-                value={formData.githubInstallationId}
-                onChange={(e) => setFormData({ ...formData, githubInstallationId: e.target.value })}
-                required
-              />
-              <p className="text-xs text-muted-foreground">
-                Auto-filled when you connect with GitHub
-              </p>
-            </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="installation">GitHub Installation ID</Label>
+                    <Input
+                      id="installation"
+                      type="number"
+                      placeholder="12345678"
+                      value={formData.githubInstallationId}
+                      onChange={(e) => setFormData({ ...formData, githubInstallationId: e.target.value })}
+                      required
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      Auto-filled when you select a repository from GitHub tab
+                    </p>
+                  </div>
+
+                  <div className="flex justify-end gap-2 pt-4">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={() => setOpen(false)}
+                      disabled={loading}
+                    >
+                      Cancel
+                    </Button>
+                    <Button type="submit" disabled={loading}>
+                      {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                      Add Site
+                    </Button>
+                  </div>
+                </div>
+              </form>
+            </TabsContent>
           </div>
-
-          <DialogFooter>
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => setOpen(false)}
-              disabled={loading}
-            >
-              Cancel
-            </Button>
-            <Button type="submit" disabled={loading}>
-              {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              Add Site
-            </Button>
-          </DialogFooter>
-        </form>
+        </Tabs>
       </DialogContent>
     </Dialog>
   );
