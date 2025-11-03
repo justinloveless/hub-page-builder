@@ -1,15 +1,22 @@
 import { GitBranch, FileUp, FileText, UserPlus, Shield, Trash2, ExternalLink, Upload } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import type { Tables } from "@/integrations/supabase/types";
 
 type ActivityLog = Tables<"activity_log">;
+type Profile = Tables<"profiles">;
 
 interface ActivityCardProps {
   activity: ActivityLog;
   repoFullName: string;
+  userProfile?: Profile | null;
 }
 
-const ActivityCard = ({ activity, repoFullName }: ActivityCardProps) => {
+const ActivityCard = ({ activity, repoFullName, userProfile }: ActivityCardProps) => {
+  const displayName = userProfile?.full_name || `User ${activity.user_id?.slice(0, 8) || 'System'}`;
+  const initials = userProfile?.full_name
+    ? userProfile.full_name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2)
+    : (activity.user_id?.slice(0, 2).toUpperCase() || 'SY');
   const getActivityIcon = () => {
     const action = activity.action.toLowerCase();
     
@@ -126,11 +133,22 @@ const ActivityCard = ({ activity, repoFullName }: ActivityCardProps) => {
 
   return (
     <div className="flex gap-3 p-4 border border-border rounded-lg hover:bg-accent/5 transition-colors">
-      <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
-        {getActivityIcon()}
-      </div>
+      <Avatar className="h-8 w-8 flex-shrink-0">
+        <AvatarImage src={userProfile?.avatar_url || undefined} alt={displayName} />
+        <AvatarFallback className="bg-gradient-to-br from-primary to-accent text-primary-foreground text-xs">
+          {initials}
+        </AvatarFallback>
+      </Avatar>
       <div className="flex-1 min-w-0">
-        <p className="font-medium text-sm break-words">{activity.action}</p>
+        <div className="flex items-center gap-2 mb-1">
+          <div className="w-6 h-6 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
+            {getActivityIcon()}
+          </div>
+          <p className="font-medium text-sm break-words">{activity.action}</p>
+        </div>
+        <p className="text-xs text-muted-foreground mb-2">
+          by <span className="font-medium">{displayName}</span>
+        </p>
         {getActivityDetails()}
         <p className="text-xs text-muted-foreground mt-2">
           {new Date(activity.created_at).toLocaleString()}

@@ -6,8 +6,12 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Calendar } from "@/components/ui/calendar";
 import { toast } from "sonner";
-import { ArrowLeft, ExternalLink, GitBranch, Users, FileText, Activity, Copy, Trash2, Check, User as UserIcon, Settings, UserCog, Crown, LogOut } from "lucide-react";
+import { ArrowLeft, ExternalLink, GitBranch, Users, FileText, Activity, Copy, Trash2, Check, User as UserIcon, Settings, UserCog, Crown, LogOut, Filter, CalendarIcon, X } from "lucide-react";
+import { format } from "date-fns";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import AssetManager from "@/components/AssetManager";
@@ -25,13 +29,17 @@ interface MemberWithProfile extends SiteMember {
   profile?: Profile | null;
 }
 
+interface ActivityWithProfile extends ActivityLog {
+  user_profile?: Profile | null;
+}
+
 const Manage = () => {
   const navigate = useNavigate();
   const { siteId } = useParams<{ siteId: string }>();
   const [loading, setLoading] = useState(true);
   const [copiedInviteId, setCopiedInviteId] = useState<string | null>(null);
   const [site, setSite] = useState<Site | null>(null);
-  const [activities, setActivities] = useState<ActivityLog[]>([]);
+  const [activities, setActivities] = useState<ActivityWithProfile[]>([]);
   const [members, setMembers] = useState<MemberWithProfile[]>([]);
   const [invitations, setInvitations] = useState<Invitation[]>([]);
   const [showLeaveDialog, setShowLeaveDialog] = useState(false);
@@ -39,6 +47,11 @@ const Manage = () => {
   const [activitiesPage, setActivitiesPage] = useState(1);
   const [hasMoreActivities, setHasMoreActivities] = useState(true);
   const ACTIVITIES_PER_PAGE = 10;
+  
+  // Activity filters
+  const [filterUserId, setFilterUserId] = useState<string>("all");
+  const [filterDateFrom, setFilterDateFrom] = useState<Date | undefined>(undefined);
+  const [filterDateTo, setFilterDateTo] = useState<Date | undefined>(undefined);
 
   // Get current user's role
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
@@ -112,22 +125,62 @@ const Manage = () => {
       const from = (page - 1) * ACTIVITIES_PER_PAGE;
       const to = from + ACTIVITIES_PER_PAGE - 1;
 
-      const { data, error } = await supabase
+      let query = supabase
         .from("activity_log")
         .select("*")
-        .eq("site_id", siteId)
+        .eq("site_id", siteId);
+
+      // Apply user filter
+      if (filterUserId && filterUserId !== "all") {
+        query = query.eq("user_id", filterUserId);
+      }
+
+      // Apply date filters
+      if (filterDateFrom) {
+        query = query.gte("created_at", filterDateFrom.toISOString());
+      }
+      if (filterDateTo) {
+        // Add one day to include the entire end date
+        const endDate = new Date(filterDateTo);
+        endDate.setDate(endDate.getDate() + 1);
+        query = query.lt("created_at", endDate.toISOString());
+      }
+
+      const { data: activitiesData, error } = await query
         .order("created_at", { ascending: false })
         .range(from, to);
 
       if (error) throw error;
       
-      const newActivities = data || [];
-      setHasMoreActivities(newActivities.length === ACTIVITIES_PER_PAGE);
+      // Fetch profiles for activities
+      const userIds = [...new Set(activitiesData?.map(a => a.user_id).filter(Boolean) || [])];
+      let profilesMap: Record<string, Profile> = {};
+      
+      if (userIds.length > 0) {
+        const { data: profilesData } = await supabase
+          .from("profiles")
+          .select("*")
+          .in("id", userIds);
+        
+        if (profilesData) {
+          profilesMap = profilesData.reduce((acc, profile) => {
+            acc[profile.id] = profile;
+            return acc;
+          }, {} as Record<string, Profile>);
+        }
+      }
+
+      const activitiesWithProfiles: ActivityWithProfile[] = (activitiesData || []).map(activity => ({
+        ...activity,
+        user_profile: activity.user_id ? profilesMap[activity.user_id] : null
+      }));
+      
+      setHasMoreActivities(activitiesWithProfiles.length === ACTIVITIES_PER_PAGE);
       
       if (append) {
-        setActivities(prev => [...prev, ...newActivities]);
+        setActivities(prev => [...prev, ...activitiesWithProfiles]);
       } else {
-        setActivities(newActivities);
+        setActivities(activitiesWithProfiles);
       }
     } catch (error: any) {
       console.error("Failed to load activities:", error);
@@ -139,6 +192,23 @@ const Manage = () => {
     setActivitiesPage(nextPage);
     await loadActivities(nextPage, true);
   };
+
+  const handleFilterChange = () => {
+    setActivitiesPage(1);
+    loadActivities(1, false);
+  };
+
+  const clearFilters = () => {
+    setFilterUserId("all");
+    setFilterDateFrom(undefined);
+    setFilterDateTo(undefined);
+  };
+
+  useEffect(() => {
+    if (siteId) {
+      handleFilterChange();
+    }
+  }, [filterUserId, filterDateFrom, filterDateTo]);
 
   const loadMembers = async () => {
     if (!siteId) return;
@@ -494,16 +564,84 @@ const Manage = () => {
           <TabsContent value="activity">
             <Card>
               <CardHeader>
-                <CardTitle>Activity Log</CardTitle>
-                <CardDescription>
-                  Recent actions and events for this site
-                </CardDescription>
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                  <div>
+                    <CardTitle>Activity Log</CardTitle>
+                    <CardDescription>
+                      Recent actions and events for this site
+                    </CardDescription>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Filter className="h-4 w-4 text-muted-foreground" />
+                    <span className="text-sm text-muted-foreground">Filters:</span>
+                  </div>
+                </div>
+                <div className="flex flex-col sm:flex-row gap-3 mt-4">
+                  <Select value={filterUserId} onValueChange={setFilterUserId}>
+                    <SelectTrigger className="w-full sm:w-[200px]">
+                      <SelectValue placeholder="All users" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All users</SelectItem>
+                      {members.map((member) => (
+                        <SelectItem key={member.user_id} value={member.user_id}>
+                          {member.profile?.full_name || `User ${member.user_id.slice(0, 8)}`}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <Button variant="outline" className="w-full sm:w-[240px] justify-start text-left font-normal">
+                        <CalendarIcon className="mr-2 h-4 w-4" />
+                        {filterDateFrom ? format(filterDateFrom, "PPP") : "From date"}
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-auto p-0">
+                      <Calendar
+                        mode="single"
+                        selected={filterDateFrom}
+                        onSelect={setFilterDateFrom}
+                        initialFocus
+                      />
+                    </PopoverContent>
+                  </Popover>
+
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <Button variant="outline" className="w-full sm:w-[240px] justify-start text-left font-normal">
+                        <CalendarIcon className="mr-2 h-4 w-4" />
+                        {filterDateTo ? format(filterDateTo, "PPP") : "To date"}
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-auto p-0">
+                      <Calendar
+                        mode="single"
+                        selected={filterDateTo}
+                        onSelect={setFilterDateTo}
+                        initialFocus
+                      />
+                    </PopoverContent>
+                  </Popover>
+
+                  {(filterUserId !== "all" || filterDateFrom || filterDateTo) && (
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={clearFilters}
+                      title="Clear filters"
+                    >
+                      <X className="h-4 w-4" />
+                    </Button>
+                  )}
+                </div>
               </CardHeader>
               <CardContent>
                 {activities.length === 0 ? (
                   <div className="text-center py-8 text-muted-foreground">
                     <Activity className="h-12 w-12 mx-auto mb-3 opacity-50" />
-                    <p>No activity yet</p>
+                    <p>No activity found</p>
                   </div>
                 ) : (
                   <div className="space-y-3">
@@ -512,6 +650,7 @@ const Manage = () => {
                         key={activity.id}
                         activity={activity}
                         repoFullName={site.repo_full_name}
+                        userProfile={activity.user_profile}
                       />
                     ))}
                     {hasMoreActivities && (
