@@ -358,20 +358,28 @@ const Manage = () => {
                     {assets.map((asset) => (
                       <div
                         key={asset.id}
-                        className="flex items-center justify-between p-4 border border-border rounded-lg hover:bg-muted/50 transition-colors"
+                        className="flex items-start gap-4 p-4 border border-border rounded-lg hover:bg-muted/50 transition-colors"
                       >
-                        <div className="flex-1">
-                          <p className="font-medium text-sm">{asset.repo_path}</p>
-                          <p className="text-xs text-muted-foreground mt-1">
-                            {asset.storage_path}
-                          </p>
+                        <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
+                          <FileText className="h-4 w-4 text-primary" />
                         </div>
-                        <div className="flex items-center gap-4">
-                          <Badge variant={asset.status === "active" ? "default" : "secondary"}>
-                            {asset.status}
-                          </Badge>
-                          <p className="text-xs text-muted-foreground">
-                            {(asset.file_size_bytes / 1024).toFixed(2)} KB
+                        <div className="flex-1 min-w-0">
+                          <p className="font-medium text-sm truncate">{asset.repo_path}</p>
+                          <div className="flex flex-wrap items-center gap-2 mt-1">
+                            <Badge variant={asset.status === "active" ? "default" : "secondary"} className="text-xs">
+                              {asset.status}
+                            </Badge>
+                            <span className="text-xs text-muted-foreground">
+                              {(asset.file_size_bytes / 1024).toFixed(2)} KB
+                            </span>
+                            {asset.checksum && (
+                              <span className="text-xs text-muted-foreground font-mono">
+                                {asset.checksum.substring(0, 8)}
+                              </span>
+                            )}
+                          </div>
+                          <p className="text-xs text-muted-foreground mt-2">
+                            {new Date(asset.created_at).toLocaleString()}
                           </p>
                         </div>
                       </div>
@@ -411,6 +419,17 @@ const Manage = () => {
                           <p className="font-medium text-sm">{activity.action}</p>
                           {activity.metadata && typeof activity.metadata === 'object' && (
                             <div className="space-y-1 mt-1">
+                              {(activity.metadata as any).pr_url && (
+                                <a
+                                  href={(activity.metadata as any).pr_url}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="inline-flex items-center gap-1 text-xs text-primary hover:underline"
+                                >
+                                  <ExternalLink className="h-3 w-3" />
+                                  View PR #{(activity.metadata as any).pr_number}
+                                </a>
+                              )}
                               {(activity.metadata as any).commit_sha && site && (
                                 <a
                                   href={`https://github.com/${site.repo_full_name}/commit/${(activity.metadata as any).commit_sha}`}
