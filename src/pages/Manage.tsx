@@ -7,7 +7,8 @@ import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Skeleton } from "@/components/ui/skeleton";
 import { toast } from "sonner";
-import { ArrowLeft, ExternalLink, GitBranch, Users, FileText, Activity, Copy, Trash2, Check, User as UserIcon, Settings, UserCog, Crown } from "lucide-react";
+import { ArrowLeft, ExternalLink, GitBranch, Users, FileText, Activity, Copy, Trash2, Check, User as UserIcon, Settings, UserCog, Crown, LogOut } from "lucide-react";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import AssetManager from "@/components/AssetManager";
 import InviteMemberDialog from "@/components/InviteMemberDialog";
@@ -32,6 +33,8 @@ const Manage = () => {
   const [activities, setActivities] = useState<ActivityLog[]>([]);
   const [members, setMembers] = useState<MemberWithProfile[]>([]);
   const [invitations, setInvitations] = useState<Invitation[]>([]);
+  const [showLeaveDialog, setShowLeaveDialog] = useState(false);
+  const [leaveAction, setLeaveAction] = useState<'leave' | 'delete' | null>(null);
 
   // Get current user's role
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
@@ -244,6 +247,78 @@ const Manage = () => {
     }
   };
 
+  const handleLeaveSite = async () => {
+    if (!currentUserId || !siteId) return;
+
+    try {
+      const owners = members.filter(m => m.role === 'owner');
+      const managers = members.filter(m => m.role === 'manager');
+      const isOwner = currentUserRole === 'owner';
+      const isLastOwner = isOwner && owners.length === 1;
+      const isLastMember = members.length === 1;
+
+      // If last member, delete the site
+      if (isLastMember) {
+        setLeaveAction('delete');
+        setShowLeaveDialog(true);
+        return;
+      }
+
+      // If last owner with managers, promote a manager first
+      if (isLastOwner && managers.length > 0) {
+        const firstManager = managers[0];
+        await supabase
+          .from("site_members")
+          .update({ role: "owner" })
+          .eq("site_id", siteId)
+          .eq("user_id", firstManager.user_id);
+
+        toast.success(`${firstManager.profile?.full_name || 'Manager'} promoted to owner`);
+      }
+
+      setLeaveAction('leave');
+      setShowLeaveDialog(true);
+    } catch (error: any) {
+      console.error("Failed to process leave request:", error);
+      toast.error("Failed to leave site");
+    }
+  };
+
+  const confirmLeaveSite = async () => {
+    if (!currentUserId || !siteId) return;
+
+    try {
+      if (leaveAction === 'delete') {
+        // Delete the site
+        const { error } = await supabase
+          .from("sites")
+          .delete()
+          .eq("id", siteId);
+
+        if (error) throw error;
+        toast.success("Site deleted successfully");
+      } else {
+        // Just remove membership
+        const { error } = await supabase
+          .from("site_members")
+          .delete()
+          .eq("site_id", siteId)
+          .eq("user_id", currentUserId);
+
+        if (error) throw error;
+        toast.success("Left site successfully");
+      }
+
+      navigate("/dashboard");
+    } catch (error: any) {
+      console.error("Failed to leave site:", error);
+      toast.error(error.message || "Failed to leave site");
+    } finally {
+      setShowLeaveDialog(false);
+      setLeaveAction(null);
+    }
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen bg-background">
@@ -301,6 +376,14 @@ const Manage = () => {
                 title="Profile"
               >
                 <UserIcon className="h-5 w-5" />
+              </Button>
+              <Button 
+                variant="ghost"
+                size="icon"
+                onClick={handleLeaveSite}
+                title="Leave Site"
+              >
+                <LogOut className="h-5 w-5" />
               </Button>
               <Button 
                 variant="outline" 
@@ -606,6 +689,27 @@ const Manage = () => {
           </TabsContent>
         </Tabs>
       </main>
+
+      <AlertDialog open={showLeaveDialog} onOpenChange={setShowLeaveDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              {leaveAction === 'delete' ? 'Delete Site?' : 'Leave Site?'}
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              {leaveAction === 'delete' 
+                ? "You are the last member of this site. Leaving will permanently delete the site and all its data. This action cannot be undone."
+                : "Are you sure you want to leave this site? You will lose access to manage it."}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={confirmLeaveSite} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+              {leaveAction === 'delete' ? 'Delete Site' : 'Leave Site'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 };
