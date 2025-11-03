@@ -102,8 +102,70 @@ export const SitePreview = ({ siteId, pendingChanges }: SitePreviewProps) => {
       if (path.endsWith('.jpg') || path.endsWith('.jpeg')) return 'image/jpeg';
       if (path.endsWith('.gif')) return 'image/gif';
       if (path.endsWith('.svg')) return 'image/svg+xml';
+      if (path.endsWith('.woff') || path.endsWith('.woff2')) return 'font/woff2';
+      if (path.endsWith('.ttf')) return 'font/ttf';
+      if (path.endsWith('.otf')) return 'font/otf';
       return 'application/octet-stream';
     };
+
+    // Create blob URLs for all files
+    const blobUrls: Record<string, string> = {};
+    Object.keys(virtualFiles).forEach(path => {
+      const file = virtualFiles[path];
+      const content = file.encoding === 'base64' 
+        ? atob(file.content)
+        : file.content;
+      const mimeType = getMimeType(path);
+      
+      // Convert to Uint8Array for binary files
+      const bytes = new Uint8Array(content.length);
+      for (let i = 0; i < content.length; i++) {
+        bytes[i] = content.charCodeAt(i);
+      }
+      
+      const blob = new Blob([bytes], { type: mimeType });
+      blobUrls[path] = URL.createObjectURL(blob);
+    });
+
+    // Create fetch interceptor script
+    const interceptorScript = `
+      <script>
+        (function() {
+          const fileMap = ${JSON.stringify(blobUrls)};
+          
+          // Helper to resolve path
+          function resolvePath(path) {
+            const cleaned = path.replace(/^\\.?\\//, '');
+            return fileMap[cleaned] || path;
+          }
+          
+          // Intercept fetch
+          const originalFetch = window.fetch;
+          window.fetch = function(input, init) {
+            if (typeof input === 'string') {
+              input = resolvePath(input);
+            }
+            return originalFetch.call(this, input, init);
+          };
+          
+          // Intercept Image constructor
+          const OriginalImage = window.Image;
+          window.Image = function() {
+            const img = new OriginalImage();
+            const originalSrcSet = Object.getOwnPropertyDescriptor(OriginalImage.prototype, 'src').set;
+            Object.defineProperty(img, 'src', {
+              set: function(value) {
+                originalSrcSet.call(this, resolvePath(value));
+              },
+              get: function() {
+                return this.getAttribute('src');
+              }
+            });
+            return img;
+          };
+        })();
+      </script>
+    `;
 
     // Replace CSS links with inline styles
     indexHtml = indexHtml.replace(/<link[^>]*rel=["']stylesheet["'][^>]*>/gi, (match) => {
@@ -118,11 +180,21 @@ export const SitePreview = ({ siteId, pendingChanges }: SitePreviewProps) => {
       return match;
     });
 
-    // Replace script tags with inline scripts
+    // Replace script tags and inject asset paths
     indexHtml = indexHtml.replace(/<script([^>]*)src=["']([^"']+)["']([^>]*)><\/script>/gi, (match, before, src, after) => {
       const jsPath = src.replace(/^\.\//, '');
-      const jsContent = getFileContent(jsPath);
+      let jsContent = getFileContent(jsPath);
       if (jsContent) {
+        // Replace asset paths in JavaScript
+        Object.keys(blobUrls).forEach(path => {
+          const patterns = [
+            new RegExp(`['"\`]\\.\\/+${path.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}['"\`]`, 'g'),
+            new RegExp(`['"\`]${path.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}['"\`]`, 'g')
+          ];
+          patterns.forEach(pattern => {
+            jsContent = jsContent.replace(pattern, `"${blobUrls[path]}"`);
+          });
+        });
         return `<script${before}${after}>${jsContent}</script>`;
       }
       return match;
@@ -139,11 +211,14 @@ export const SitePreview = ({ siteId, pendingChanges }: SitePreviewProps) => {
       return match;
     });
 
+    // Inject interceptor script before any other scripts
+    indexHtml = indexHtml.replace(/<head>/i, `<head>${interceptorScript}`);
+
     // Create blob URL
     const blob = new Blob([indexHtml], { type: 'text/html' });
     const url = URL.createObjectURL(blob);
 
-    // Clean up previous URL
+    // Clean up previous URLs
     if (previewUrl) {
       URL.revokeObjectURL(previewUrl);
     }
