@@ -287,10 +287,47 @@ const AssetUploadDialog = ({ open, onOpenChange, asset, siteId, onSuccess }: Ass
     setJsonFormData(prev => ({ ...prev, [key]: value }));
   };
 
-  const renderSchemaField = (key: string, fieldSchema: any) => {
-    const value = jsonFormData[key] ?? fieldSchema.default ?? '';
+  const renderSchemaField = (key: string, fieldSchema: any, parentKey?: string) => {
+    const fullKey = parentKey ? `${parentKey}.${key}` : key;
+    const value = parentKey 
+      ? jsonFormData[parentKey]?.[key] ?? fieldSchema.default ?? ''
+      : jsonFormData[key] ?? fieldSchema.default ?? '';
+    
+    const updateValue = (newValue: any) => {
+      if (parentKey) {
+        setJsonFormData(prev => ({
+          ...prev,
+          [parentKey]: {
+            ...(prev[parentKey] || {}),
+            [key]: newValue
+          }
+        }));
+      } else {
+        updateJsonField(key, newValue);
+      }
+    };
     
     switch (fieldSchema.type) {
+      case 'object':
+        if (fieldSchema.properties) {
+          return (
+            <div key={fullKey} className="space-y-3 p-4 border rounded-lg bg-accent/5">
+              <h3 className="font-semibold text-sm uppercase tracking-wide text-muted-foreground">
+                {fieldSchema.title || key}
+              </h3>
+              {fieldSchema.description && (
+                <p className="text-xs text-muted-foreground -mt-2">{fieldSchema.description}</p>
+              )}
+              <div className="space-y-3 pl-2">
+                {Object.entries(fieldSchema.properties).map(([nestedKey, nestedSchema]: [string, any]) =>
+                  renderSchemaField(nestedKey, nestedSchema, key)
+                )}
+              </div>
+            </div>
+          );
+        }
+        return null;
+      
       case 'string':
         if (fieldSchema.enum) {
           return (
@@ -304,9 +341,9 @@ const AssetUploadDialog = ({ open, onOpenChange, asset, siteId, onSuccess }: Ass
                 )}
               </Label>
               <select
-                id={key}
+                id={fullKey}
                 value={value}
-                onChange={(e) => updateJsonField(key, e.target.value)}
+                onChange={(e) => updateValue(e.target.value)}
                 className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
               >
                 <option value="">Select...</option>
@@ -318,8 +355,8 @@ const AssetUploadDialog = ({ open, onOpenChange, asset, siteId, onSuccess }: Ass
           );
         }
         return (
-          <div key={key} className="space-y-2">
-            <Label htmlFor={key}>
+          <div key={fullKey} className="space-y-2">
+            <Label htmlFor={fullKey}>
               {fieldSchema.title || key}
               {fieldSchema.description && (
                 <span className="text-xs text-muted-foreground ml-2">
@@ -329,17 +366,17 @@ const AssetUploadDialog = ({ open, onOpenChange, asset, siteId, onSuccess }: Ass
             </Label>
             {fieldSchema.multiline ? (
               <Textarea
-                id={key}
+                id={fullKey}
                 value={value}
-                onChange={(e) => updateJsonField(key, e.target.value)}
+                onChange={(e) => updateValue(e.target.value)}
                 placeholder={fieldSchema.placeholder}
                 className="min-h-[100px]"
               />
             ) : (
               <Input
-                id={key}
+                id={fullKey}
                 value={value}
-                onChange={(e) => updateJsonField(key, e.target.value)}
+                onChange={(e) => updateValue(e.target.value)}
                 placeholder={fieldSchema.placeholder}
               />
             )}
@@ -349,8 +386,8 @@ const AssetUploadDialog = ({ open, onOpenChange, asset, siteId, onSuccess }: Ass
       case 'number':
       case 'integer':
         return (
-          <div key={key} className="space-y-2">
-            <Label htmlFor={key}>
+          <div key={fullKey} className="space-y-2">
+            <Label htmlFor={fullKey}>
               {fieldSchema.title || key}
               {fieldSchema.description && (
                 <span className="text-xs text-muted-foreground ml-2">
@@ -359,10 +396,10 @@ const AssetUploadDialog = ({ open, onOpenChange, asset, siteId, onSuccess }: Ass
               )}
             </Label>
             <Input
-              id={key}
+              id={fullKey}
               type="number"
               value={value}
-              onChange={(e) => updateJsonField(key, fieldSchema.type === 'integer' ? parseInt(e.target.value) || 0 : parseFloat(e.target.value) || 0)}
+              onChange={(e) => updateValue(fieldSchema.type === 'integer' ? parseInt(e.target.value) || 0 : parseFloat(e.target.value) || 0)}
               placeholder={fieldSchema.placeholder}
               min={fieldSchema.minimum}
               max={fieldSchema.maximum}
@@ -372,15 +409,15 @@ const AssetUploadDialog = ({ open, onOpenChange, asset, siteId, onSuccess }: Ass
       
       case 'boolean':
         return (
-          <div key={key} className="flex items-center space-x-2 py-2">
+          <div key={fullKey} className="flex items-center space-x-2 py-2">
             <input
-              id={key}
+              id={fullKey}
               type="checkbox"
               checked={!!value}
-              onChange={(e) => updateJsonField(key, e.target.checked)}
+              onChange={(e) => updateValue(e.target.checked)}
               className="h-4 w-4 rounded border-input"
             />
-            <Label htmlFor={key} className="cursor-pointer">
+            <Label htmlFor={fullKey} className="cursor-pointer">
               {fieldSchema.title || key}
               {fieldSchema.description && (
                 <span className="text-xs text-muted-foreground ml-2">
@@ -393,16 +430,16 @@ const AssetUploadDialog = ({ open, onOpenChange, asset, siteId, onSuccess }: Ass
       
       default:
         return (
-          <div key={key} className="space-y-2">
-            <Label htmlFor={key}>{fieldSchema.title || key}</Label>
+          <div key={fullKey} className="space-y-2">
+            <Label htmlFor={fullKey}>{fieldSchema.title || key}</Label>
             <Input
-              id={key}
+              id={fullKey}
               value={typeof value === 'object' ? JSON.stringify(value) : value}
               onChange={(e) => {
                 try {
-                  updateJsonField(key, JSON.parse(e.target.value));
+                  updateValue(JSON.parse(e.target.value));
                 } catch {
-                  updateJsonField(key, e.target.value);
+                  updateValue(e.target.value);
                 }
               }}
             />
