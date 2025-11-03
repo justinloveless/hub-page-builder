@@ -265,10 +265,27 @@ const AssetUploadDialog = ({ open, onOpenChange, asset, siteId, pendingChanges, 
       const base64Content = btoa(unescape(encodeURIComponent(contentToUpload)));
       
       if (saveToBatch) {
+        // Fetch original content for diff comparison
+        let originalContent = "";
+        try {
+          const { data: originalData } = await supabase.functions.invoke('fetch-asset-content', {
+            body: { 
+              site_id: siteId,
+              asset_path: asset.path
+            },
+          });
+          if (originalData?.found) {
+            originalContent = originalData.content;
+          }
+        } catch (error) {
+          console.error("Failed to fetch original content for diff:", error);
+        }
+
         const fileName = asset.path.split('/').pop() || 'file';
         const newChange: PendingAssetChange = {
           repoPath: asset.path,
           content: base64Content,
+          originalContent: originalContent ? btoa(unescape(encodeURIComponent(originalContent))) : undefined,
           fileName
         };
         

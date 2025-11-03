@@ -23,6 +23,7 @@ import type { Tables } from "@/integrations/supabase/types";
 export interface PendingAssetChange {
   repoPath: string;
   content: string;
+  originalContent?: string;
   fileName: string;
 }
 
