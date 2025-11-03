@@ -64,7 +64,7 @@ Deno.serve(async (req) => {
 
     // Get GitHub App configuration
     const { data: appConfig, error: appError } = await supabase
-      .from('github_app_config')
+      .from('github_app_public_config')
       .select('*')
       .single()
 
@@ -90,24 +90,27 @@ Deno.serve(async (req) => {
       privateKey: privateKey,
     })
 
-    const octokit = await app.getInstallationOctokit(site.installation_id)
+    const octokit = await app.getInstallationOctokit(site.github_installation_id)
+
+    // Parse repo owner and name from full name
+    const [repo_owner, repo_name] = site.repo_full_name.split('/')
 
     // Get the default branch's tree
     const { data: ref } = await octokit.request('GET /repos/{owner}/{repo}/git/ref/{ref}', {
-      owner: site.repo_owner,
-      repo: site.repo_name,
-      ref: `heads/${site.branch}`,
+      owner: repo_owner,
+      repo: repo_name,
+      ref: `heads/${site.default_branch}`,
     })
 
     const { data: commit } = await octokit.request('GET /repos/{owner}/{repo}/git/commits/{commit_sha}', {
-      owner: site.repo_owner,
-      repo: site.repo_name,
+      owner: repo_owner,
+      repo: repo_name,
       commit_sha: ref.object.sha,
     })
 
     const { data: tree } = await octokit.request('GET /repos/{owner}/{repo}/git/trees/{tree_sha}', {
-      owner: site.repo_owner,
-      repo: site.repo_name,
+      owner: repo_owner,
+      repo: repo_name,
       tree_sha: commit.tree.sha,
       recursive: '1',
     })
@@ -119,8 +122,8 @@ Deno.serve(async (req) => {
       if (item.type === 'blob' && item.path) {
         try {
           const { data: blob } = await octokit.request('GET /repos/{owner}/{repo}/git/blobs/{file_sha}', {
-            owner: site.repo_owner,
-            repo: site.repo_name,
+            owner: repo_owner,
+            repo: repo_name,
             file_sha: item.sha!,
           })
           
