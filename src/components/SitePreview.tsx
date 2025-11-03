@@ -22,6 +22,18 @@ export const SitePreview = ({ siteId, pendingChanges }: SitePreviewProps) => {
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const filesRef = useRef<Record<string, { content: string; encoding: string }>>({});
 
+  // Add message listener for debug logs from iframe
+  useEffect(() => {
+    const handleMessage = (event: MessageEvent) => {
+      if (event.data?.source === 'site-preview') {
+        const { level, args } = event.data;
+        console.log(`[Site Preview ${level.toUpperCase()}]`, ...args);
+      }
+    };
+    window.addEventListener('message', handleMessage);
+    return () => window.removeEventListener('message', handleMessage);
+  }, []);
+
   useEffect(() => {
     loadSiteFiles();
   }, [siteId]);
@@ -131,23 +143,96 @@ export const SitePreview = ({ siteId, pendingChanges }: SitePreviewProps) => {
     const interceptorScript = `
       <script>
         (function() {
+          // Bridge console to parent for debugging
+          (function setupConsoleBridge() {
+            const methods = ['log','info','warn','error'];
+            methods.forEach((m) => {
+              const original = console[m];
+              console[m] = function(...args) {
+                try { window.parent?.postMessage({ source: 'site-preview', level: m, args: args.map(a => {
+                  try { return typeof a === 'string' ? a : JSON.stringify(a); } catch { return String(a); }
+                }) }, '*'); } catch {}
+                return original.apply(console, args);
+              };
+            });
+            window.addEventListener('error', (e) => {
+              window.parent?.postMessage({ source: 'site-preview', level: 'error', args: ['Uncaught Error: ' + e.message, e.filename, e.lineno, e.colno] }, '*');
+            });
+            window.addEventListener('unhandledrejection', (e) => {
+              window.parent?.postMessage({ source: 'site-preview', level: 'error', args: ['Unhandled Promise Rejection', String(e.reason)] }, '*');
+            });
+          })();
+
+          console.log('[Site Preview] Interceptor script starting...');
           const fileMap = ${JSON.stringify(blobUrls)};
-          
-          // Helper to resolve path
-          function resolvePath(path) {
-            const cleaned = path.replace(/^\\.?\\//, '');
-            return fileMap[cleaned] || path;
+          console.log('[Site Preview] File map keys:', Object.keys(fileMap));
+
+          function stripQueryHash(path) {
+            return (path || '').split('#')[0].split('?')[0];
           }
-          
+
+          // Helper to resolve path against our virtual FS
+          function resolvePath(path) {
+            if (!path) return path;
+            // Support URL and Request objects by converting to string first
+            if (typeof path !== 'string') {
+              try { path = String(path.url || path.href || path); } catch { return path; }
+            }
+            const withoutQ = stripQueryHash(path);
+            const variants = [];
+            const dropPrefixes = (p) => p.replace(/^\.\//, '').replace(/^\//, '');
+            const base = dropPrefixes(withoutQ);
+            variants.push(base, './' + base, '/' + base);
+            for (let v of variants) {
+              if (fileMap[v]) {
+                console.log('[Site Preview] Resolved path:', path, '->', fileMap[v]);
+                return fileMap[v];
+              }
+            }
+            return path;
+          }
+
           // Intercept fetch
           const originalFetch = window.fetch;
           window.fetch = function(input, init) {
-            if (typeof input === 'string') {
-              input = resolvePath(input);
+            try { console.log('[Site Preview] Fetch intercepted:', input); } catch {}
+            if (typeof input === 'string' || input instanceof URL) {
+              const resolved = resolvePath(input);
+              return originalFetch.call(this, resolved, init);
+            }
+            // Request object
+            if (input && typeof input === 'object' && 'url' in input) {
+              const resolvedUrl = resolvePath(input.url);
+              const cloned = new Request(resolvedUrl, input);
+              return originalFetch.call(this, cloned, init);
             }
             return originalFetch.call(this, input, init);
           };
-          
+
+          // Intercept XMLHttpRequest
+          const OriginalXHR = window.XMLHttpRequest;
+          window.XMLHttpRequest = function() {
+            const xhr = new OriginalXHR();
+            const originalOpen = xhr.open;
+            xhr.open = function(method, url, ...args) {
+              const resolvedUrl = resolvePath(url);
+              if (url !== resolvedUrl) { console.log('[Site Preview] XHR path resolved:', url, '->', resolvedUrl); }
+              return originalOpen.call(this, method, resolvedUrl, ...args);
+            };
+            return xhr;
+          };
+
+          // Intercept element attribute setting for src/href
+          const originalSetAttribute = Element.prototype.setAttribute;
+          Element.prototype.setAttribute = function(name, value) {
+            if (name === 'src' || name === 'href' || name === 'srcset') {
+              const resolved = resolvePath(value);
+              if (resolved !== value) { try { console.log('[Site Preview] Attribute resolved:', name, value, '->', resolved); } catch {} }
+              return originalSetAttribute.call(this, name, resolved);
+            }
+            return originalSetAttribute.call(this, name, value);
+          };
+
           // Intercept Image constructor
           const OriginalImage = window.Image;
           window.Image = function() {
@@ -155,7 +240,8 @@ export const SitePreview = ({ siteId, pendingChanges }: SitePreviewProps) => {
             const originalSrcSet = Object.getOwnPropertyDescriptor(OriginalImage.prototype, 'src').set;
             Object.defineProperty(img, 'src', {
               set: function(value) {
-                originalSrcSet.call(this, resolvePath(value));
+                const resolved = resolvePath(value);
+                originalSrcSet.call(this, resolved);
               },
               get: function() {
                 return this.getAttribute('src');
@@ -163,6 +249,10 @@ export const SitePreview = ({ siteId, pendingChanges }: SitePreviewProps) => {
             });
             return img;
           };
+
+          document.addEventListener('DOMContentLoaded', () => console.log('[Site Preview] DOMContentLoaded'));
+          window.addEventListener('load', () => console.log('[Site Preview] Window load'));
+          console.log('[Site Preview] Interceptor script completed');
         })();
       </script>
     `;
