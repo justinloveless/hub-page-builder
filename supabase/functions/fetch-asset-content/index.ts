@@ -140,8 +140,13 @@ Deno.serve(async (req) => {
         });
       }
 
-      // Decode content from base64
-      const content = atob(fileData.content);
+      // Decode content from base64 with proper UTF-8 support
+      const binaryString = atob(fileData.content);
+      const bytes = new Uint8Array(binaryString.length);
+      for (let i = 0; i < binaryString.length; i++) {
+        bytes[i] = binaryString.charCodeAt(i);
+      }
+      const content = new TextDecoder('utf-8').decode(bytes);
 
       console.log('Successfully fetched asset content, length:', content.length);
 
