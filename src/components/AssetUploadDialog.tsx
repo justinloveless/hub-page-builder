@@ -9,6 +9,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { Upload, RefreshCw, FileText, Loader2, Trash2, ExternalLink, Eye } from "lucide-react";
+import ReactMarkdown from "react-markdown";
 
 interface AssetConfig {
   path: string;
@@ -54,6 +55,7 @@ const AssetUploadDialog = ({ open, onOpenChange, asset, siteId, onSuccess }: Ass
 
   const isTextAsset = asset.type === "text" || asset.type === "markdown";
   const isJsonAsset = asset.type === "json" && asset.schema;
+  const isMarkdownAsset = asset.type === "markdown" || asset.path.endsWith(".md");
 
   useEffect(() => {
     if (open) {
@@ -459,7 +461,7 @@ const AssetUploadDialog = ({ open, onOpenChange, asset, siteId, onSuccess }: Ass
         </DialogHeader>
 
         <Tabs value={activeTab} onValueChange={setActiveTab} className="flex-1 flex flex-col overflow-hidden">
-          <TabsList className="grid w-full flex-shrink-0" style={{ gridTemplateColumns: (isTextAsset || isJsonAsset) ? 'repeat(3, 1fr)' : 'repeat(2, 1fr)' }}>
+          <TabsList className="grid w-full flex-shrink-0" style={{ gridTemplateColumns: isMarkdownAsset ? 'repeat(4, 1fr)' : (isTextAsset || isJsonAsset) ? 'repeat(3, 1fr)' : 'repeat(2, 1fr)' }}>
             <TabsTrigger value="view">
               <Eye className="mr-2 h-4 w-4" />
               Current Assets
@@ -468,6 +470,12 @@ const AssetUploadDialog = ({ open, onOpenChange, asset, siteId, onSuccess }: Ass
               <TabsTrigger value="edit">
                 <FileText className="mr-2 h-4 w-4" />
                 Edit Content
+              </TabsTrigger>
+            )}
+            {isMarkdownAsset && (
+              <TabsTrigger value="preview">
+                <Eye className="mr-2 h-4 w-4" />
+                Preview
               </TabsTrigger>
             )}
             <TabsTrigger value="upload">
@@ -601,6 +609,25 @@ const AssetUploadDialog = ({ open, onOpenChange, asset, siteId, onSuccess }: Ass
                         </>
                       )}
                     </Button>
+                  </div>
+                </div>
+              )}
+            </TabsContent>
+          )}
+
+          {isMarkdownAsset && (
+            <TabsContent value="preview" className="mt-0 h-full">
+              {loadingContent ? (
+                <div className="flex items-center justify-center py-8">
+                  <Loader2 className="h-6 w-6 animate-spin" />
+                  <span className="ml-2 text-sm text-muted-foreground">Loading content...</span>
+                </div>
+              ) : (
+                <div className="pb-4 px-1">
+                  <div className="rounded-lg border bg-background p-6">
+                    <div className="prose prose-sm max-w-none dark:prose-invert">
+                      <ReactMarkdown>{textContent || "*No content to preview*"}</ReactMarkdown>
+                    </div>
                   </div>
                 </div>
               )}
