@@ -18,6 +18,7 @@ import AssetManager from "@/components/AssetManager";
 import PendingBatchChanges from "@/components/PendingBatchChanges";
 import InviteMemberDialog from "@/components/InviteMemberDialog";
 import ActivityCard from "@/components/ActivityCard";
+import { SitePreview } from "@/components/SitePreview";
 import type { Tables } from "@/integrations/supabase/types";
 
 export interface PendingAssetChange {
@@ -571,6 +572,10 @@ const Manage = () => {
               pendingChanges={pendingChanges}
               setPendingChanges={setPendingChanges}
               onRefresh={loadActivities}
+            />
+            <SitePreview 
+              siteId={siteId!}
+              pendingChanges={pendingChanges}
             />
             <AssetManager 
               siteId={siteId!} 
