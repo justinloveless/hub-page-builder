@@ -56,6 +56,7 @@ const AssetUploadDialog = ({ open, onOpenChange, asset, siteId, pendingChanges, 
   const [deleting, setDeleting] = useState<string | null>(null);
   const [showConfirmation, setShowConfirmation] = useState(false);
   const [jsonFormData, setJsonFormData] = useState<Record<string, any>>({});
+  const [newKey, setNewKey] = useState("");
 
   const isTextAsset = asset.type === "text" || asset.type === "markdown";
   const isJsonAsset = asset.type === "json" && asset.schema;
@@ -343,6 +344,40 @@ const AssetUploadDialog = ({ open, onOpenChange, asset, siteId, pendingChanges, 
     setJsonFormData(prev => ({ ...prev, [key]: value }));
   };
 
+  const addNewEntry = () => {
+    if (!newKey.trim()) {
+      toast.error("Key cannot be empty");
+      return;
+    }
+    if (jsonFormData[newKey]) {
+      toast.error("Key already exists");
+      return;
+    }
+    
+    // Initialize with default values based on additionalProperties schema
+    const additionalPropsSchema = asset.schema?.additionalProperties;
+    let defaultValue = {};
+    
+    if (additionalPropsSchema?.type === 'object' && additionalPropsSchema.properties) {
+      Object.entries(additionalPropsSchema.properties).forEach(([propKey, propSchema]: [string, any]) => {
+        defaultValue[propKey] = propSchema.default ?? '';
+      });
+    }
+    
+    setJsonFormData(prev => ({ ...prev, [newKey]: defaultValue }));
+    setNewKey("");
+    toast.success(`Added "${newKey}"`);
+  };
+
+  const removeEntry = (key: string) => {
+    setJsonFormData(prev => {
+      const updated = { ...prev };
+      delete updated[key];
+      return updated;
+    });
+    toast.success(`Removed "${key}"`);
+  };
+
   const renderSchemaField = (key: string, fieldSchema: any, parentKey?: string) => {
     const fullKey = parentKey ? `${parentKey}.${key}` : key;
     const value = parentKey 
@@ -617,11 +652,98 @@ const AssetUploadDialog = ({ open, onOpenChange, asset, siteId, pendingChanges, 
                 <div className="space-y-4 pb-4 px-1">
                   {isJsonAsset && asset.schema ? (
                     <>
-                      <div className="space-y-4">
-                        {Object.entries(asset.schema.properties || {}).map(([key, fieldSchema]: [string, any]) => 
-                          renderSchemaField(key, fieldSchema)
-                        )}
-                      </div>
+                      {asset.schema.properties ? (
+                        <div className="space-y-4">
+                          {Object.entries(asset.schema.properties).map(([key, fieldSchema]: [string, any]) => 
+                            renderSchemaField(key, fieldSchema)
+                          )}
+                        </div>
+                      ) : asset.schema.additionalProperties ? (
+                        <div className="space-y-4">
+                          <div className="flex items-center gap-2 mb-4">
+                            <Input
+                              placeholder="Enter key name (e.g., filename)"
+                              value={newKey}
+                              onChange={(e) => setNewKey(e.target.value)}
+                              onKeyDown={(e) => {
+                                if (e.key === 'Enter') {
+                                  e.preventDefault();
+                                  addNewEntry();
+                                }
+                              }}
+                            />
+                            <Button onClick={addNewEntry} variant="secondary" size="sm">
+                              Add Entry
+                            </Button>
+                          </div>
+                          
+                          {Object.keys(jsonFormData).length === 0 ? (
+                            <div className="text-center py-8 text-muted-foreground border rounded-lg">
+                              <p>No entries yet. Add one above to get started.</p>
+                            </div>
+                          ) : (
+                            <div className="space-y-4">
+                              {Object.entries(jsonFormData).map(([key, value]) => (
+                                <div key={key} className="p-4 border rounded-lg bg-accent/5 space-y-3">
+                                  <div className="flex items-center justify-between">
+                                    <h3 className="font-semibold text-sm font-mono">{key}</h3>
+                                    <Button
+                                      variant="ghost"
+                                      size="sm"
+                                      onClick={() => removeEntry(key)}
+                                      className="h-8 w-8 p-0"
+                                    >
+                                      <Trash2 className="h-4 w-4 text-destructive" />
+                                    </Button>
+                                  </div>
+                                  {asset.schema.additionalProperties.properties && (
+                                    <div className="space-y-3 pl-2">
+                                      {Object.entries(asset.schema.additionalProperties.properties).map(([propKey, propSchema]: [string, any]) => (
+                                        <div key={propKey} className="space-y-2">
+                                          <Label htmlFor={`${key}-${propKey}`}>
+                                            {propSchema.title || propKey}
+                                            {propSchema.description && (
+                                              <span className="text-xs text-muted-foreground ml-2">
+                                                {propSchema.description}
+                                              </span>
+                                            )}
+                                          </Label>
+                                          {propSchema.multiline ? (
+                                            <Textarea
+                                              id={`${key}-${propKey}`}
+                                              value={value[propKey] ?? ''}
+                                              onChange={(e) => setJsonFormData(prev => ({
+                                                ...prev,
+                                                [key]: { ...prev[key], [propKey]: e.target.value }
+                                              }))}
+                                              placeholder={propSchema.placeholder}
+                                              className="min-h-[80px]"
+                                            />
+                                          ) : (
+                                            <Input
+                                              id={`${key}-${propKey}`}
+                                              value={value[propKey] ?? ''}
+                                              onChange={(e) => setJsonFormData(prev => ({
+                                                ...prev,
+                                                [key]: { ...prev[key], [propKey]: e.target.value }
+                                              }))}
+                                              placeholder={propSchema.placeholder}
+                                            />
+                                          )}
+                                        </div>
+                                      ))}
+                                    </div>
+                                  )}
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      ) : (
+                        <div className="text-center py-8 text-muted-foreground border rounded-lg">
+                          <p>Unsupported JSON schema format</p>
+                        </div>
+                      )}
                     </>
                   ) : (
                     <div className="space-y-2">
