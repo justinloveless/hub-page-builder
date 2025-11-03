@@ -49,6 +49,59 @@ export type Database = {
           },
         ]
       }
+      asset_shares: {
+        Row: {
+          allowed_extensions: string[] | null
+          asset_path: string
+          created_at: string
+          created_by: string
+          description: string | null
+          expires_at: string
+          id: string
+          max_uploads: number | null
+          site_id: string
+          token: string
+          updated_at: string
+          upload_count: number
+        }
+        Insert: {
+          allowed_extensions?: string[] | null
+          asset_path: string
+          created_at?: string
+          created_by: string
+          description?: string | null
+          expires_at: string
+          id?: string
+          max_uploads?: number | null
+          site_id: string
+          token: string
+          updated_at?: string
+          upload_count?: number
+        }
+        Update: {
+          allowed_extensions?: string[] | null
+          asset_path?: string
+          created_at?: string
+          created_by?: string
+          description?: string | null
+          expires_at?: string
+          id?: string
+          max_uploads?: number | null
+          site_id?: string
+          token?: string
+          updated_at?: string
+          upload_count?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "asset_shares_site_id_fkey"
+            columns: ["site_id"]
+            isOneToOne: false
+            referencedRelation: "sites"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       asset_versions: {
         Row: {
           batch_id: string | null

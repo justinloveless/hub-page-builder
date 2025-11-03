@@ -12,6 +12,7 @@ import Settings from "./pages/Settings";
 import Manage from "./pages/Manage";
 import GithubCallback from "./pages/GithubCallback";
 import AcceptInvite from "./pages/AcceptInvite";
+import GuestUpload from "./pages/GuestUpload";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -31,6 +32,7 @@ const App = () => (
             <Route path="/settings" element={<Settings />} />
             <Route path="/manage/:siteId" element={<Manage />} />
             <Route path="/invite/:token" element={<AcceptInvite />} />
+            <Route path="/upload/:token" element={<GuestUpload />} />
             <Route path="/github/callback" element={<GithubCallback />} />
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
             <Route path="*" element={<NotFound />} />

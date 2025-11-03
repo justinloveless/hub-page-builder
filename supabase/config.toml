@@ -30,3 +30,9 @@ verify_jwt = true
 [functions.accept-invitation]
 verify_jwt = true
 
+[functions.create-asset-share]
+verify_jwt = true
+
+[functions.guest-upload-asset]
+verify_jwt = false
+

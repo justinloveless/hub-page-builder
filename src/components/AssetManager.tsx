@@ -8,6 +8,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { Folder, FileText, Image, AlertCircle, RefreshCw, GitPullRequest, ExternalLink, Upload } from "lucide-react";
 import AssetUploadDialog from "./AssetUploadDialog";
+import CreateShareDialog from "./CreateShareDialog";
 
 interface AssetConfig {
   path: string;
@@ -271,18 +272,24 @@ const AssetManager = ({ siteId }: AssetManagerProps) => {
                       )}
                     </div>
                   </div>
-                  <Button 
-                    variant="outline" 
-                    size="sm"
-                    onClick={() => {
-                      setSelectedAsset(asset);
-                      setUploadDialogOpen(true);
-                    }}
-                    className="w-full sm:w-auto flex-shrink-0"
-                  >
-                    <Upload className="mr-2 h-4 w-4" />
-                    Upload
-                  </Button>
+                  <div className="flex gap-2 w-full sm:w-auto flex-shrink-0">
+                    <Button 
+                      variant="outline" 
+                      size="sm"
+                      onClick={() => {
+                        setSelectedAsset(asset);
+                        setUploadDialogOpen(true);
+                      }}
+                      className="flex-1 sm:flex-initial"
+                    >
+                      <Upload className="mr-2 h-4 w-4" />
+                      Upload
+                    </Button>
+                    <CreateShareDialog 
+                      siteId={siteId}
+                      assetPath={asset.path.includes('/') ? asset.path.substring(0, asset.path.lastIndexOf('/')) : '.'}
+                    />
+                  </div>
                 </div>
               ))}
             </div>
