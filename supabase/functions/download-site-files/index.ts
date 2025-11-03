@@ -69,13 +69,21 @@ Deno.serve(async (req) => {
       .single()
 
     if (appError || !appConfig) {
+      console.error('GitHub App config error:', appError)
       throw new Error('GitHub App not configured')
+    }
+
+    if (!appConfig.app_id) {
+      console.error('GitHub App ID missing in config:', appConfig)
+      throw new Error('GitHub App ID not configured in database')
     }
 
     const privateKey = normalizePemKey(Deno.env.get('GITHUB_APP_PKEY') || '')
     if (!privateKey) {
       throw new Error('GitHub private key not configured')
     }
+
+    console.log('Initializing GitHub App with ID:', appConfig.app_id)
 
     const app = new App({
       appId: appConfig.app_id,
