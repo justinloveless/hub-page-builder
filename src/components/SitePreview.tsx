@@ -146,20 +146,24 @@ export const SitePreview = ({ siteId, pendingChanges }: SitePreviewProps) => {
           // Bridge console to parent for debugging
           (function setupConsoleBridge() {
             const methods = ['log','info','warn','error'];
-            methods.forEach((m) => {
+            methods.forEach(function(m) {
               const original = console[m];
-              console[m] = function(...args) {
-                try { window.parent?.postMessage({ source: 'site-preview', level: m, args: args.map(a => {
-                  try { return typeof a === 'string' ? a : JSON.stringify(a); } catch { return String(a); }
-                }) }, '*'); } catch {}
+              console[m] = function() {
+                const args = Array.prototype.slice.call(arguments);
+                try { 
+                  if (window.parent) {
+                    window.parent.postMessage({ 
+                      source: 'site-preview', 
+                      level: m, 
+                      args: args.map(function(a) {
+                        try { return typeof a === 'string' ? a : JSON.stringify(a); } 
+                        catch (e) { return String(a); }
+                      }) 
+                    }, '*'); 
+                  }
+                } catch (e) {}
                 return original.apply(console, args);
               };
-            });
-            window.addEventListener('error', (e) => {
-              window.parent?.postMessage({ source: 'site-preview', level: 'error', args: ['Uncaught Error: ' + e.message, e.filename, e.lineno, e.colno] }, '*');
-            });
-            window.addEventListener('unhandledrejection', (e) => {
-              window.parent?.postMessage({ source: 'site-preview', level: 'error', args: ['Unhandled Promise Rejection', String(e.reason)] }, '*');
             });
           })();
 
@@ -176,19 +180,20 @@ export const SitePreview = ({ siteId, pendingChanges }: SitePreviewProps) => {
             if (!path) return path;
             // Support URL and Request objects by converting to string first
             if (typeof path !== 'string') {
-              try { path = String(path.url || path.href || path); } catch { return path; }
+              try { path = String(path.url || path.href || path); } catch (e) { return path; }
             }
             const withoutQ = stripQueryHash(path);
-            const variants = [];
-            const dropPrefixes = (p) => p.replace(/^\.\//, '').replace(/^\//, '');
+            const dropPrefixes = function(p) { return p.replace(/^\\.\\//g, '').replace(/^\\//g, ''); };
             const base = dropPrefixes(withoutQ);
-            variants.push(base, './' + base, '/' + base);
-            for (let v of variants) {
+            const variants = [base, './' + base, '/' + base];
+            for (var i = 0; i < variants.length; i++) {
+              var v = variants[i];
               if (fileMap[v]) {
                 console.log('[Site Preview] Resolved path:', path, '->', fileMap[v]);
                 return fileMap[v];
               }
             }
+            console.warn('[Site Preview] Could not resolve path:', path);
             return path;
           }
 
@@ -214,10 +219,11 @@ export const SitePreview = ({ siteId, pendingChanges }: SitePreviewProps) => {
           window.XMLHttpRequest = function() {
             const xhr = new OriginalXHR();
             const originalOpen = xhr.open;
-            xhr.open = function(method, url, ...args) {
+            xhr.open = function(method, url) {
+              var args = Array.prototype.slice.call(arguments, 2);
               const resolvedUrl = resolvePath(url);
               if (url !== resolvedUrl) { console.log('[Site Preview] XHR path resolved:', url, '->', resolvedUrl); }
-              return originalOpen.call(this, method, resolvedUrl, ...args);
+              return originalOpen.apply(this, [method, resolvedUrl].concat(args));
             };
             return xhr;
           };
@@ -250,8 +256,8 @@ export const SitePreview = ({ siteId, pendingChanges }: SitePreviewProps) => {
             return img;
           };
 
-          document.addEventListener('DOMContentLoaded', () => console.log('[Site Preview] DOMContentLoaded'));
-          window.addEventListener('load', () => console.log('[Site Preview] Window load'));
+          document.addEventListener('DOMContentLoaded', function() { console.log('[Site Preview] DOMContentLoaded'); });
+          window.addEventListener('load', function() { console.log('[Site Preview] Window load'); });
           console.log('[Site Preview] Interceptor script completed');
         })();
       </script>
