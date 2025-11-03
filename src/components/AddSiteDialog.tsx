@@ -113,17 +113,79 @@ const AddSiteDialog = ({ onSiteAdded }: AddSiteDialogProps) => {
     setConnectingGithub(true);
     
     try {
-      // Fetch GitHub app config
+      // Open popup IMMEDIATELY (before async calls) to prevent iOS blocking
+      const width = 600;
+      const height = 700;
+      const left = window.screenX + (window.outerWidth - width) / 2;
+      const top = window.screenY + (window.outerHeight - height) / 2;
+      
+      // Open with about:blank first - this must happen synchronously
+      const popup = window.open(
+        'about:blank',
+        'GitHub OAuth',
+        `width=${width},height=${height},left=${left},top=${top},noopener,noreferrer`
+      );
+
+      if (!popup) {
+        throw new Error("Popup was blocked. Please allow popups for this site and try again.");
+      }
+
+      setPopupWindow(popup);
+      
+      // Show loading message in popup
+      popup.document.write(`
+        <html>
+          <head>
+            <style>
+              body {
+                margin: 0;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                height: 100vh;
+                font-family: system-ui, -apple-system, sans-serif;
+                background: #f9fafb;
+              }
+              .loader {
+                text-align: center;
+              }
+              .spinner {
+                border: 3px solid #e5e7eb;
+                border-top: 3px solid #3b82f6;
+                border-radius: 50%;
+                width: 40px;
+                height: 40px;
+                animation: spin 1s linear infinite;
+                margin: 0 auto 16px;
+              }
+              @keyframes spin {
+                0% { transform: rotate(0deg); }
+                100% { transform: rotate(360deg); }
+              }
+            </style>
+          </head>
+          <body>
+            <div class="loader">
+              <div class="spinner"></div>
+              <p>Connecting to GitHub...</p>
+            </div>
+          </body>
+        </html>
+      `);
+      
+      // NOW fetch config asynchronously
       const { data: config, error } = await supabase
         .from('github_app_public_config')
         .select('client_id, slug')
         .maybeSingle();
 
       if (error) {
+        popup.close();
         throw new Error("Failed to load GitHub App configuration");
       }
 
       if (!config) {
+        popup.close();
         throw new Error("GitHub App not configured. Please contact your administrator.");
       }
 
@@ -136,28 +198,11 @@ const AddSiteDialog = ({ onSiteAdded }: AddSiteDialogProps) => {
       
       const oauthUrl = `https://github.com/apps/${config.slug}/installations/new?state=${state}`;
       
-      // Open in popup
-      const width = 600;
-      const height = 700;
-      const left = window.screenX + (window.outerWidth - width) / 2;
-      const top = window.screenY + (window.outerHeight - height) / 2;
-      
-      const popup = window.open(
-        oauthUrl,
-        'GitHub OAuth',
-        `width=${width},height=${height},left=${left},top=${top},noopener,noreferrer`
-      );
-
-      if (!popup) {
-        throw new Error("Popup was blocked. Please allow popups for this site and try again.");
-      }
-
-      setPopupWindow(popup);
-      
-      // Focus the popup
+      // Update popup location to actual OAuth URL
+      popup.location.href = oauthUrl;
       popup.focus();
       
-      console.log('GitHub OAuth popup opened');
+      console.log('GitHub OAuth popup redirected to:', oauthUrl);
     } catch (error: any) {
       console.error("Error connecting to GitHub:", error);
       toast.error(error.message || "Failed to connect to GitHub");
