@@ -193,7 +193,7 @@ const AssetUploadDialog = ({ open, onOpenChange, asset, siteId, pendingChanges, 
     }
   };
 
-  const handleUpload = async () => {
+  const handleUpload = async (saveToBatch: boolean = false) => {
     if (!file) return;
 
     setUploading(true);
@@ -216,22 +216,40 @@ const AssetUploadDialog = ({ open, onOpenChange, asset, siteId, pendingChanges, 
           fullPath = basePath + file.name;
         }
 
-        const { data, error } = await supabase.functions.invoke('upload-site-asset', {
-          body: {
-            site_id: siteId,
-            file_path: fullPath,
+        if (saveToBatch) {
+          // Add to batch without committing
+          const newChange: PendingAssetChange = {
+            repoPath: fullPath,
             content: base64,
-            message: commitMessage,
-          },
-        });
+            fileName: file.name
+          };
+          
+          const updatedChanges = pendingChanges.filter(c => c.repoPath !== fullPath);
+          setPendingChanges([...updatedChanges, newChange]);
+          toast.success("Added to batch");
+          setFile(null);
+          setPreview(null);
+          setShowConfirmation(false);
+          onOpenChange(false);
+        } else {
+          // Commit immediately
+          const { data, error } = await supabase.functions.invoke('upload-site-asset', {
+            body: {
+              site_id: siteId,
+              file_path: fullPath,
+              content: base64,
+              message: commitMessage,
+            },
+          });
 
-        if (error) throw error;
+          if (error) throw error;
 
-        toast.success("Asset uploaded successfully!");
-        setFile(null);
-        setPreview(null);
-        await loadExistingFiles();
-        onSuccess();
+          toast.success("Asset uploaded successfully!");
+          setFile(null);
+          setPreview(null);
+          await loadExistingFiles();
+          onSuccess();
+        }
       };
       reader.readAsDataURL(file);
     } catch (error: any) {
@@ -773,7 +791,24 @@ const AssetUploadDialog = ({ open, onOpenChange, asset, siteId, pendingChanges, 
                         Back
                       </Button>
                       <Button
-                        onClick={handleUpload}
+                        variant="secondary"
+                        onClick={() => handleUpload(true)}
+                        disabled={!file || uploading}
+                      >
+                        {uploading ? (
+                          <>
+                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                            Adding...
+                          </>
+                        ) : (
+                          <>
+                            <Package className="mr-2 h-4 w-4" />
+                            Add to Batch
+                          </>
+                        )}
+                      </Button>
+                      <Button
+                        onClick={() => handleUpload(false)}
                         disabled={!file || uploading}
                         className="bg-primary"
                       >
@@ -785,7 +820,7 @@ const AssetUploadDialog = ({ open, onOpenChange, asset, siteId, pendingChanges, 
                         ) : (
                           <>
                             <Upload className="mr-2 h-4 w-4" />
-                            Confirm & Upload
+                            Upload & Commit
                           </>
                         )}
                       </Button>

@@ -45,7 +45,39 @@ const PendingBatchChanges = ({ siteId, pendingChanges, setPendingChanges, onRefr
     }
   };
 
+  const isBinaryFile = (fileName: string): boolean => {
+    const binaryExtensions = ['.jpg', '.jpeg', '.png', '.gif', '.webp', '.svg', '.ico', '.pdf', '.zip', '.mp3', '.mp4', '.woff', '.woff2', '.ttf', '.eot'];
+    return binaryExtensions.some(ext => fileName.toLowerCase().endsWith(ext));
+  };
+
   const renderDiff = (change: PendingAssetChange) => {
+    // Check if it's a binary file
+    if (isBinaryFile(change.fileName)) {
+      return (
+        <div className="bg-muted/50 rounded-md p-4">
+          <div className="text-xs text-muted-foreground mb-2">
+            {change.originalContent ? 'File updated' : 'New file'}
+          </div>
+          <div className="flex items-center gap-3 p-3 border rounded-lg bg-background">
+            {change.fileName.match(/\.(jpg|jpeg|png|gif|webp|svg)$/i) && (
+              <img
+                src={`data:image/${change.fileName.split('.').pop()};base64,${change.content}`}
+                alt={change.fileName}
+                className="w-32 h-32 object-cover rounded border"
+              />
+            )}
+            <div>
+              <p className="font-medium">{change.fileName}</p>
+              <p className="text-sm text-muted-foreground">Binary file</p>
+              <p className="text-xs text-muted-foreground mt-1">
+                Size: {(change.content.length * 0.75 / 1024).toFixed(2)} KB
+              </p>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
     const newContent = decodeContent(change.content);
     const oldContent = change.originalContent ? decodeContent(change.originalContent) : "";
 
