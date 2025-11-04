@@ -56,6 +56,7 @@ const AssetManagerSidebar = ({ siteId, pendingChanges, setPendingChanges }: Asse
   const [directoryFiles, setDirectoryFiles] = useState<Record<string, AssetFile[]>>({});
   const [loadingFiles, setLoadingFiles] = useState<Record<string, boolean>>({});
   const [deletingFile, setDeletingFile] = useState<string | null>(null);
+  const [imageUrls, setImageUrls] = useState<Record<string, string>>({});
 
   useEffect(() => {
     fetchAssets();
@@ -75,8 +76,33 @@ const AssetManagerSidebar = ({ siteId, pendingChanges, setPendingChanges }: Asse
       if ((asset.type === 'directory' || asset.type === 'folder') && !directoryFiles[asset.path]) {
         await loadDirectoryFiles(asset);
       }
+      // Load image when expanding
+      if ((asset.type === 'image' || asset.type === 'img') && !imageUrls[asset.path]) {
+        await loadImageAsset(asset);
+      }
     }
     setExpandedAssets(newExpanded);
+  };
+
+  const loadImageAsset = async (asset: AssetConfig) => {
+    setLoadingContent(prev => ({ ...prev, [asset.path]: true }));
+    try {
+      const { data, error } = await supabase.functions.invoke('fetch-asset-content', {
+        body: { site_id: siteId, asset_path: asset.path },
+      });
+
+      if (error) throw error;
+
+      if (data.found) {
+        // The content is base64 encoded
+        const imageUrl = `data:image/${asset.path.split('.').pop()};base64,${data.content}`;
+        setImageUrls(prev => ({ ...prev, [asset.path]: imageUrl }));
+      }
+    } catch (error: any) {
+      console.error("Failed to load image:", error);
+    } finally {
+      setLoadingContent(prev => ({ ...prev, [asset.path]: false }));
+    }
   };
 
   const loadDirectoryFiles = async (asset: AssetConfig) => {
@@ -677,33 +703,54 @@ const AssetManagerSidebar = ({ siteId, pendingChanges, setPendingChanges }: Asse
 
                     {/* Image upload */}
                     {isImageAsset && (
-                      <div className="space-y-2">
-                        <Label htmlFor={`file-${index}`} className="text-xs">
-                          Upload Image
-                        </Label>
-                        <Input
-                          id={`file-${index}`}
-                          type="file"
-                          accept={asset.allowedExtensions?.join(',') || 'image/*'}
-                          onChange={(e) => {
-                            const file = e.target.files?.[0];
-                            if (file) {
-                              if (asset.maxSize && file.size > asset.maxSize) {
-                                toast.error(`File size exceeds maximum of ${(asset.maxSize / 1024 / 1024).toFixed(1)} MB`);
-                                return;
-                              }
-                              handleFileUpload(asset, file);
-                              e.target.value = '';
-                            }
-                          }}
-                          className="text-xs"
-                        />
-                        <div className="flex flex-col gap-1 text-xs text-muted-foreground">
-                          <span>Max size: {formatFileSize(asset.maxSize)}</span>
-                          {asset.allowedExtensions && (
-                            <span>Types: {asset.allowedExtensions.join(', ')}</span>
-                          )}
-                        </div>
+                      <div className="space-y-3">
+                        {loadingContent[asset.path] ? (
+                          <Skeleton className="h-48 w-full" />
+                        ) : (
+                          <>
+                            {imageUrls[asset.path] && (
+                              <div className="space-y-2">
+                                <Label className="text-xs">Current Image</Label>
+                                <div className="relative border rounded-lg overflow-hidden">
+                                  <img
+                                    src={imageUrls[asset.path]}
+                                    alt={asset.label || asset.path}
+                                    className="w-full h-auto"
+                                  />
+                                </div>
+                              </div>
+                            )}
+                            
+                            <div className="space-y-2">
+                              <Label htmlFor={`file-${index}`} className="text-xs">
+                                {imageUrls[asset.path] ? 'Replace Image' : 'Upload Image'}
+                              </Label>
+                              <Input
+                                id={`file-${index}`}
+                                type="file"
+                                accept={asset.allowedExtensions?.join(',') || 'image/*'}
+                                onChange={(e) => {
+                                  const file = e.target.files?.[0];
+                                  if (file) {
+                                    if (asset.maxSize && file.size > asset.maxSize) {
+                                      toast.error(`File size exceeds maximum of ${(asset.maxSize / 1024 / 1024).toFixed(1)} MB`);
+                                      return;
+                                    }
+                                    handleFileUpload(asset, file);
+                                    e.target.value = '';
+                                  }
+                                }}
+                                className="text-xs"
+                              />
+                              <div className="flex flex-col gap-1 text-xs text-muted-foreground">
+                                <span>Max size: {formatFileSize(asset.maxSize)}</span>
+                                {asset.allowedExtensions && (
+                                  <span>Types: {asset.allowedExtensions.join(', ')}</span>
+                                )}
+                              </div>
+                            </div>
+                          </>
+                        )}
                       </div>
                     )}
 
