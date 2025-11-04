@@ -20,8 +20,8 @@ import PendingBatchChanges from "@/components/PendingBatchChanges";
 import InviteMemberDialog from "@/components/InviteMemberDialog";
 import ActivityCard from "@/components/ActivityCard";
 import { SitePreview } from "@/components/SitePreview";
-import { SidebarProvider, Sidebar, SidebarContent, SidebarHeader, SidebarTrigger } from "@/components/ui/sidebar";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { ResizablePanelGroup, ResizablePanel, ResizableHandle } from "@/components/ui/resizable";
 import type { Tables } from "@/integrations/supabase/types";
 
 export interface PendingAssetChange {
@@ -455,182 +455,176 @@ const Manage = () => {
   }
 
   return (
-    <SidebarProvider>
-      <div className="min-h-screen w-full flex bg-background">
+    <div className="min-h-screen w-full flex flex-col bg-background">
+      {/* Header */}
+      <header className="border-b border-border bg-card/50 backdrop-blur-sm sticky top-0 z-50">
+        <div className="px-4 py-3">
+          <div className="flex items-start gap-3">
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => navigate("/dashboard")}
+              className="flex-shrink-0"
+            >
+              <ArrowLeft className="h-5 w-5" />
+            </Button>
+            <div className="flex-1 min-w-0">
+              <h1 className="text-lg sm:text-xl font-bold truncate">{site.name}</h1>
+              <p className="text-xs sm:text-sm text-muted-foreground truncate">{site.repo_full_name}</p>
+            </div>
+            <div className="flex items-center gap-2 flex-shrink-0">
+              <Button 
+                variant="ghost"
+                size="icon"
+                onClick={() => navigate("/profile")}
+                title="Profile"
+              >
+                <UserIcon className="h-5 w-5" />
+              </Button>
+              <Button 
+                variant="ghost"
+                size="icon"
+                onClick={handleLeaveSite}
+                title="Leave Site"
+              >
+                <LogOut className="h-5 w-5" />
+              </Button>
+              <Button 
+                variant="outline" 
+                size="sm"
+                onClick={() => window.open(getGithubPagesUrl(site.repo_full_name), '_blank')}
+                className="hidden sm:flex"
+              >
+                <ExternalLink className="mr-2 h-4 w-4" />
+                View Site
+              </Button>
+              <Button 
+                variant="outline" 
+                size="icon"
+                onClick={() => window.open(getGithubPagesUrl(site.repo_full_name), '_blank')}
+                className="sm:hidden"
+                title="View Site"
+              >
+                <ExternalLink className="h-4 w-4" />
+              </Button>
+            </div>
+          </div>
+        </div>
+      </header>
+
+      <ResizablePanelGroup direction="horizontal" className="flex-1">
         {/* Sidebar */}
-        <Sidebar className="border-r" collapsible="icon">
-          <SidebarHeader className="border-b p-4">
-            <div className="flex items-center justify-between">
-              <h2 className="font-semibold text-sm">Site Manager</h2>
-              <SidebarTrigger />
-            </div>
-          </SidebarHeader>
-          <SidebarContent>
-            <ScrollArea className="h-full">
-              <div className="p-4 space-y-6">
-                {/* Site Details */}
-                <div className="space-y-3">
-                  <h3 className="text-sm font-semibold">Site Details</h3>
-                  <div className="space-y-2 text-xs">
-                    <div>
-                      <p className="text-muted-foreground mb-1">Repository</p>
-                      <button
-                        onClick={() => window.open(getRepositoryUrl(site.repo_full_name), '_blank')}
-                        className="text-primary hover:underline flex items-center gap-1"
-                      >
-                        <ExternalLink className="h-3 w-3" />
-                        <span className="truncate">{site.repo_full_name}</span>
-                      </button>
-                    </div>
-                    <div>
-                      <p className="text-muted-foreground mb-1">Branch</p>
-                      <Badge variant="secondary" className="text-xs">
-                        <GitBranch className="mr-1 h-3 w-3" />
-                        {site.default_branch}
-                      </Badge>
-                    </div>
-                    <div>
-                      <p className="text-muted-foreground mb-1">Created</p>
-                      <p>{new Date(site.created_at).toLocaleDateString()}</p>
-                    </div>
+        <ResizablePanel defaultSize={20} minSize={15} maxSize={35}>
+          <ScrollArea className="h-full border-r">
+            <div className="p-4 space-y-6">
+              {/* Site Details */}
+              <div className="space-y-3">
+                <h3 className="text-sm font-semibold">Site Details</h3>
+                <div className="space-y-2 text-xs">
+                  <div>
+                    <p className="text-muted-foreground mb-1">Repository</p>
+                    <button
+                      onClick={() => window.open(getRepositoryUrl(site.repo_full_name), '_blank')}
+                      className="text-primary hover:underline flex items-center gap-1"
+                    >
+                      <ExternalLink className="h-3 w-3" />
+                      <span className="truncate">{site.repo_full_name}</span>
+                    </button>
+                  </div>
+                  <div>
+                    <p className="text-muted-foreground mb-1">Branch</p>
+                    <Badge variant="secondary" className="text-xs">
+                      <GitBranch className="mr-1 h-3 w-3" />
+                      {site.default_branch}
+                    </Badge>
+                  </div>
+                  <div>
+                    <p className="text-muted-foreground mb-1">Created</p>
+                    <p>{new Date(site.created_at).toLocaleDateString()}</p>
                   </div>
                 </div>
+              </div>
 
-                <Separator />
+              <Separator />
 
-                {/* Asset Manager */}
-                <div className="space-y-3">
-                  <h3 className="text-sm font-semibold">Assets</h3>
-                  <AssetManagerSidebar
-                    siteId={siteId!}
-                    pendingChanges={pendingChanges}
-                    setPendingChanges={setPendingChanges}
-                  />
+              {/* Asset Manager */}
+              <div className="space-y-3">
+                <h3 className="text-sm font-semibold">Assets</h3>
+                <AssetManagerSidebar
+                  siteId={siteId!}
+                  pendingChanges={pendingChanges}
+                  setPendingChanges={setPendingChanges}
+                />
+              </div>
+
+              <Separator />
+
+              {/* Members */}
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <h3 className="text-sm font-semibold">Members</h3>
+                  <InviteMemberDialog siteId={siteId!} onInviteCreated={loadInvitations} />
                 </div>
-
-                <Separator />
-
-                {/* Members */}
-                <div className="space-y-3">
-                  <div className="flex items-center justify-between">
-                    <h3 className="text-sm font-semibold">Members</h3>
-                    <InviteMemberDialog siteId={siteId!} onInviteCreated={loadInvitations} />
-                  </div>
-                  <div className="space-y-2">
-                    {members.slice(0, 3).map((member) => {
-                      const displayName = member.profile?.full_name || `User ${member.user_id.slice(0, 8)}`;
-                      const initials = member.profile?.full_name
-                        ? member.profile.full_name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2)
-                        : member.user_id.slice(0, 2).toUpperCase();
-                      
-                      return (
-                        <div key={member.user_id} className="flex items-center gap-2">
-                          <Avatar className="h-6 w-6">
-                            <AvatarImage src={member.profile?.avatar_url || undefined} />
-                            <AvatarFallback className="text-xs bg-gradient-to-br from-primary to-accent text-primary-foreground">
-                              {initials}
-                            </AvatarFallback>
-                          </Avatar>
-                          <div className="flex-1 min-w-0">
-                            <p className="text-xs font-medium truncate">{displayName}</p>
-                          </div>
-                          <Badge variant={member.role === "owner" ? "default" : "secondary"} className="text-xs">
-                            {member.role === "owner" && <Crown className="mr-1 h-2 w-2" />}
-                            {member.role}
-                          </Badge>
+                <div className="space-y-2">
+                  {members.slice(0, 3).map((member) => {
+                    const displayName = member.profile?.full_name || `User ${member.user_id.slice(0, 8)}`;
+                    const initials = member.profile?.full_name
+                      ? member.profile.full_name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2)
+                      : member.user_id.slice(0, 2).toUpperCase();
+                    
+                    return (
+                      <div key={member.user_id} className="flex items-center gap-2">
+                        <Avatar className="h-6 w-6">
+                          <AvatarImage src={member.profile?.avatar_url || undefined} />
+                          <AvatarFallback className="text-xs bg-gradient-to-br from-primary to-accent text-primary-foreground">
+                            {initials}
+                          </AvatarFallback>
+                        </Avatar>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-xs font-medium truncate">{displayName}</p>
                         </div>
-                      );
-                    })}
-                    {members.length > 3 && (
-                      <p className="text-xs text-muted-foreground">+{members.length - 3} more</p>
-                    )}
-                  </div>
-                </div>
-
-                <Separator />
-
-                {/* Activity Preview */}
-                <div className="space-y-3">
-                  <h3 className="text-sm font-semibold">Recent Activity</h3>
-                  <div className="space-y-2">
-                    {activities.slice(0, 3).map((activity) => (
-                      <div key={activity.id} className="text-xs">
-                        <p className="font-medium truncate">{activity.action}</p>
-                        <p className="text-muted-foreground text-xs">
-                          {new Date(activity.created_at).toLocaleDateString()}
-                        </p>
+                        <Badge variant={member.role === "owner" ? "default" : "secondary"} className="text-xs">
+                          {member.role === "owner" && <Crown className="mr-1 h-2 w-2" />}
+                          {member.role}
+                        </Badge>
                       </div>
-                    ))}
-                    {activities.length === 0 && (
-                      <p className="text-xs text-muted-foreground">No recent activity</p>
-                    )}
-                  </div>
+                    );
+                  })}
+                  {members.length > 3 && (
+                    <p className="text-xs text-muted-foreground">+{members.length - 3} more</p>
+                  )}
                 </div>
               </div>
-            </ScrollArea>
-          </SidebarContent>
-        </Sidebar>
 
-        {/* Main Content */}
-        <div className="flex-1 flex flex-col min-w-0">
-          {/* Header */}
-          <header className="border-b border-border bg-card/50 backdrop-blur-sm sticky top-0 z-50">
-            <div className="px-4 py-3">
-              <div className="flex items-start gap-3">
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  onClick={() => navigate("/dashboard")}
-                  className="flex-shrink-0"
-                >
-                  <ArrowLeft className="h-5 w-5" />
-                </Button>
-                <div className="flex-1 min-w-0">
-                  <h1 className="text-lg sm:text-xl font-bold truncate">{site.name}</h1>
-                  <p className="text-xs sm:text-sm text-muted-foreground truncate">{site.repo_full_name}</p>
-                </div>
-                <div className="flex items-center gap-2 flex-shrink-0">
-                  <Button 
-                    variant="ghost"
-                    size="icon"
-                    onClick={() => navigate("/profile")}
-                    title="Profile"
-                  >
-                    <UserIcon className="h-5 w-5" />
-                  </Button>
-                  <Button 
-                    variant="ghost"
-                    size="icon"
-                    onClick={handleLeaveSite}
-                    title="Leave Site"
-                  >
-                    <LogOut className="h-5 w-5" />
-                  </Button>
-                  <Button 
-                    variant="outline" 
-                    size="sm"
-                    onClick={() => window.open(getGithubPagesUrl(site.repo_full_name), '_blank')}
-                    className="hidden sm:flex"
-                  >
-                    <ExternalLink className="mr-2 h-4 w-4" />
-                    View Site
-                  </Button>
-                  <Button 
-                    variant="outline" 
-                    size="icon"
-                    onClick={() => window.open(getGithubPagesUrl(site.repo_full_name), '_blank')}
-                    className="sm:hidden"
-                    title="View Site"
-                  >
-                    <ExternalLink className="h-4 w-4" />
-                  </Button>
+              <Separator />
+
+              {/* Activity Preview */}
+              <div className="space-y-3">
+                <h3 className="text-sm font-semibold">Recent Activity</h3>
+                <div className="space-y-2">
+                  {activities.slice(0, 3).map((activity) => (
+                    <div key={activity.id} className="text-xs">
+                      <p className="font-medium truncate">{activity.action}</p>
+                      <p className="text-muted-foreground text-xs">
+                        {new Date(activity.created_at).toLocaleDateString()}
+                      </p>
+                    </div>
+                  ))}
+                  {activities.length === 0 && (
+                    <p className="text-xs text-muted-foreground">No recent activity</p>
+                  )}
                 </div>
               </div>
             </div>
-          </header>
+          </ScrollArea>
+        </ResizablePanel>
 
-          {/* Preview and Controls */}
-          <main className="flex-1 flex flex-col p-4 gap-4 overflow-hidden">
+        <ResizableHandle withHandle />
+
+        <ResizablePanel defaultSize={80} minSize={50}>
+          <div className="flex flex-col h-full">
+            {/* Preview and Controls */}
+            <main className="flex-1 flex flex-col p-4 gap-4 overflow-hidden">
             {/* Commit Controls - Prominent */}
             {pendingChanges.length > 0 && (
               <Card className="shadow-lg border-primary/20">
@@ -714,9 +708,11 @@ const Manage = () => {
               </CardContent>
             </Card>
           </main>
-        </div>
+          </div>
+        </ResizablePanel>
+      </ResizablePanelGroup>
 
-        {/* Alert Dialog for leaving site */}
+      {/* Alert Dialog for leaving site */}
         <AlertDialog open={showLeaveDialog} onOpenChange={setShowLeaveDialog}>
           <AlertDialogContent>
             <AlertDialogHeader>
@@ -737,8 +733,7 @@ const Manage = () => {
             </AlertDialogFooter>
           </AlertDialogContent>
         </AlertDialog>
-      </div>
-    </SidebarProvider>
+    </div>
   );
 };
 

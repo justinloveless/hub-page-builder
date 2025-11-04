@@ -3,11 +3,13 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import { Label } from "@/components/ui/label";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { Folder, FileText, Image, AlertCircle, RefreshCw, GitPullRequest, Upload, ChevronDown, ChevronRight } from "lucide-react";
+import { Folder, FileText, Image, AlertCircle, RefreshCw, GitPullRequest, ChevronDown, ChevronRight, Plus, Trash2, File } from "lucide-react";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
-import AssetUploadDialog from "./AssetUploadDialog";
 import CreateShareDialog from "./CreateShareDialog";
 import type { PendingAssetChange } from "@/pages/Manage";
 
@@ -36,22 +38,101 @@ const AssetManagerSidebar = ({ siteId, pendingChanges, setPendingChanges }: Asse
   const [creatingPr, setCreatingPr] = useState(false);
   const [config, setConfig] = useState<SiteAssetsConfig | null>(null);
   const [found, setFound] = useState<boolean | null>(null);
-  const [uploadDialogOpen, setUploadDialogOpen] = useState(false);
-  const [selectedAsset, setSelectedAsset] = useState<AssetConfig | null>(null);
   const [expandedAssets, setExpandedAssets] = useState<Set<string>>(new Set());
+  const [assetContents, setAssetContents] = useState<Record<string, string>>({});
+  const [loadingContent, setLoadingContent] = useState<Record<string, boolean>>({});
 
   useEffect(() => {
     fetchAssets();
   }, [siteId]);
 
-  const toggleExpanded = (path: string) => {
+  const toggleExpanded = async (asset: AssetConfig) => {
     const newExpanded = new Set(expandedAssets);
-    if (newExpanded.has(path)) {
-      newExpanded.delete(path);
+    if (newExpanded.has(asset.path)) {
+      newExpanded.delete(asset.path);
     } else {
-      newExpanded.add(path);
+      newExpanded.add(asset.path);
+      // Load content when expanding if it's a text/json asset
+      if ((asset.type === 'text' || asset.type === 'json' || asset.type === 'markdown') && !assetContents[asset.path]) {
+        await loadAssetContent(asset.path);
+      }
     }
     setExpandedAssets(newExpanded);
+  };
+
+  const loadAssetContent = async (path: string) => {
+    setLoadingContent(prev => ({ ...prev, [path]: true }));
+    try {
+      const { data, error } = await supabase.functions.invoke('fetch-asset-content', {
+        body: { site_id: siteId, asset_path: path },
+      });
+
+      if (error) throw error;
+
+      if (data.found) {
+        setAssetContents(prev => ({ ...prev, [path]: data.content }));
+      }
+    } catch (error: any) {
+      console.error("Failed to load content:", error);
+    } finally {
+      setLoadingContent(prev => ({ ...prev, [path]: false }));
+    }
+  };
+
+  const handleContentChange = async (asset: AssetConfig, newContent: string) => {
+    setAssetContents(prev => ({ ...prev, [asset.path]: newContent }));
+    
+    // Auto-save to batch
+    const base64Content = btoa(unescape(encodeURIComponent(newContent)));
+    const fileName = asset.path.split('/').pop() || 'file';
+    
+    // Fetch original content for diff
+    let originalContent = "";
+    try {
+      const { data: originalData } = await supabase.functions.invoke('fetch-asset-content', {
+        body: { site_id: siteId, asset_path: asset.path },
+      });
+      if (originalData?.found) {
+        originalContent = originalData.content;
+      }
+    } catch (error) {
+      console.error("Failed to fetch original content:", error);
+    }
+
+    const newChange: PendingAssetChange = {
+      repoPath: asset.path,
+      content: base64Content,
+      originalContent: originalContent ? btoa(unescape(encodeURIComponent(originalContent))) : undefined,
+      fileName
+    };
+    
+    const updatedChanges = pendingChanges.filter(c => c.repoPath !== asset.path);
+    setPendingChanges([...updatedChanges, newChange]);
+    toast.success("Saved to batch");
+  };
+
+  const handleFileUpload = async (asset: AssetConfig, file: File) => {
+    const reader = new FileReader();
+    reader.onloadend = async () => {
+      const base64 = (reader.result as string).split(',')[1];
+      
+      let fullPath = asset.path;
+      if (asset.type === 'directory' || asset.path.endsWith('/')) {
+        const basePath = asset.path.endsWith('/') ? asset.path : asset.path + '/';
+        fullPath = basePath + file.name;
+      }
+
+      const newChange: PendingAssetChange = {
+        repoPath: fullPath,
+        content: base64,
+        fileName: file.name
+      };
+      
+      const updatedChanges = pendingChanges.filter(c => c.repoPath !== fullPath);
+      setPendingChanges([...updatedChanges, newChange]);
+      toast.success("Added to batch");
+    };
+    reader.readAsDataURL(file);
   };
 
   const fetchAssets = async () => {
@@ -206,12 +287,15 @@ const AssetManagerSidebar = ({ siteId, pendingChanges, setPendingChanges }: Asse
       <div className="space-y-2">
         {config.assets.map((asset, index) => {
           const isExpanded = expandedAssets.has(asset.path);
+          const isTextAsset = asset.type === 'text' || asset.type === 'json' || asset.type === 'markdown';
+          const isImageAsset = asset.type === 'image' || asset.type === 'img';
+          const isDirectoryAsset = asset.type === 'directory' || asset.type === 'folder';
           
           return (
             <Collapsible
               key={index}
               open={isExpanded}
-              onOpenChange={() => toggleExpanded(asset.path)}
+              onOpenChange={() => toggleExpanded(asset)}
             >
               <div className="border border-border rounded-lg overflow-hidden">
                 <CollapsibleTrigger className="w-full p-3 hover:bg-muted/50 transition-colors">
@@ -239,38 +323,69 @@ const AssetManagerSidebar = ({ siteId, pendingChanges, setPendingChanges }: Asse
                 </CollapsibleTrigger>
                 
                 <CollapsibleContent>
-                  <div className="p-3 pt-0 space-y-2">
+                  <div className="p-3 pt-0 space-y-3">
                     {asset.description && (
                       <p className="text-xs text-muted-foreground">
                         {asset.description}
                       </p>
                     )}
                     
-                    <div className="flex flex-col gap-1 text-xs text-muted-foreground">
-                      <span>Max size: {formatFileSize(asset.maxSize)}</span>
-                      {asset.allowedExtensions && (
-                        <span>Types: {asset.allowedExtensions.join(', ')}</span>
-                      )}
-                    </div>
+                    {/* Text/JSON/Markdown inline editor */}
+                    {isTextAsset && (
+                      <div className="space-y-2">
+                        <Label className="text-xs">Current Content</Label>
+                        {loadingContent[asset.path] ? (
+                          <Skeleton className="h-24 w-full" />
+                        ) : (
+                          <Textarea
+                            value={assetContents[asset.path] || ''}
+                            onChange={(e) => setAssetContents(prev => ({ ...prev, [asset.path]: e.target.value }))}
+                            onBlur={(e) => handleContentChange(asset, e.target.value)}
+                            placeholder="Enter content..."
+                            className="min-h-[100px] font-mono text-xs"
+                          />
+                        )}
+                        <p className="text-xs text-muted-foreground">Changes are automatically saved to batch</p>
+                      </div>
+                    )}
 
-                    <div className="flex gap-2 pt-2">
-                      <Button 
-                        variant="default" 
-                        size="sm"
-                        onClick={() => {
-                          setSelectedAsset(asset);
-                          setUploadDialogOpen(true);
-                        }}
-                        className="flex-1"
-                      >
-                        <Upload className="mr-2 h-3 w-3" />
-                        Upload
-                      </Button>
-                      <CreateShareDialog 
-                        siteId={siteId}
-                        assetPath={asset.path.includes('/') ? asset.path.substring(0, asset.path.lastIndexOf('/')) : '.'}
-                      />
-                    </div>
+                    {/* Image/File upload */}
+                    {(isImageAsset || isDirectoryAsset) && (
+                      <div className="space-y-2">
+                        <Label htmlFor={`file-${index}`} className="text-xs">
+                          {isDirectoryAsset ? 'Add File' : 'Upload Image'}
+                        </Label>
+                        <Input
+                          id={`file-${index}`}
+                          type="file"
+                          accept={asset.allowedExtensions?.join(',') || '*'}
+                          onChange={(e) => {
+                            const file = e.target.files?.[0];
+                            if (file) {
+                              // Validate file size
+                              if (asset.maxSize && file.size > asset.maxSize) {
+                                toast.error(`File size exceeds maximum of ${(asset.maxSize / 1024 / 1024).toFixed(1)} MB`);
+                                return;
+                              }
+                              handleFileUpload(asset, file);
+                              e.target.value = ''; // Reset input
+                            }
+                          }}
+                          className="text-xs"
+                        />
+                        <div className="flex flex-col gap-1 text-xs text-muted-foreground">
+                          <span>Max size: {formatFileSize(asset.maxSize)}</span>
+                          {asset.allowedExtensions && (
+                            <span>Types: {asset.allowedExtensions.join(', ')}</span>
+                          )}
+                        </div>
+                      </div>
+                    )}
+
+                    <CreateShareDialog 
+                      siteId={siteId}
+                      assetPath={asset.path.includes('/') ? asset.path.substring(0, asset.path.lastIndexOf('/')) : '.'}
+                    />
                   </div>
                 </CollapsibleContent>
               </div>
@@ -278,21 +393,6 @@ const AssetManagerSidebar = ({ siteId, pendingChanges, setPendingChanges }: Asse
           );
         })}
       </div>
-
-      {selectedAsset && (
-        <AssetUploadDialog
-          open={uploadDialogOpen}
-          onOpenChange={setUploadDialogOpen}
-          asset={selectedAsset}
-          siteId={siteId}
-          pendingChanges={pendingChanges}
-          setPendingChanges={setPendingChanges}
-          onSuccess={() => {
-            fetchAssets();
-            toast.success("Asset updated!");
-          }}
-        />
-      )}
     </div>
   );
 };
