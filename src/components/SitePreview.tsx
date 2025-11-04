@@ -49,7 +49,7 @@ export const SitePreview = ({ siteId, pendingChanges }: SitePreviewProps) => {
     try {
       setLoading(true);
       const { data: { session } } = await supabase.auth.getSession();
-      
+
       const { data, error } = await supabase.functions.invoke('download-site-files', {
         body: { site_id: siteId },
         headers: {
@@ -73,17 +73,16 @@ export const SitePreview = ({ siteId, pendingChanges }: SitePreviewProps) => {
     // Create a virtual file system with pending changes applied
     const virtualFiles = { ...filesRef.current };
 
-    // Apply pending changes
+    // Apply pending changes (content is already base64-encoded)
     pendingChanges.forEach(change => {
-      const encoded = btoa(unescape(encodeURIComponent(change.content)));
       virtualFiles[change.repoPath] = {
-        content: encoded,
+        content: change.content,
         encoding: 'base64',
       };
     });
 
     // Find index.html
-    const indexPath = Object.keys(virtualFiles).find(path => 
+    const indexPath = Object.keys(virtualFiles).find(path =>
       path.endsWith('index.html') || path === 'index.html'
     );
 
@@ -93,7 +92,7 @@ export const SitePreview = ({ siteId, pendingChanges }: SitePreviewProps) => {
     }
 
     const indexFile = virtualFiles[indexPath];
-    let indexHtml = indexFile.encoding === 'base64' 
+    let indexHtml = indexFile.encoding === 'base64'
       ? decodeURIComponent(escape(atob(indexFile.content)))
       : indexFile.content;
 
@@ -127,19 +126,30 @@ export const SitePreview = ({ siteId, pendingChanges }: SitePreviewProps) => {
 
     // Helper to check if file is text-based
     const isTextFile = (path: string): boolean => {
-      return path.endsWith('.json') || path.endsWith('.md') || path.endsWith('.txt') || 
-             path.endsWith('.html') || path.endsWith('.css') || path.endsWith('.js');
+      return path.endsWith('.json') || path.endsWith('.md') || path.endsWith('.txt') ||
+        path.endsWith('.html') || path.endsWith('.css') || path.endsWith('.js');
     };
 
-    // Create blob URLs for all files
+    // Create blob URLs for images (for direct use in <img> tags)
     const blobUrls: Record<string, string> = {};
+    // Store file content for fetch interception
+    const fileContentMap: Record<string, { content: string; mimeType: string; encoding: string }> = {};
     // Capture previous batch URLs; revoke after new iframe loads
     const prevBatchUrls = objectUrlsRef.current.slice();
     objectUrlsRef.current = [];
+
     Object.keys(virtualFiles).forEach(path => {
       const file = virtualFiles[path];
       const mimeType = getMimeType(path);
-      
+
+      // Store content for fetch interception
+      fileContentMap[path] = {
+        content: file.content,
+        mimeType,
+        encoding: file.encoding || 'utf-8'
+      };
+
+      // Also create blob URLs for images (for <img> src attributes)
       let blob: Blob;
       if (file.encoding === 'base64') {
         if (isTextFile(path)) {
@@ -159,7 +169,7 @@ export const SitePreview = ({ siteId, pendingChanges }: SitePreviewProps) => {
         // Already decoded text
         blob = new Blob([file.content], { type: mimeType });
       }
-      
+
       const urlObj = URL.createObjectURL(blob);
       blobUrls[path] = urlObj;
       objectUrlsRef.current.push(urlObj);
@@ -194,8 +204,9 @@ export const SitePreview = ({ siteId, pendingChanges }: SitePreviewProps) => {
           })();
 
           console.log('[Site Preview] Interceptor script starting...');
-          const fileMap = ${JSON.stringify(blobUrls)};
-          console.log('[Site Preview] File map keys:', Object.keys(fileMap));
+          const fileContentMap = ${JSON.stringify(fileContentMap)};
+          const blobUrls = ${JSON.stringify(blobUrls)};
+          console.log('[Site Preview] File map keys:', Object.keys(fileContentMap));
 
           function stripQueryHash(path) {
             return (path || '').split('#')[0].split('?')[0];
@@ -208,25 +219,35 @@ export const SitePreview = ({ siteId, pendingChanges }: SitePreviewProps) => {
             if (typeof path !== 'string') {
               try { path = String(path.url || path.href || path); } catch (e) { return path; }
             }
+            // Skip blob, data, http, and https URLs - they're already resolved
+            if (path.indexOf('blob:') === 0 || path.indexOf('data:') === 0 || 
+                path.indexOf('http://') === 0 || path.indexOf('https://') === 0) {
+              return path;
+            }
             const withoutQ = stripQueryHash(path);
             const dropPrefixes = function(p) { return p.replace(/^\\.\\//g, '').replace(/^\\//g, ''); };
             const base = dropPrefixes(withoutQ);
             const variants = [base, './' + base, '/' + base];
             for (var i = 0; i < variants.length; i++) {
               var v = variants[i];
-              if (fileMap[v]) {
-                console.log('[Site Preview] Resolved path:', path, '->', fileMap[v]);
-                return fileMap[v];
+              if (fileContentMap[v]) {
+                console.log('[Site Preview] Resolved path:', path, '->', v);
+                return v;
               }
             }
-            // If path looks like assets/<file>, try filename-only match
+            // Try filename-only match in any directory
             var fileName = base.split('/').pop();
-            if (fileName && fileMap['assets/' + fileName]) {
-              console.log('[Site Preview] Resolved by filename:', path, '->', fileMap['assets/' + fileName]);
-              return fileMap['assets/' + fileName];
+            if (fileName) {
+              // Search all file paths for a matching filename
+              for (var filePath in fileContentMap) {
+                if (filePath.endsWith('/' + fileName) || filePath === fileName) {
+                  console.log('[Site Preview] Resolved by filename match:', path, '->', filePath);
+                  return filePath;
+                }
+              }
             }
             console.warn('[Site Preview] Could not resolve path:', path);
-            return path;
+            return null;
           }
 
           function resolveSrcset(value) {
@@ -236,8 +257,23 @@ export const SitePreview = ({ siteId, pendingChanges }: SitePreviewProps) => {
               if (!trimmed) return trimmed;
               var pieces = trimmed.split(/\s+/);
               var url = pieces.shift();
-              var resolved = resolvePath(url);
-              return [resolved].concat(pieces).join(' ');
+              var resolvedPath = resolvePath(url);
+              // For images in srcset, use data URLs
+              if (resolvedPath && fileContentMap[resolvedPath] && fileContentMap[resolvedPath].encoding === 'base64') {
+                var fileData = fileContentMap[resolvedPath];
+                var ext = resolvedPath.split('.').pop().toLowerCase();
+                var mimeTypes = {
+                  'jpg': 'image/jpeg', 'jpeg': 'image/jpeg',
+                  'png': 'image/png', 'gif': 'image/gif',
+                  'webp': 'image/webp', 'svg': 'image/svg+xml',
+                  'bmp': 'image/bmp', 'ico': 'image/x-icon'
+                };
+                var mimeType = mimeTypes[ext] || 'application/octet-stream';
+                var finalUrl = 'data:' + mimeType + ';base64,' + fileData.content;
+                return [finalUrl].concat(pieces).join(' ');
+              }
+              var finalUrl = (resolvedPath && blobUrls[resolvedPath]) || resolvedPath || url;
+              return [finalUrl].concat(pieces).join(' ');
             }).join(', ');
           }
 
@@ -246,8 +282,23 @@ export const SitePreview = ({ siteId, pendingChanges }: SitePreviewProps) => {
             return value.replace(/url\(([^)]+)\)/gi, function(m, p1) {
               var raw = (p1 || '').trim().replace(/^['"]|['"]$/g, '');
               if (!raw || raw.indexOf('data:') === 0 || raw.indexOf('http://') === 0 || raw.indexOf('https://') === 0 || raw.indexOf('blob:') === 0) return m;
-              var resolved = resolvePath(raw);
-              return 'url("' + resolved + '")';
+              var resolvedPath = resolvePath(raw);
+              // For images in CSS, use data URLs
+              if (resolvedPath && fileContentMap[resolvedPath] && fileContentMap[resolvedPath].encoding === 'base64') {
+                var fileData = fileContentMap[resolvedPath];
+                var ext = resolvedPath.split('.').pop().toLowerCase();
+                var mimeTypes = {
+                  'jpg': 'image/jpeg', 'jpeg': 'image/jpeg',
+                  'png': 'image/png', 'gif': 'image/gif',
+                  'webp': 'image/webp', 'svg': 'image/svg+xml',
+                  'bmp': 'image/bmp', 'ico': 'image/x-icon'
+                };
+                var mimeType = mimeTypes[ext] || 'application/octet-stream';
+                var finalUrl = 'data:' + mimeType + ';base64,' + fileData.content;
+                return 'url("' + finalUrl + '")';
+              }
+              var finalUrl = (resolvedPath && blobUrls[resolvedPath]) || resolvedPath || raw;
+              return 'url("' + finalUrl + '")';
             });
           }
 
@@ -255,15 +306,48 @@ export const SitePreview = ({ siteId, pendingChanges }: SitePreviewProps) => {
           const originalFetch = window.fetch;
           window.fetch = function(input, init) {
             try { console.log('[Site Preview] Fetch intercepted:', input); } catch {}
+            
+            var pathToResolve;
+            if (typeof input === 'string' || input instanceof URL) {
+              pathToResolve = String(input);
+            } else if (input && typeof input === 'object' && 'url' in input) {
+              pathToResolve = input.url;
+            }
+            
+            // Try to resolve the path
+            if (pathToResolve) {
+              const resolvedPath = resolvePath(pathToResolve);
+              if (resolvedPath && fileContentMap[resolvedPath]) {
+                // Create Response from file content
+                const file = fileContentMap[resolvedPath];
+                var responseBody;
+                
+                if (file.encoding === 'base64') {
+                  // Decode base64
+                  var binaryString = atob(file.content);
+                  var bytes = new Uint8Array(binaryString.length);
+                  for (var i = 0; i < binaryString.length; i++) {
+                    bytes[i] = binaryString.charCodeAt(i);
+                  }
+                  responseBody = bytes;
+                } else {
+                  responseBody = file.content;
+                }
+                
+                return Promise.resolve(new Response(responseBody, {
+                  status: 200,
+                  statusText: 'OK',
+                  headers: { 'Content-Type': file.mimeType }
+                }));
+              }
+            }
+            
+            // Pass through to original fetch
             var promise;
             if (typeof input === 'string' || input instanceof URL) {
-              const resolved = resolvePath(input);
-              promise = originalFetch.call(this, resolved, init);
+              promise = originalFetch.call(this, input, init);
             } else if (input && typeof input === 'object' && 'url' in input) {
-              // Request object
-              const resolvedUrl = resolvePath(input.url);
-              const cloned = new Request(resolvedUrl, input);
-              promise = originalFetch.call(this, cloned, init);
+              promise = originalFetch.call(this, input, init);
             } else {
               promise = originalFetch.call(this, input, init);
             }
@@ -276,14 +360,14 @@ export const SitePreview = ({ siteId, pendingChanges }: SitePreviewProps) => {
                   // Replace all asset paths in the text with blob URLs
                   var transformed = text;
                   Object.keys(fileMap).forEach(function(path) {
-                    // Simple string replacements for various path formats
                     var blobUrl = fileMap[path];
-                    // Match exact path in quotes
+                    // Simple string replacements for various path formats
                     transformed = transformed.split('"' + path + '"').join('"' + blobUrl + '"');
-                    // Match with leading ./
                     transformed = transformed.split('"./' + path + '"').join('"' + blobUrl + '"');
-                    // Match with leading /
                     transformed = transformed.split('"/' + path + '"').join('"' + blobUrl + '"');
+                    transformed = transformed.split("'" + path + "'").join('"' + blobUrl + '"');
+                    transformed = transformed.split("'./" + path + "'").join('"' + blobUrl + '"');
+                    transformed = transformed.split("'/" + path + "'").join('"' + blobUrl + '"');
                   });
                   
                   // Create new response with transformed content
@@ -316,9 +400,11 @@ export const SitePreview = ({ siteId, pendingChanges }: SitePreviewProps) => {
           const originalSetAttribute = Element.prototype.setAttribute;
           Element.prototype.setAttribute = function(name, value) {
             if (name === 'src' || name === 'href') {
-              const resolved = resolvePath(value);
-              if (resolved !== value) { try { console.log('[Site Preview] Attribute resolved:', name, value, '->', resolved); } catch {} }
-              return originalSetAttribute.call(this, name, resolved);
+              const resolvedPath = resolvePath(value);
+              // For src/href, use blob URL if available, otherwise use resolved path
+              const finalUrl = (resolvedPath && blobUrls[resolvedPath]) || resolvedPath || value;
+              if (finalUrl !== value) { try { console.log('[Site Preview] Attribute resolved:', name, value, '->', finalUrl); } catch {} }
+              return originalSetAttribute.call(this, name, finalUrl);
             }
             if (name === 'srcset') {
               const resolvedSet = resolveSrcset(value);
@@ -358,6 +444,41 @@ export const SitePreview = ({ siteId, pendingChanges }: SitePreviewProps) => {
           }
 
 
+          // Intercept HTMLImageElement src property
+          if (window.HTMLImageElement && HTMLImageElement.prototype) {
+            const imgSrcDesc = Object.getOwnPropertyDescriptor(HTMLImageElement.prototype, 'src');
+            if (imgSrcDesc && imgSrcDesc.set) {
+              Object.defineProperty(HTMLImageElement.prototype, 'src', {
+                set: function(value) {
+                  const resolvedPath = resolvePath(value);
+                  // For images, use fileContentMap to get base64 data
+                  if (resolvedPath && fileContentMap[resolvedPath]) {
+                    var fileData = fileContentMap[resolvedPath];
+                    if (fileData.encoding === 'base64') {
+                      var ext = resolvedPath.split('.').pop().toLowerCase();
+                      var mimeTypes = {
+                        'jpg': 'image/jpeg', 'jpeg': 'image/jpeg',
+                        'png': 'image/png', 'gif': 'image/gif',
+                        'webp': 'image/webp', 'svg': 'image/svg+xml',
+                        'bmp': 'image/bmp', 'ico': 'image/x-icon'
+                      };
+                      var mimeType = mimeTypes[ext] || 'application/octet-stream';
+                      var dataUrl = 'data:' + mimeType + ';base64,' + fileData.content;
+                      try { console.log('[Site Preview] Image src set:', value, '->', 'data URL'); } catch {}
+                      imgSrcDesc.set.call(this, dataUrl);
+                      return;
+                    }
+                  }
+                  // Fallback to blob URL for other resources
+                  var finalUrl = (resolvedPath && blobUrls[resolvedPath]) || resolvedPath || value;
+                  try { console.log('[Site Preview] Image src set:', value, '->', finalUrl); } catch {}
+                  imgSrcDesc.set.call(this, finalUrl);
+                },
+                get: imgSrcDesc.get
+              });
+            }
+          }
+          
           // Intercept Image constructor
           const OriginalImage = window.Image;
           window.Image = function() {
@@ -365,8 +486,9 @@ export const SitePreview = ({ siteId, pendingChanges }: SitePreviewProps) => {
             const originalSrcSet = Object.getOwnPropertyDescriptor(OriginalImage.prototype, 'src').set;
             Object.defineProperty(img, 'src', {
               set: function(value) {
-                const resolved = resolvePath(value);
-                originalSrcSet.call(this, resolved);
+                const resolvedPath = resolvePath(value);
+                const finalUrl = (resolvedPath && blobUrls[resolvedPath]) || resolvedPath || value;
+                originalSrcSet.call(this, finalUrl);
               },
               get: function() {
                 return this.getAttribute('src');
@@ -423,7 +545,7 @@ export const SitePreview = ({ siteId, pendingChanges }: SitePreviewProps) => {
             const key = raw.replace(/^\.\//, '').replace(/^\//, '');
             const mapped = blobUrls[key];
             if (mapped) {
-              try { console.log('[Site Preview] CSS url resolved:', raw, '->', mapped); } catch {}
+              try { console.log('[Site Preview] CSS url resolved:', raw, '->', mapped); } catch { }
               return `url("${mapped}")`;
             }
             return m;
@@ -434,21 +556,11 @@ export const SitePreview = ({ siteId, pendingChanges }: SitePreviewProps) => {
       return match;
     });
 
-    // Replace script tags and inject asset paths
+    // Replace script tags with inline scripts (don't replace paths - let interceptor handle them)
     indexHtml = indexHtml.replace(/<script([^>]*)src=["']([^"']+)["']([^>]*)><\/script>/gi, (match, before, src, after) => {
       const jsPath = src.replace(/^\.\//, '');
-      let jsContent = getFileContent(jsPath);
+      const jsContent = getFileContent(jsPath);
       if (jsContent) {
-        // Replace asset paths in JavaScript
-        Object.keys(blobUrls).forEach(path => {
-          const patterns = [
-            new RegExp(`['"\`]\\.\\/+${path.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}['"\`]`, 'g'),
-            new RegExp(`['"\`]${path.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}['"\`]`, 'g')
-          ];
-          patterns.forEach(pattern => {
-            jsContent = jsContent.replace(pattern, `"${blobUrls[path]}"`);
-          });
-        });
         return `<script${before}${after}>${jsContent}</script>`;
       }
       return match;
@@ -456,7 +568,7 @@ export const SitePreview = ({ siteId, pendingChanges }: SitePreviewProps) => {
 
     // Replace image src attributes with data URLs
     indexHtml = indexHtml.replace(/(<img[^>]*src=["'])([^"']+)(["'][^>]*>)/gi, (match, before, src, after) => {
-      const imgPath = src.replace(/^\.\//, '');
+      const imgPath = src.replace(/^\.\//, '').replace(/^\//, '');
       const file = virtualFiles[imgPath];
       if (file && file.encoding === 'base64') {
         const mimeType = getMimeType(imgPath);
@@ -484,7 +596,7 @@ export const SitePreview = ({ siteId, pendingChanges }: SitePreviewProps) => {
         try {
           if (oldPreviewUrl) URL.revokeObjectURL(oldPreviewUrl);
           if (oldBatchUrls.length) oldBatchUrls.forEach((u) => URL.revokeObjectURL(u));
-        } catch (e) {}
+        } catch (e) { }
         iframeEl.removeEventListener('load', onLoad);
       };
       iframeEl.addEventListener('load', onLoad);
@@ -497,7 +609,7 @@ export const SitePreview = ({ siteId, pendingChanges }: SitePreviewProps) => {
         URL.revokeObjectURL(previewUrl);
       }
       if (objectUrlsRef.current.length) {
-        try { objectUrlsRef.current.forEach((u) => URL.revokeObjectURL(u)); } catch (e) {}
+        try { objectUrlsRef.current.forEach((u) => URL.revokeObjectURL(u)); } catch (e) { }
         objectUrlsRef.current = [];
       }
     };
