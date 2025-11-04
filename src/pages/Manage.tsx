@@ -426,14 +426,14 @@ const Manage = () => {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-background">
-        <header className="border-b border-border bg-card/50 backdrop-blur-sm sticky top-0 z-50">
+      <div className="h-screen w-full flex flex-col bg-background overflow-hidden">
+        <header className="border-b border-border bg-card/50 backdrop-blur-sm flex-shrink-0 z-50">
           <div className="container mx-auto px-4 h-16 flex items-center">
             <Skeleton className="h-8 w-8 rounded mr-4" />
             <Skeleton className="h-8 w-48" />
           </div>
         </header>
-        <main className="container mx-auto px-4 py-8">
+        <main className="container mx-auto px-4 py-8 flex-1 overflow-auto">
           <Skeleton className="h-32 w-full mb-6" />
           <Skeleton className="h-96 w-full" />
         </main>
@@ -443,7 +443,7 @@ const Manage = () => {
 
   if (!site) {
     return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
+      <div className="h-screen w-full bg-background flex items-center justify-center overflow-hidden">
         <div className="text-center">
           <h2 className="text-2xl font-bold mb-4">Site not found</h2>
           <Button onClick={() => navigate("/dashboard")}>
@@ -456,9 +456,9 @@ const Manage = () => {
   }
 
   return (
-    <div className="min-h-screen w-full flex flex-col bg-background">
+    <div className="h-screen w-full flex flex-col bg-background overflow-hidden">
       {/* Header */}
-      <header className="border-b border-border bg-card/50 backdrop-blur-sm sticky top-0 z-50">
+      <header className="border-b border-border bg-card/50 backdrop-blur-sm flex-shrink-0 z-50">
         <div className="px-4 py-3">
           <div className="flex items-start gap-3">
             <Button
@@ -513,9 +513,9 @@ const Manage = () => {
         </div>
       </header>
 
-      <ResizablePanelGroup direction="horizontal" className="flex-1">
+      <ResizablePanelGroup direction="horizontal" className="flex-1 min-h-0">
         {/* Sidebar */}
-        <ResizablePanel defaultSize={20} minSize={15} maxSize={35} className="overflow-hidden">
+        <ResizablePanel defaultSize={20} minSize={15} maxSize={35} className="overflow-hidden min-h-0">
           <div className="h-full flex flex-col min-w-0 border-r overflow-y-auto">
             <div className="p-4 space-y-6">
               {/* Site Details */}
@@ -623,10 +623,10 @@ const Manage = () => {
         </ResizablePanel>
         <ResizableHandle withHandle />
 
-        <ResizablePanel defaultSize={80} minSize={50}>
-          <div className="flex flex-col h-full">
+        <ResizablePanel defaultSize={80} minSize={50} className="overflow-hidden min-h-0">
+          <div className="flex flex-col h-full min-h-0">
             {/* Preview and Controls */}
-            <main className="flex-1 flex flex-col p-4 gap-4 overflow-hidden">
+            <main className="flex-1 flex flex-col p-4 gap-4 overflow-hidden min-h-0">
               {/* Commit Controls - Prominent */}
               {pendingChanges.length > 0 && (
                 <Card className="shadow-lg border-primary/20">
@@ -703,14 +703,14 @@ const Manage = () => {
               )}
 
               {/* Live Preview */}
-              <Card className="flex-1 overflow-hidden">
-                <CardHeader className="pb-3">
+              <Card className="flex-1 overflow-hidden flex flex-col">
+                <CardHeader className="pb-3 flex-shrink-0">
                   <CardTitle className="text-base">Live Preview</CardTitle>
                   <CardDescription className="text-xs">
                     Changes appear here in real-time before committing
                   </CardDescription>
                 </CardHeader>
-                <CardContent className="p-0 h-[calc(100%-4rem)]">
+                <CardContent className="p-0 flex-1 overflow-hidden">
                   <SitePreview
                     siteId={siteId!}
                     pendingChanges={pendingChanges}

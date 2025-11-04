@@ -617,7 +617,7 @@ export const SitePreview = ({ siteId, pendingChanges }: SitePreviewProps) => {
 
   if (loading) {
     return (
-      <Card className="flex items-center justify-center h-[600px]">
+      <Card className="flex items-center justify-center h-full">
         <div className="flex flex-col items-center gap-2">
           <Loader2 className="h-8 w-8 animate-spin text-primary" />
           <p className="text-sm text-muted-foreground">Loading preview...</p>
@@ -627,14 +627,14 @@ export const SitePreview = ({ siteId, pendingChanges }: SitePreviewProps) => {
   }
 
   return (
-    <Card className="overflow-hidden">
-      <div className="bg-muted p-2 text-xs text-muted-foreground border-b">
+    <Card className="overflow-hidden h-full flex flex-col">
+      <div className="bg-muted p-2 text-xs text-muted-foreground border-b flex-shrink-0">
         Preview with pending changes
       </div>
       <iframe
         ref={iframeRef}
         src={previewUrl}
-        className="w-full h-[600px] border-0"
+        className="w-full flex-1 border-0"
         sandbox="allow-scripts allow-same-origin"
         title="Site Preview"
       />
