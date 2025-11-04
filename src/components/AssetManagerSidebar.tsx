@@ -390,6 +390,11 @@ const AssetManagerSidebar = ({ siteId, pendingChanges, setPendingChanges }: Asse
     reader.readAsDataURL(file);
   };
 
+  const isImageFile = (fileName: string): boolean => {
+    const imageExtensions = ['.jpg', '.jpeg', '.png', '.gif', '.webp', '.svg', '.bmp', '.ico'];
+    return imageExtensions.some(ext => fileName.toLowerCase().endsWith(ext));
+  };
+
   const fetchAssets = async () => {
     setLoading(true);
     try {
@@ -714,17 +719,25 @@ const AssetManagerSidebar = ({ siteId, pendingChanges, setPendingChanges }: Asse
                                 <Label className="text-xs">Existing Files</Label>
                                 <div className="space-y-1 max-h-48 overflow-y-auto">
                                   {directoryFiles[asset.path].map((file) => (
-                                    <div key={file.path} className="flex items-center justify-between p-2 border rounded-lg hover:bg-muted/50">
-                                      <div className="flex items-center gap-2 flex-1 min-w-0">
-                                        <File className="h-4 w-4 text-muted-foreground flex-shrink-0" />
-                                        <div className="flex-1 min-w-0">
-                                          <p className="text-xs font-medium truncate">{file.name}</p>
-                                          <p className="text-xs text-muted-foreground">
-                                            {(file.size / 1024).toFixed(1)} KB
-                                          </p>
+                                    <div key={file.path} className="flex items-center gap-2 p-2 border rounded-lg hover:bg-muted/50">
+                                      {isImageFile(file.name) ? (
+                                        <img
+                                          src={file.download_url}
+                                          alt={file.name}
+                                          className="w-12 h-12 object-cover rounded border flex-shrink-0"
+                                        />
+                                      ) : (
+                                        <div className="w-12 h-12 flex items-center justify-center bg-muted rounded border flex-shrink-0">
+                                          <File className="h-6 w-6 text-muted-foreground" />
                                         </div>
+                                      )}
+                                      <div className="flex-1 min-w-0">
+                                        <p className="text-xs font-medium truncate">{file.name}</p>
+                                        <p className="text-xs text-muted-foreground">
+                                          {(file.size / 1024).toFixed(1)} KB
+                                        </p>
                                       </div>
-                                      <div className="flex items-center gap-1">
+                                      <div className="flex items-center gap-1 flex-shrink-0">
                                         <Button
                                           variant="ghost"
                                           size="sm"
