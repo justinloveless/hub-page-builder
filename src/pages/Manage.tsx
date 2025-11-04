@@ -10,15 +10,18 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
 import { toast } from "sonner";
-import { ArrowLeft, ExternalLink, GitBranch, Users, FileText, Activity, Copy, Trash2, Check, User as UserIcon, Settings, UserCog, Crown, LogOut, Filter, CalendarIcon, X } from "lucide-react";
+import { ArrowLeft, ExternalLink, GitBranch, Users, FileText, Activity, Copy, Trash2, Check, User as UserIcon, Settings, UserCog, Crown, LogOut, Filter, CalendarIcon, X, Package, GitCommit } from "lucide-react";
+import { Separator } from "@/components/ui/separator";
 import { format } from "date-fns";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import AssetManager from "@/components/AssetManager";
+import AssetManagerSidebar from "@/components/AssetManagerSidebar";
 import PendingBatchChanges from "@/components/PendingBatchChanges";
 import InviteMemberDialog from "@/components/InviteMemberDialog";
 import ActivityCard from "@/components/ActivityCard";
 import { SitePreview } from "@/components/SitePreview";
+import { SidebarProvider, Sidebar, SidebarContent, SidebarHeader, SidebarTrigger } from "@/components/ui/sidebar";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import type { Tables } from "@/integrations/supabase/types";
 
 export interface PendingAssetChange {
@@ -452,427 +455,290 @@ const Manage = () => {
   }
 
   return (
-    <div className="min-h-screen bg-background">
-      {/* Header */}
-      <header className="border-b border-border bg-card/50 backdrop-blur-sm sticky top-0 z-50">
-        <div className="container mx-auto px-4 py-3">
-          <div className="flex items-start gap-3">
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={() => navigate("/dashboard")}
-              className="flex-shrink-0"
-            >
-              <ArrowLeft className="h-5 w-5" />
-            </Button>
-            <div className="flex-1 min-w-0">
-              <h1 className="text-lg sm:text-xl font-bold truncate">{site.name}</h1>
-              <p className="text-xs sm:text-sm text-muted-foreground truncate">{site.repo_full_name}</p>
+    <SidebarProvider>
+      <div className="min-h-screen w-full flex bg-background">
+        {/* Sidebar */}
+        <Sidebar className="border-r" collapsible="icon">
+          <SidebarHeader className="border-b p-4">
+            <div className="flex items-center justify-between">
+              <h2 className="font-semibold text-sm">Site Manager</h2>
+              <SidebarTrigger />
             </div>
-            <div className="flex items-center gap-2 flex-shrink-0">
-              <Button 
-                variant="ghost"
-                size="icon"
-                onClick={() => navigate("/profile")}
-                title="Profile"
-              >
-                <UserIcon className="h-5 w-5" />
-              </Button>
-              <Button 
-                variant="ghost"
-                size="icon"
-                onClick={handleLeaveSite}
-                title="Leave Site"
-              >
-                <LogOut className="h-5 w-5" />
-              </Button>
-              <Button 
-                variant="outline" 
-                size="sm"
-                onClick={() => window.open(getGithubPagesUrl(site.repo_full_name), '_blank')}
-                className="hidden sm:flex"
-              >
-                <ExternalLink className="mr-2 h-4 w-4" />
-                View Site
-              </Button>
-              <Button 
-                variant="outline" 
-                size="icon"
-                onClick={() => window.open(getGithubPagesUrl(site.repo_full_name), '_blank')}
-                className="sm:hidden"
-                title="View Site"
-              >
-                <ExternalLink className="h-4 w-4" />
-              </Button>
-            </div>
-          </div>
-        </div>
-      </header>
-
-      {/* Main Content */}
-      <main className="container mx-auto px-4 py-8">
-        {/* Site Overview */}
-        <Card className="mb-6">
-          <CardHeader>
-            <CardTitle>Site Details</CardTitle>
-            <CardDescription>General information about this site</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
-              <div className="min-w-0">
-                <p className="text-sm font-medium mb-1">Repository</p>
-                <button
-                  onClick={() => window.open(getRepositoryUrl(site.repo_full_name), '_blank')}
-                  className="text-sm text-muted-foreground flex items-center gap-2 hover:text-primary transition-colors cursor-pointer truncate w-full text-left"
-                >
-                  <ExternalLink className="h-4 w-4 flex-shrink-0" />
-                  <span className="truncate">{site.repo_full_name}</span>
-                </button>
-              </div>
-              <div>
-                <p className="text-sm font-medium mb-1">Default Branch</p>
-                <Badge variant="secondary" className="mt-1">
-                  <GitBranch className="mr-1 h-3 w-3" />
-                  {site.default_branch}
-                </Badge>
-              </div>
-              <div>
-                <p className="text-sm font-medium mb-1">Created</p>
-                <p className="text-sm text-muted-foreground">
-                  {new Date(site.created_at).toLocaleDateString()}
-                </p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Tabs */}
-        <Tabs defaultValue="assets" className="space-y-6">
-          <TabsList className="grid w-full grid-cols-3">
-            <TabsTrigger value="assets" className="text-xs sm:text-sm">
-              <FileText className="mr-1 sm:mr-2 h-3 w-3 sm:h-4 sm:w-4" />
-              <span className="hidden sm:inline">Assets</span>
-              <span className="sm:hidden">Files</span>
-            </TabsTrigger>
-            <TabsTrigger value="activity" className="text-xs sm:text-sm">
-              <Activity className="mr-1 sm:mr-2 h-3 w-3 sm:h-4 sm:w-4" />
-              <span className="hidden sm:inline">Activity</span>
-              <span className="sm:hidden">Log</span>
-            </TabsTrigger>
-            <TabsTrigger value="members" className="text-xs sm:text-sm">
-              <Users className="mr-1 sm:mr-2 h-3 w-3 sm:h-4 sm:w-4" />
-              Members
-            </TabsTrigger>
-          </TabsList>
-
-          {/* Assets Tab */}
-          <TabsContent value="assets" className="space-y-6">
-            <PendingBatchChanges 
-              siteId={siteId!} 
-              pendingChanges={pendingChanges}
-              setPendingChanges={setPendingChanges}
-              onRefresh={loadActivities}
-            />
-            <SitePreview 
-              siteId={siteId!}
-              pendingChanges={pendingChanges}
-            />
-            <AssetManager 
-              siteId={siteId!} 
-              pendingChanges={pendingChanges}
-              setPendingChanges={setPendingChanges}
-            />
-          </TabsContent>
-
-          {/* Activity Tab */}
-          <TabsContent value="activity">
-            <Card>
-              <CardHeader>
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                  <div>
-                    <CardTitle>Activity Log</CardTitle>
-                    <CardDescription>
-                      Recent actions and events for this site
-                    </CardDescription>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <Filter className="h-4 w-4 text-muted-foreground" />
-                    <span className="text-sm text-muted-foreground">Filters:</span>
+          </SidebarHeader>
+          <SidebarContent>
+            <ScrollArea className="h-full">
+              <div className="p-4 space-y-6">
+                {/* Site Details */}
+                <div className="space-y-3">
+                  <h3 className="text-sm font-semibold">Site Details</h3>
+                  <div className="space-y-2 text-xs">
+                    <div>
+                      <p className="text-muted-foreground mb-1">Repository</p>
+                      <button
+                        onClick={() => window.open(getRepositoryUrl(site.repo_full_name), '_blank')}
+                        className="text-primary hover:underline flex items-center gap-1"
+                      >
+                        <ExternalLink className="h-3 w-3" />
+                        <span className="truncate">{site.repo_full_name}</span>
+                      </button>
+                    </div>
+                    <div>
+                      <p className="text-muted-foreground mb-1">Branch</p>
+                      <Badge variant="secondary" className="text-xs">
+                        <GitBranch className="mr-1 h-3 w-3" />
+                        {site.default_branch}
+                      </Badge>
+                    </div>
+                    <div>
+                      <p className="text-muted-foreground mb-1">Created</p>
+                      <p>{new Date(site.created_at).toLocaleDateString()}</p>
+                    </div>
                   </div>
                 </div>
-                <div className="flex flex-col sm:flex-row gap-3 mt-4">
-                  <Select value={filterUserId} onValueChange={setFilterUserId}>
-                    <SelectTrigger className="w-full sm:w-[200px]">
-                      <SelectValue placeholder="All users" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">All users</SelectItem>
-                      {members.map((member) => (
-                        <SelectItem key={member.user_id} value={member.user_id}>
-                          {member.profile?.full_name || `User ${member.user_id.slice(0, 8)}`}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  
-                  <Popover>
-                    <PopoverTrigger asChild>
-                      <Button variant="outline" className="w-full sm:w-[240px] justify-start text-left font-normal">
-                        <CalendarIcon className="mr-2 h-4 w-4" />
-                        {filterDateFrom ? format(filterDateFrom, "PPP") : "From date"}
-                      </Button>
-                    </PopoverTrigger>
-                    <PopoverContent className="w-auto p-0">
-                      <Calendar
-                        mode="single"
-                        selected={filterDateFrom}
-                        onSelect={setFilterDateFrom}
-                        initialFocus
-                      />
-                    </PopoverContent>
-                  </Popover>
 
-                  <Popover>
-                    <PopoverTrigger asChild>
-                      <Button variant="outline" className="w-full sm:w-[240px] justify-start text-left font-normal">
-                        <CalendarIcon className="mr-2 h-4 w-4" />
-                        {filterDateTo ? format(filterDateTo, "PPP") : "To date"}
-                      </Button>
-                    </PopoverTrigger>
-                    <PopoverContent className="w-auto p-0">
-                      <Calendar
-                        mode="single"
-                        selected={filterDateTo}
-                        onSelect={setFilterDateTo}
-                        initialFocus
-                      />
-                    </PopoverContent>
-                  </Popover>
+                <Separator />
 
-                  {(filterUserId !== "all" || filterDateFrom || filterDateTo) && (
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      onClick={clearFilters}
-                      title="Clear filters"
-                    >
-                      <X className="h-4 w-4" />
-                    </Button>
-                  )}
+                {/* Asset Manager */}
+                <div className="space-y-3">
+                  <h3 className="text-sm font-semibold">Assets</h3>
+                  <AssetManagerSidebar
+                    siteId={siteId!}
+                    pendingChanges={pendingChanges}
+                    setPendingChanges={setPendingChanges}
+                  />
                 </div>
-              </CardHeader>
-              <CardContent>
-                {activities.length === 0 ? (
-                  <div className="text-center py-8 text-muted-foreground">
-                    <Activity className="h-12 w-12 mx-auto mb-3 opacity-50" />
-                    <p>No activity found</p>
-                  </div>
-                ) : (
-                  <div className="space-y-3">
-                    {activities.map((activity) => (
-                      <ActivityCard
-                        key={activity.id}
-                        activity={activity}
-                        repoFullName={site.repo_full_name}
-                        userProfile={activity.user_profile}
-                      />
-                    ))}
-                    {hasMoreActivities && (
-                      <div className="flex justify-center pt-4">
-                        <Button
-                          variant="outline"
-                          onClick={loadMoreActivities}
-                        >
-                          Load More
-                        </Button>
-                      </div>
-                    )}
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-          </TabsContent>
 
-          {/* Members Tab */}
-          <TabsContent value="members" className="space-y-6">
-            <Card>
-              <CardHeader>
-                <div className="flex items-center justify-between">
-                  <div>
-                    <CardTitle>Site Members</CardTitle>
-                    <CardDescription>
-                      Users who have access to manage this site
-                    </CardDescription>
+                <Separator />
+
+                {/* Members */}
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <h3 className="text-sm font-semibold">Members</h3>
+                    <InviteMemberDialog siteId={siteId!} onInviteCreated={loadInvitations} />
                   </div>
-                  <InviteMemberDialog siteId={siteId!} onInviteCreated={loadInvitations} />
-                </div>
-              </CardHeader>
-              <CardContent>
-                {members.length === 0 ? (
-                  <div className="text-center py-8 text-muted-foreground">
-                    <Users className="h-12 w-12 mx-auto mb-3 opacity-50" />
-                    <p>No members found</p>
-                  </div>
-                ) : (
-                  <div className="space-y-3">
-                    {members.map((member) => {
+                  <div className="space-y-2">
+                    {members.slice(0, 3).map((member) => {
                       const displayName = member.profile?.full_name || `User ${member.user_id.slice(0, 8)}`;
                       const initials = member.profile?.full_name
                         ? member.profile.full_name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2)
                         : member.user_id.slice(0, 2).toUpperCase();
-                      const isCurrentUser = member.user_id === currentUserId;
-                      const canManage = currentUserRole === "owner" && !isCurrentUser && member.role !== "owner";
                       
                       return (
-                        <div
-                          key={`${member.site_id}-${member.user_id}`}
-                          className="flex flex-col sm:flex-row sm:items-center gap-3 p-4 border border-border rounded-lg"
-                        >
-                          <div className="flex items-center gap-3 flex-1 min-w-0">
-                            <Avatar className="h-10 w-10 flex-shrink-0">
-                              <AvatarImage src={member.profile?.avatar_url || undefined} alt={displayName} />
-                              <AvatarFallback className="bg-gradient-to-br from-primary to-accent text-primary-foreground">
-                                {initials}
-                              </AvatarFallback>
-                            </Avatar>
-                            <div className="flex-1 min-w-0">
-                              <div className="flex items-center gap-2 flex-wrap">
-                                <p className="font-medium text-sm truncate">{displayName}</p>
-                                {isCurrentUser && (
-                                  <Badge variant="secondary" className="text-xs flex-shrink-0">You</Badge>
-                                )}
-                              </div>
-                              <p className="text-xs text-muted-foreground">
-                                Added {new Date(member.created_at).toLocaleDateString()}
-                              </p>
-                            </div>
+                        <div key={member.user_id} className="flex items-center gap-2">
+                          <Avatar className="h-6 w-6">
+                            <AvatarImage src={member.profile?.avatar_url || undefined} />
+                            <AvatarFallback className="text-xs bg-gradient-to-br from-primary to-accent text-primary-foreground">
+                              {initials}
+                            </AvatarFallback>
+                          </Avatar>
+                          <div className="flex-1 min-w-0">
+                            <p className="text-xs font-medium truncate">{displayName}</p>
                           </div>
-                          <div className="flex items-center gap-2 flex-wrap">
-                            <Badge variant={member.role === "owner" ? "default" : "secondary"} className="flex-shrink-0">
-                              {member.role === "owner" && <Crown className="mr-1 h-3 w-3" />}
-                              {member.role}
-                            </Badge>
-                            {canManage && (
-                              <>
-                                {member.role === "manager" && (
-                                  <Button
-                                    size="sm"
-                                    variant="outline"
-                                    onClick={() => handlePromoteToOwner(member.user_id, displayName)}
-                                    title="Promote to owner"
-                                    className="text-xs"
-                                  >
-                                    <UserCog className="h-3 w-3 sm:mr-1" />
-                                    <span className="hidden sm:inline">Promote</span>
-                                  </Button>
-                                )}
-                                <Button
-                                  size="sm"
-                                  variant="ghost"
-                                  onClick={() => handleRemoveMember(member.user_id, displayName)}
-                                  title="Remove member"
-                                >
-                                  <Trash2 className="h-4 w-4 text-destructive" />
-                                </Button>
-                              </>
-                            )}
-                          </div>
+                          <Badge variant={member.role === "owner" ? "default" : "secondary"} className="text-xs">
+                            {member.role === "owner" && <Crown className="mr-1 h-2 w-2" />}
+                            {member.role}
+                          </Badge>
                         </div>
                       );
                     })}
+                    {members.length > 3 && (
+                      <p className="text-xs text-muted-foreground">+{members.length - 3} more</p>
+                    )}
                   </div>
-                )}
-              </CardContent>
-            </Card>
+                </div>
 
-            {/* Pending Invitations */}
-            {invitations.length > 0 && (
-              <Card>
-                <CardHeader>
-                  <CardTitle>Pending Invitations</CardTitle>
-                  <CardDescription>
-                    Invitations waiting to be accepted
-                  </CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-3">
-                    {invitations.map((invitation) => (
-                      <div
-                        key={invitation.id}
-                        className="flex flex-col sm:flex-row sm:items-center gap-3 p-4 border border-border rounded-lg"
-                      >
-                        <div className="flex-1 min-w-0">
-                          <p className="font-medium text-sm truncate">
-                            {invitation.email || "Invitation link"}
-                          </p>
-                          <p className="text-xs text-muted-foreground">
-                            Expires {new Date(invitation.expires_at).toLocaleDateString()}
-                          </p>
-                          {invitation.invite_code && (
-                            <p className="text-xs font-mono font-bold text-primary mt-1">
-                              Code: {invitation.invite_code}
-                            </p>
-                          )}
-                        </div>
-                        <div className="flex items-center gap-2 flex-wrap">
-                          <Badge variant="secondary" className="flex-shrink-0">{invitation.role}</Badge>
-                          <Button
-                            size="icon"
-                            variant="ghost"
-                            onClick={() => handleCopyInviteLink(invitation.token, invitation.id)}
-                            title="Copy invite link"
-                            className="flex-shrink-0"
-                          >
-                            {copiedInviteId === invitation.id ? (
-                              <Check className="h-4 w-4 text-green-600" />
-                            ) : (
-                              <Copy className="h-4 w-4" />
-                            )}
-                          </Button>
-                          {currentUserRole === "owner" && (
-                            <Button
-                              size="icon"
-                              variant="ghost"
-                              onClick={() => handleDeleteInvitation(invitation.id)}
-                              title="Delete invitation"
-                              className="flex-shrink-0"
-                            >
-                              <Trash2 className="h-4 w-4 text-destructive" />
-                            </Button>
-                          )}
-                        </div>
+                <Separator />
+
+                {/* Activity Preview */}
+                <div className="space-y-3">
+                  <h3 className="text-sm font-semibold">Recent Activity</h3>
+                  <div className="space-y-2">
+                    {activities.slice(0, 3).map((activity) => (
+                      <div key={activity.id} className="text-xs">
+                        <p className="font-medium truncate">{activity.action}</p>
+                        <p className="text-muted-foreground text-xs">
+                          {new Date(activity.created_at).toLocaleDateString()}
+                        </p>
                       </div>
                     ))}
+                    {activities.length === 0 && (
+                      <p className="text-xs text-muted-foreground">No recent activity</p>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </ScrollArea>
+          </SidebarContent>
+        </Sidebar>
+
+        {/* Main Content */}
+        <div className="flex-1 flex flex-col min-w-0">
+          {/* Header */}
+          <header className="border-b border-border bg-card/50 backdrop-blur-sm sticky top-0 z-50">
+            <div className="px-4 py-3">
+              <div className="flex items-start gap-3">
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => navigate("/dashboard")}
+                  className="flex-shrink-0"
+                >
+                  <ArrowLeft className="h-5 w-5" />
+                </Button>
+                <div className="flex-1 min-w-0">
+                  <h1 className="text-lg sm:text-xl font-bold truncate">{site.name}</h1>
+                  <p className="text-xs sm:text-sm text-muted-foreground truncate">{site.repo_full_name}</p>
+                </div>
+                <div className="flex items-center gap-2 flex-shrink-0">
+                  <Button 
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => navigate("/profile")}
+                    title="Profile"
+                  >
+                    <UserIcon className="h-5 w-5" />
+                  </Button>
+                  <Button 
+                    variant="ghost"
+                    size="icon"
+                    onClick={handleLeaveSite}
+                    title="Leave Site"
+                  >
+                    <LogOut className="h-5 w-5" />
+                  </Button>
+                  <Button 
+                    variant="outline" 
+                    size="sm"
+                    onClick={() => window.open(getGithubPagesUrl(site.repo_full_name), '_blank')}
+                    className="hidden sm:flex"
+                  >
+                    <ExternalLink className="mr-2 h-4 w-4" />
+                    View Site
+                  </Button>
+                  <Button 
+                    variant="outline" 
+                    size="icon"
+                    onClick={() => window.open(getGithubPagesUrl(site.repo_full_name), '_blank')}
+                    className="sm:hidden"
+                    title="View Site"
+                  >
+                    <ExternalLink className="h-4 w-4" />
+                  </Button>
+                </div>
+              </div>
+            </div>
+          </header>
+
+          {/* Preview and Controls */}
+          <main className="flex-1 flex flex-col p-4 gap-4 overflow-hidden">
+            {/* Commit Controls - Prominent */}
+            {pendingChanges.length > 0 && (
+              <Card className="shadow-lg border-primary/20">
+                <CardContent className="p-4">
+                  <div className="flex items-center justify-between gap-4">
+                    <div className="flex items-center gap-3">
+                      <Package className="h-5 w-5 text-primary" />
+                      <div>
+                        <p className="font-semibold text-sm">
+                          {pendingChanges.length} Pending {pendingChanges.length === 1 ? 'Change' : 'Changes'}
+                        </p>
+                        <p className="text-xs text-muted-foreground">
+                          Ready to commit to repository
+                        </p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => {
+                          setPendingChanges([]);
+                          toast.success('All changes cleared');
+                        }}
+                      >
+                        <Trash2 className="h-4 w-4 mr-2" />
+                        Clear All
+                      </Button>
+                      <Button
+                        size="sm"
+                        onClick={async () => {
+                          const message = prompt("Enter commit message:");
+                          if (!message?.trim()) return;
+                          
+                          try {
+                            const assetChanges = pendingChanges.map(change => ({
+                              repo_path: change.repoPath,
+                              content: change.content
+                            }));
+
+                            const { data, error } = await supabase.functions.invoke('commit-batch-changes', {
+                              body: {
+                                site_id: siteId,
+                                commit_message: message,
+                                asset_changes: assetChanges
+                              }
+                            });
+
+                            if (error) throw error;
+
+                            toast.success('All changes committed!');
+                            setPendingChanges([]);
+                            loadActivities();
+                          } catch (error: any) {
+                            toast.error(error.message || 'Failed to commit');
+                          }
+                        }}
+                      >
+                        <GitCommit className="h-4 w-4 mr-2" />
+                        Commit All
+                      </Button>
+                    </div>
                   </div>
                 </CardContent>
               </Card>
             )}
-          </TabsContent>
-        </Tabs>
-      </main>
 
-      {/* Alert Dialog for leaving site */}
-      <AlertDialog open={showLeaveDialog} onOpenChange={setShowLeaveDialog}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>
-              {leaveAction === 'delete' ? 'Delete Site?' : 'Leave Site?'}
-            </AlertDialogTitle>
-            <AlertDialogDescription>
-              {leaveAction === 'delete' 
-                ? 'You are the last member of this site. Leaving will delete the site. This action cannot be undone.'
-                : 'Are you sure you want to leave this site? You will need to be invited again to regain access.'}
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={confirmLeaveSite} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
-              {leaveAction === 'delete' ? 'Delete Site' : 'Leave Site'}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
-    </div>
+            {/* Live Preview */}
+            <Card className="flex-1 overflow-hidden">
+              <CardHeader className="pb-3">
+                <CardTitle className="text-base">Live Preview</CardTitle>
+                <CardDescription className="text-xs">
+                  Changes appear here in real-time before committing
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="p-0 h-[calc(100%-4rem)]">
+                <SitePreview 
+                  siteId={siteId!}
+                  pendingChanges={pendingChanges}
+                />
+              </CardContent>
+            </Card>
+          </main>
+        </div>
+
+        {/* Alert Dialog for leaving site */}
+        <AlertDialog open={showLeaveDialog} onOpenChange={setShowLeaveDialog}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>
+                {leaveAction === 'delete' ? 'Delete Site?' : 'Leave Site?'}
+              </AlertDialogTitle>
+              <AlertDialogDescription>
+                {leaveAction === 'delete' 
+                  ? 'You are the last member of this site. Leaving will delete the site. This action cannot be undone.'
+                  : 'Are you sure you want to leave this site? You will need to be invited again to regain access.'}
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Cancel</AlertDialogCancel>
+              <AlertDialogAction onClick={confirmLeaveSite} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+                {leaveAction === 'delete' ? 'Delete Site' : 'Leave Site'}
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+      </div>
+    </SidebarProvider>
   );
 };
 
