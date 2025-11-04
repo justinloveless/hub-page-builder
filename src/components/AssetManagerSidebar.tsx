@@ -93,13 +93,13 @@ const AssetManagerSidebar = ({ siteId, pendingChanges, setPendingChanges }: Asse
 
       if (error) throw error;
 
-      if (data.found) {
-        // The content is base64 encoded
-        const imageUrl = `data:image/${asset.path.split('.').pop()};base64,${data.content}`;
-        setImageUrls(prev => ({ ...prev, [asset.path]: imageUrl }));
+      if (data.found && data.download_url) {
+        // Use the download_url from GitHub directly, just like directory assets do
+        setImageUrls(prev => ({ ...prev, [asset.path]: data.download_url }));
       }
     } catch (error: any) {
       console.error("Failed to load image:", error);
+      toast.error("Failed to load image");
     } finally {
       setLoadingContent(prev => ({ ...prev, [asset.path]: false }));
     }
@@ -124,7 +124,7 @@ const AssetManagerSidebar = ({ siteId, pendingChanges, setPendingChanges }: Asse
 
   const handleDeleteFile = async (asset: AssetConfig, filePath: string, sha: string) => {
     if (!confirm(`Are you sure you want to delete ${filePath}?`)) return;
-    
+
     setDeletingFile(filePath);
     try {
       const { error } = await supabase.functions.invoke('delete-site-asset', {
@@ -159,7 +159,7 @@ const AssetManagerSidebar = ({ siteId, pendingChanges, setPendingChanges }: Asse
 
       if (data.found) {
         setAssetContents(prev => ({ ...prev, [asset.path]: data.content }));
-        
+
         // Parse JSON for schema-based editing
         if (asset.type === 'json' && asset.schema) {
           try {
@@ -193,7 +193,7 @@ const AssetManagerSidebar = ({ siteId, pendingChanges, setPendingChanges }: Asse
   const saveToBatch = async (asset: AssetConfig, content: string) => {
     const base64Content = btoa(unescape(encodeURIComponent(content)));
     const fileName = asset.path.split('/').pop() || 'file';
-    
+
     // Fetch original content for diff
     let originalContent = "";
     try {
@@ -213,7 +213,7 @@ const AssetManagerSidebar = ({ siteId, pendingChanges, setPendingChanges }: Asse
       originalContent: originalContent ? btoa(unescape(encodeURIComponent(originalContent))) : undefined,
       fileName
     };
-    
+
     const updatedChanges = pendingChanges.filter(c => c.repoPath !== asset.path);
     setPendingChanges([...updatedChanges, newChange]);
     toast.success("Saved to batch");
@@ -237,16 +237,16 @@ const AssetManagerSidebar = ({ siteId, pendingChanges, setPendingChanges }: Asse
       toast.error("Key already exists");
       return;
     }
-    
+
     const additionalPropsSchema = asset.schema?.additionalProperties;
     let defaultValue = {};
-    
+
     if (additionalPropsSchema?.type === 'object' && additionalPropsSchema.properties) {
       Object.entries(additionalPropsSchema.properties).forEach(([propKey, propSchema]: [string, any]) => {
         defaultValue[propKey] = propSchema.default ?? '';
       });
     }
-    
+
     setJsonFormData(prev => ({
       ...prev,
       [asset.path]: { ...prev[asset.path], [newKey]: defaultValue }
@@ -269,10 +269,10 @@ const AssetManagerSidebar = ({ siteId, pendingChanges, setPendingChanges }: Asse
   const renderSchemaField = (asset: AssetConfig, key: string, fieldSchema: any, parentKey?: string) => {
     const fullKey = parentKey ? `${parentKey}.${key}` : key;
     const assetData = jsonFormData[asset.path] || {};
-    const value = parentKey 
+    const value = parentKey
       ? assetData[parentKey]?.[key] ?? fieldSchema.default ?? ''
       : assetData[key] ?? fieldSchema.default ?? '';
-    
+
     const updateValue = async (newValue: any) => {
       if (parentKey) {
         setJsonFormData(prev => ({
@@ -290,7 +290,7 @@ const AssetManagerSidebar = ({ siteId, pendingChanges, setPendingChanges }: Asse
       }
       await handleJsonFormChange(asset);
     };
-    
+
     switch (fieldSchema.type) {
       case 'object':
         if (fieldSchema.properties) {
@@ -311,7 +311,7 @@ const AssetManagerSidebar = ({ siteId, pendingChanges, setPendingChanges }: Asse
           );
         }
         return null;
-      
+
       case 'string':
         if (fieldSchema.enum) {
           return (
@@ -363,7 +363,7 @@ const AssetManagerSidebar = ({ siteId, pendingChanges, setPendingChanges }: Asse
             )}
           </div>
         );
-      
+
       case 'number':
       case 'integer':
         return (
@@ -386,7 +386,7 @@ const AssetManagerSidebar = ({ siteId, pendingChanges, setPendingChanges }: Asse
             />
           </div>
         );
-      
+
       default:
         return null;
     }
@@ -396,7 +396,7 @@ const AssetManagerSidebar = ({ siteId, pendingChanges, setPendingChanges }: Asse
     const reader = new FileReader();
     reader.onloadend = async () => {
       const base64 = (reader.result as string).split(',')[1];
-      
+
       let fullPath = asset.path;
       if (asset.type === 'directory' || asset.path.endsWith('/')) {
         const basePath = asset.path.endsWith('/') ? asset.path : asset.path + '/';
@@ -408,7 +408,7 @@ const AssetManagerSidebar = ({ siteId, pendingChanges, setPendingChanges }: Asse
         content: base64,
         fileName: file.name
       };
-      
+
       const updatedChanges = pendingChanges.filter(c => c.repoPath !== fullPath);
       setPendingChanges([...updatedChanges, newChange]);
       toast.success("Added to batch");
@@ -468,7 +468,7 @@ const AssetManagerSidebar = ({ siteId, pendingChanges, setPendingChanges }: Asse
       if (error) throw error;
 
       toast.success("Pull request created!");
-      
+
       if (data.pr_url) {
         window.open(data.pr_url, '_blank');
       }
@@ -519,9 +519,9 @@ const AssetManagerSidebar = ({ siteId, pendingChanges, setPendingChanges }: Asse
           <p className="mb-2">
             No <code className="bg-muted px-1 py-0.5 rounded text-xs">site-assets.json</code> found.
           </p>
-          
-          <Button 
-            onClick={createTemplatePr} 
+
+          <Button
+            onClick={createTemplatePr}
             disabled={creatingPr}
             size="sm"
             className="w-full"
@@ -577,7 +577,7 @@ const AssetManagerSidebar = ({ siteId, pendingChanges, setPendingChanges }: Asse
           const isTextAsset = (asset.type === 'text' || asset.type === 'markdown') && !isJsonWithSchema;
           const isImageAsset = asset.type === 'image' || asset.type === 'img';
           const isDirectoryAsset = asset.type === 'directory' || asset.type === 'folder';
-          
+
           return (
             <Collapsible
               key={index}
@@ -608,7 +608,7 @@ const AssetManagerSidebar = ({ siteId, pendingChanges, setPendingChanges }: Asse
                     </div>
                   </div>
                 </CollapsibleTrigger>
-                
+
                 <CollapsibleContent>
                   <div className="p-3 pt-0 space-y-3">
                     {asset.description && (
@@ -616,7 +616,7 @@ const AssetManagerSidebar = ({ siteId, pendingChanges, setPendingChanges }: Asse
                         {asset.description}
                       </p>
                     )}
-                    
+
                     {/* JSON with Schema - Form Editor */}
                     {isJsonWithSchema && (
                       <div className="space-y-3">
@@ -631,7 +631,7 @@ const AssetManagerSidebar = ({ siteId, pendingChanges, setPendingChanges }: Asse
                                 )}
                               </div>
                             )}
-                            
+
                             {asset.schema.additionalProperties && (
                               <div className="space-y-2 pt-2 border-t">
                                 <Label className="text-xs font-semibold">Entries</Label>
@@ -657,7 +657,7 @@ const AssetManagerSidebar = ({ siteId, pendingChanges, setPendingChanges }: Asse
                                     )}
                                   </div>
                                 ))}
-                                
+
                                 <div className="flex gap-2 pt-2">
                                   <Input
                                     placeholder="New key..."
@@ -720,7 +720,7 @@ const AssetManagerSidebar = ({ siteId, pendingChanges, setPendingChanges }: Asse
                                 </div>
                               </div>
                             )}
-                            
+
                             <div className="space-y-2">
                               <Label htmlFor={`file-${index}`} className="text-xs">
                                 {imageUrls[asset.path] ? 'Replace Image' : 'Upload Image'}
@@ -814,7 +814,7 @@ const AssetManagerSidebar = ({ siteId, pendingChanges, setPendingChanges }: Asse
                                 </div>
                               </div>
                             )}
-                            
+
                             <div className="space-y-2">
                               <Label htmlFor={`file-${index}`} className="text-xs">
                                 Add New File
@@ -848,7 +848,7 @@ const AssetManagerSidebar = ({ siteId, pendingChanges, setPendingChanges }: Asse
                       </div>
                     )}
 
-                    <CreateShareDialog 
+                    <CreateShareDialog
                       siteId={siteId}
                       assetPath={asset.path.includes('/') ? asset.path.substring(0, asset.path.lastIndexOf('/')) : '.'}
                     />

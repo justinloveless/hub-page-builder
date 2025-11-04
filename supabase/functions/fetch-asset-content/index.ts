@@ -29,7 +29,7 @@ Deno.serve(async (req) => {
   try {
     const supabaseUrl = Deno.env.get('SUPABASE_URL');
     const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
-    
+
     if (!supabaseUrl || !supabaseKey) {
       throw new Error('Missing Supabase environment variables');
     }
@@ -131,7 +131,7 @@ Deno.serve(async (req) => {
       });
 
       if (Array.isArray(fileData) || fileData.type !== 'file') {
-        return new Response(JSON.stringify({ 
+        return new Response(JSON.stringify({
           found: false,
           message: 'Path is not a file'
         }), {
@@ -155,6 +155,7 @@ Deno.serve(async (req) => {
         content,
         sha: fileData.sha,
         size: fileData.size,
+        download_url: fileData.download_url,
       }), {
         status: 200,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -176,7 +177,7 @@ Deno.serve(async (req) => {
 
   } catch (error: any) {
     console.error('Error fetching asset content:', error);
-    return new Response(JSON.stringify({ 
+    return new Response(JSON.stringify({
       error: error.message || 'Failed to fetch asset content'
     }), {
       status: 500,
