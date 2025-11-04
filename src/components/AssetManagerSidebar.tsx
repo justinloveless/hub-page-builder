@@ -20,6 +20,7 @@ interface AssetConfig {
   description?: string;
   maxSize?: number;
   allowedExtensions?: string[];
+  schema?: Record<string, any>;
 }
 
 interface SiteAssetsConfig {
@@ -41,6 +42,8 @@ const AssetManagerSidebar = ({ siteId, pendingChanges, setPendingChanges }: Asse
   const [expandedAssets, setExpandedAssets] = useState<Set<string>>(new Set());
   const [assetContents, setAssetContents] = useState<Record<string, string>>({});
   const [loadingContent, setLoadingContent] = useState<Record<string, boolean>>({});
+  const [jsonFormData, setJsonFormData] = useState<Record<string, Record<string, any>>>({});
+  const [newKeys, setNewKeys] = useState<Record<string, string>>({});
 
   useEffect(() => {
     fetchAssets();
@@ -54,36 +57,56 @@ const AssetManagerSidebar = ({ siteId, pendingChanges, setPendingChanges }: Asse
       newExpanded.add(asset.path);
       // Load content when expanding if it's a text/json asset
       if ((asset.type === 'text' || asset.type === 'json' || asset.type === 'markdown') && !assetContents[asset.path]) {
-        await loadAssetContent(asset.path);
+        await loadAssetContent(asset);
       }
     }
     setExpandedAssets(newExpanded);
   };
 
-  const loadAssetContent = async (path: string) => {
-    setLoadingContent(prev => ({ ...prev, [path]: true }));
+  const loadAssetContent = async (asset: AssetConfig) => {
+    setLoadingContent(prev => ({ ...prev, [asset.path]: true }));
     try {
       const { data, error } = await supabase.functions.invoke('fetch-asset-content', {
-        body: { site_id: siteId, asset_path: path },
+        body: { site_id: siteId, asset_path: asset.path },
       });
 
       if (error) throw error;
 
       if (data.found) {
-        setAssetContents(prev => ({ ...prev, [path]: data.content }));
+        setAssetContents(prev => ({ ...prev, [asset.path]: data.content }));
+        
+        // Parse JSON for schema-based editing
+        if (asset.type === 'json' && asset.schema) {
+          try {
+            const parsed = JSON.parse(data.content);
+            setJsonFormData(prev => ({ ...prev, [asset.path]: parsed }));
+          } catch (e) {
+            console.error("Failed to parse JSON:", e);
+            setJsonFormData(prev => ({ ...prev, [asset.path]: {} }));
+          }
+        }
       }
     } catch (error: any) {
       console.error("Failed to load content:", error);
     } finally {
-      setLoadingContent(prev => ({ ...prev, [path]: false }));
+      setLoadingContent(prev => ({ ...prev, [asset.path]: false }));
     }
   };
 
   const handleContentChange = async (asset: AssetConfig, newContent: string) => {
     setAssetContents(prev => ({ ...prev, [asset.path]: newContent }));
-    
-    // Auto-save to batch
-    const base64Content = btoa(unescape(encodeURIComponent(newContent)));
+    await saveToBatch(asset, newContent);
+  };
+
+  const handleJsonFormChange = async (asset: AssetConfig) => {
+    const jsonData = jsonFormData[asset.path];
+    const newContent = JSON.stringify(jsonData, null, 2);
+    setAssetContents(prev => ({ ...prev, [asset.path]: newContent }));
+    await saveToBatch(asset, newContent);
+  };
+
+  const saveToBatch = async (asset: AssetConfig, content: string) => {
+    const base64Content = btoa(unescape(encodeURIComponent(content)));
     const fileName = asset.path.split('/').pop() || 'file';
     
     // Fetch original content for diff
@@ -109,6 +132,179 @@ const AssetManagerSidebar = ({ siteId, pendingChanges, setPendingChanges }: Asse
     const updatedChanges = pendingChanges.filter(c => c.repoPath !== asset.path);
     setPendingChanges([...updatedChanges, newChange]);
     toast.success("Saved to batch");
+  };
+
+  const updateJsonField = (assetPath: string, key: string, value: any) => {
+    setJsonFormData(prev => ({
+      ...prev,
+      [assetPath]: { ...prev[assetPath], [key]: value }
+    }));
+  };
+
+  const addNewEntry = async (asset: AssetConfig) => {
+    const newKey = newKeys[asset.path] || '';
+    if (!newKey.trim()) {
+      toast.error("Key cannot be empty");
+      return;
+    }
+    const currentData = jsonFormData[asset.path] || {};
+    if (currentData[newKey]) {
+      toast.error("Key already exists");
+      return;
+    }
+    
+    const additionalPropsSchema = asset.schema?.additionalProperties;
+    let defaultValue = {};
+    
+    if (additionalPropsSchema?.type === 'object' && additionalPropsSchema.properties) {
+      Object.entries(additionalPropsSchema.properties).forEach(([propKey, propSchema]: [string, any]) => {
+        defaultValue[propKey] = propSchema.default ?? '';
+      });
+    }
+    
+    setJsonFormData(prev => ({
+      ...prev,
+      [asset.path]: { ...prev[asset.path], [newKey]: defaultValue }
+    }));
+    setNewKeys(prev => ({ ...prev, [asset.path]: '' }));
+    toast.success(`Added "${newKey}"`);
+    await handleJsonFormChange(asset);
+  };
+
+  const removeEntry = async (asset: AssetConfig, key: string) => {
+    setJsonFormData(prev => {
+      const updated = { ...prev[asset.path] };
+      delete updated[key];
+      return { ...prev, [asset.path]: updated };
+    });
+    toast.success(`Removed "${key}"`);
+    await handleJsonFormChange(asset);
+  };
+
+  const renderSchemaField = (asset: AssetConfig, key: string, fieldSchema: any, parentKey?: string) => {
+    const fullKey = parentKey ? `${parentKey}.${key}` : key;
+    const assetData = jsonFormData[asset.path] || {};
+    const value = parentKey 
+      ? assetData[parentKey]?.[key] ?? fieldSchema.default ?? ''
+      : assetData[key] ?? fieldSchema.default ?? '';
+    
+    const updateValue = async (newValue: any) => {
+      if (parentKey) {
+        setJsonFormData(prev => ({
+          ...prev,
+          [asset.path]: {
+            ...(prev[asset.path] || {}),
+            [parentKey]: {
+              ...(prev[asset.path]?.[parentKey] || {}),
+              [key]: newValue
+            }
+          }
+        }));
+      } else {
+        updateJsonField(asset.path, key, newValue);
+      }
+      await handleJsonFormChange(asset);
+    };
+    
+    switch (fieldSchema.type) {
+      case 'object':
+        if (fieldSchema.properties) {
+          return (
+            <div key={fullKey} className="space-y-2 p-3 border rounded-lg bg-accent/5">
+              <h4 className="font-semibold text-xs uppercase tracking-wide text-muted-foreground">
+                {fieldSchema.title || key}
+              </h4>
+              {fieldSchema.description && (
+                <p className="text-xs text-muted-foreground -mt-1">{fieldSchema.description}</p>
+              )}
+              <div className="space-y-2 pl-2">
+                {Object.entries(fieldSchema.properties).map(([nestedKey, nestedSchema]: [string, any]) =>
+                  renderSchemaField(asset, nestedKey, nestedSchema, key)
+                )}
+              </div>
+            </div>
+          );
+        }
+        return null;
+      
+      case 'string':
+        if (fieldSchema.enum) {
+          return (
+            <div key={fullKey} className="space-y-1">
+              <Label htmlFor={fullKey} className="text-xs">
+                {fieldSchema.title || key}
+              </Label>
+              {fieldSchema.description && (
+                <p className="text-xs text-muted-foreground">{fieldSchema.description}</p>
+              )}
+              <select
+                id={fullKey}
+                value={value}
+                onChange={(e) => updateValue(e.target.value)}
+                className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-xs"
+              >
+                <option value="">Select...</option>
+                {fieldSchema.enum.map((option: string) => (
+                  <option key={option} value={option}>{option}</option>
+                ))}
+              </select>
+            </div>
+          );
+        }
+        return (
+          <div key={fullKey} className="space-y-1">
+            <Label htmlFor={fullKey} className="text-xs">
+              {fieldSchema.title || key}
+            </Label>
+            {fieldSchema.description && (
+              <p className="text-xs text-muted-foreground">{fieldSchema.description}</p>
+            )}
+            {fieldSchema.multiline ? (
+              <Textarea
+                id={fullKey}
+                value={value}
+                onChange={(e) => updateValue(e.target.value)}
+                placeholder={fieldSchema.placeholder}
+                className="min-h-[80px] text-xs"
+              />
+            ) : (
+              <Input
+                id={fullKey}
+                value={value}
+                onChange={(e) => updateValue(e.target.value)}
+                placeholder={fieldSchema.placeholder}
+                className="h-9 text-xs"
+              />
+            )}
+          </div>
+        );
+      
+      case 'number':
+      case 'integer':
+        return (
+          <div key={fullKey} className="space-y-1">
+            <Label htmlFor={fullKey} className="text-xs">
+              {fieldSchema.title || key}
+            </Label>
+            {fieldSchema.description && (
+              <p className="text-xs text-muted-foreground">{fieldSchema.description}</p>
+            )}
+            <Input
+              id={fullKey}
+              type="number"
+              value={value}
+              onChange={(e) => updateValue(fieldSchema.type === 'integer' ? parseInt(e.target.value) || 0 : parseFloat(e.target.value) || 0)}
+              placeholder={fieldSchema.placeholder}
+              min={fieldSchema.minimum}
+              max={fieldSchema.maximum}
+              className="h-9 text-xs"
+            />
+          </div>
+        );
+      
+      default:
+        return null;
+    }
   };
 
   const handleFileUpload = async (asset: AssetConfig, file: File) => {
@@ -287,7 +483,8 @@ const AssetManagerSidebar = ({ siteId, pendingChanges, setPendingChanges }: Asse
       <div className="space-y-2">
         {config.assets.map((asset, index) => {
           const isExpanded = expandedAssets.has(asset.path);
-          const isTextAsset = asset.type === 'text' || asset.type === 'json' || asset.type === 'markdown';
+          const isJsonWithSchema = asset.type === 'json' && asset.schema;
+          const isTextAsset = (asset.type === 'text' || asset.type === 'markdown') && !isJsonWithSchema;
           const isImageAsset = asset.type === 'image' || asset.type === 'img';
           const isDirectoryAsset = asset.type === 'directory' || asset.type === 'folder';
           
@@ -330,7 +527,72 @@ const AssetManagerSidebar = ({ siteId, pendingChanges, setPendingChanges }: Asse
                       </p>
                     )}
                     
-                    {/* Text/JSON/Markdown inline editor */}
+                    {/* JSON with Schema - Form Editor */}
+                    {isJsonWithSchema && (
+                      <div className="space-y-3">
+                        {loadingContent[asset.path] ? (
+                          <Skeleton className="h-32 w-full" />
+                        ) : (
+                          <>
+                            {asset.schema.properties && (
+                              <div className="space-y-2">
+                                {Object.entries(asset.schema.properties).map(([key, fieldSchema]: [string, any]) =>
+                                  renderSchemaField(asset, key, fieldSchema)
+                                )}
+                              </div>
+                            )}
+                            
+                            {asset.schema.additionalProperties && (
+                              <div className="space-y-2 pt-2 border-t">
+                                <Label className="text-xs font-semibold">Entries</Label>
+                                {Object.keys(jsonFormData[asset.path] || {}).map((key) => (
+                                  <div key={key} className="p-2 border rounded-lg space-y-2">
+                                    <div className="flex items-center justify-between">
+                                      <Label className="text-xs font-semibold">{key}</Label>
+                                      <Button
+                                        variant="ghost"
+                                        size="sm"
+                                        onClick={() => removeEntry(asset, key)}
+                                        className="h-6 w-6 p-0"
+                                      >
+                                        <Trash2 className="h-3 w-3" />
+                                      </Button>
+                                    </div>
+                                    {asset.schema.additionalProperties.properties && (
+                                      <div className="space-y-2 pl-2">
+                                        {Object.entries(asset.schema.additionalProperties.properties).map(([nestedKey, nestedSchema]: [string, any]) =>
+                                          renderSchemaField(asset, nestedKey, nestedSchema, key)
+                                        )}
+                                      </div>
+                                    )}
+                                  </div>
+                                ))}
+                                
+                                <div className="flex gap-2 pt-2">
+                                  <Input
+                                    placeholder="New key..."
+                                    value={newKeys[asset.path] || ''}
+                                    onChange={(e) => setNewKeys(prev => ({ ...prev, [asset.path]: e.target.value }))}
+                                    className="h-8 text-xs"
+                                  />
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => addNewEntry(asset)}
+                                    className="h-8"
+                                  >
+                                    <Plus className="h-3 w-3" />
+                                  </Button>
+                                </div>
+                              </div>
+                            )}
+                            <p className="text-xs text-muted-foreground">Changes are automatically saved to batch</p>
+                          </>
+                        )}
+                      </div>
+                    )}
+
+                    {/* Text/Markdown inline editor */}
                     {isTextAsset && (
                       <div className="space-y-2">
                         <Label className="text-xs">Current Content</Label>
