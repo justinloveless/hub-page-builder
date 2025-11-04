@@ -23,6 +23,15 @@ interface AssetConfig {
   schema?: Record<string, any>;
 }
 
+interface AssetFile {
+  name: string;
+  path: string;
+  sha: string;
+  size: number;
+  type: string;
+  download_url: string;
+}
+
 interface SiteAssetsConfig {
   version: string;
   assets: AssetConfig[];
@@ -44,6 +53,9 @@ const AssetManagerSidebar = ({ siteId, pendingChanges, setPendingChanges }: Asse
   const [loadingContent, setLoadingContent] = useState<Record<string, boolean>>({});
   const [jsonFormData, setJsonFormData] = useState<Record<string, Record<string, any>>>({});
   const [newKeys, setNewKeys] = useState<Record<string, string>>({});
+  const [directoryFiles, setDirectoryFiles] = useState<Record<string, AssetFile[]>>({});
+  const [loadingFiles, setLoadingFiles] = useState<Record<string, boolean>>({});
+  const [deletingFile, setDeletingFile] = useState<string | null>(null);
 
   useEffect(() => {
     fetchAssets();
@@ -55,12 +67,59 @@ const AssetManagerSidebar = ({ siteId, pendingChanges, setPendingChanges }: Asse
       newExpanded.delete(asset.path);
     } else {
       newExpanded.add(asset.path);
-      // Load content when expanding if it's a text/json asset
+      // Load content when expanding
       if ((asset.type === 'text' || asset.type === 'json' || asset.type === 'markdown') && !assetContents[asset.path]) {
         await loadAssetContent(asset);
       }
+      // Load directory files when expanding
+      if ((asset.type === 'directory' || asset.type === 'folder') && !directoryFiles[asset.path]) {
+        await loadDirectoryFiles(asset);
+      }
     }
     setExpandedAssets(newExpanded);
+  };
+
+  const loadDirectoryFiles = async (asset: AssetConfig) => {
+    setLoadingFiles(prev => ({ ...prev, [asset.path]: true }));
+    try {
+      const { data, error } = await supabase.functions.invoke('list-directory-assets', {
+        body: { site_id: siteId, asset_path: asset.path },
+      });
+
+      if (error) throw error;
+      setDirectoryFiles(prev => ({ ...prev, [asset.path]: data.files || [] }));
+    } catch (error: any) {
+      console.error('Error loading directory files:', error);
+      toast.error('Failed to load files');
+    } finally {
+      setLoadingFiles(prev => ({ ...prev, [asset.path]: false }));
+    }
+  };
+
+  const handleDeleteFile = async (asset: AssetConfig, filePath: string, sha: string) => {
+    if (!confirm(`Are you sure you want to delete ${filePath}?`)) return;
+    
+    setDeletingFile(filePath);
+    try {
+      const { error } = await supabase.functions.invoke('delete-site-asset', {
+        body: {
+          site_id: siteId,
+          file_path: filePath,
+          sha: sha,
+          message: `Delete ${filePath}`,
+        },
+      });
+
+      if (error) throw error;
+
+      toast.success("File deleted successfully");
+      await loadDirectoryFiles(asset);
+    } catch (error: any) {
+      console.error('Error deleting file:', error);
+      toast.error(error.message || "Failed to delete file");
+    } finally {
+      setDeletingFile(null);
+    }
   };
 
   const loadAssetContent = async (asset: AssetConfig) => {
@@ -611,26 +670,25 @@ const AssetManagerSidebar = ({ siteId, pendingChanges, setPendingChanges }: Asse
                       </div>
                     )}
 
-                    {/* Image/File upload */}
-                    {(isImageAsset || isDirectoryAsset) && (
+                    {/* Image upload */}
+                    {isImageAsset && (
                       <div className="space-y-2">
                         <Label htmlFor={`file-${index}`} className="text-xs">
-                          {isDirectoryAsset ? 'Add File' : 'Upload Image'}
+                          Upload Image
                         </Label>
                         <Input
                           id={`file-${index}`}
                           type="file"
-                          accept={asset.allowedExtensions?.join(',') || '*'}
+                          accept={asset.allowedExtensions?.join(',') || 'image/*'}
                           onChange={(e) => {
                             const file = e.target.files?.[0];
                             if (file) {
-                              // Validate file size
                               if (asset.maxSize && file.size > asset.maxSize) {
                                 toast.error(`File size exceeds maximum of ${(asset.maxSize / 1024 / 1024).toFixed(1)} MB`);
                                 return;
                               }
                               handleFileUpload(asset, file);
-                              e.target.value = ''; // Reset input
+                              e.target.value = '';
                             }
                           }}
                           className="text-xs"
@@ -641,6 +699,92 @@ const AssetManagerSidebar = ({ siteId, pendingChanges, setPendingChanges }: Asse
                             <span>Types: {asset.allowedExtensions.join(', ')}</span>
                           )}
                         </div>
+                      </div>
+                    )}
+
+                    {/* Directory with file list */}
+                    {isDirectoryAsset && (
+                      <div className="space-y-3">
+                        {loadingFiles[asset.path] ? (
+                          <Skeleton className="h-20 w-full" />
+                        ) : (
+                          <>
+                            {directoryFiles[asset.path] && directoryFiles[asset.path].length > 0 && (
+                              <div className="space-y-2">
+                                <Label className="text-xs">Existing Files</Label>
+                                <div className="space-y-1 max-h-48 overflow-y-auto">
+                                  {directoryFiles[asset.path].map((file) => (
+                                    <div key={file.path} className="flex items-center justify-between p-2 border rounded-lg hover:bg-muted/50">
+                                      <div className="flex items-center gap-2 flex-1 min-w-0">
+                                        <File className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+                                        <div className="flex-1 min-w-0">
+                                          <p className="text-xs font-medium truncate">{file.name}</p>
+                                          <p className="text-xs text-muted-foreground">
+                                            {(file.size / 1024).toFixed(1)} KB
+                                          </p>
+                                        </div>
+                                      </div>
+                                      <div className="flex items-center gap-1">
+                                        <Button
+                                          variant="ghost"
+                                          size="sm"
+                                          onClick={() => window.open(file.download_url, '_blank')}
+                                          className="h-7 w-7 p-0"
+                                          title="Open file"
+                                        >
+                                          <FileText className="h-3 w-3" />
+                                        </Button>
+                                        <Button
+                                          variant="ghost"
+                                          size="sm"
+                                          onClick={() => handleDeleteFile(asset, file.path, file.sha)}
+                                          disabled={deletingFile === file.path}
+                                          className="h-7 w-7 p-0"
+                                          title="Delete file"
+                                        >
+                                          {deletingFile === file.path ? (
+                                            <RefreshCw className="h-3 w-3 animate-spin" />
+                                          ) : (
+                                            <Trash2 className="h-3 w-3" />
+                                          )}
+                                        </Button>
+                                      </div>
+                                    </div>
+                                  ))}
+                                </div>
+                              </div>
+                            )}
+                            
+                            <div className="space-y-2">
+                              <Label htmlFor={`file-${index}`} className="text-xs">
+                                Add New File
+                              </Label>
+                              <Input
+                                id={`file-${index}`}
+                                type="file"
+                                accept={asset.allowedExtensions?.join(',') || '*'}
+                                onChange={(e) => {
+                                  const file = e.target.files?.[0];
+                                  if (file) {
+                                    if (asset.maxSize && file.size > asset.maxSize) {
+                                      toast.error(`File size exceeds maximum of ${(asset.maxSize / 1024 / 1024).toFixed(1)} MB`);
+                                      return;
+                                    }
+                                    handleFileUpload(asset, file);
+                                    e.target.value = '';
+                                  }
+                                }}
+                                className="text-xs"
+                              />
+                              <div className="flex flex-col gap-1 text-xs text-muted-foreground">
+                                <span>Max size: {formatFileSize(asset.maxSize)}</span>
+                                {asset.allowedExtensions && (
+                                  <span>Types: {asset.allowedExtensions.join(', ')}</span>
+                                )}
+                              </div>
+                            </div>
+                          </>
+                        )}
                       </div>
                     )}
 
