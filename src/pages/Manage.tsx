@@ -21,7 +21,6 @@ import PendingBatchChanges from "@/components/PendingBatchChanges";
 import InviteMemberDialog from "@/components/InviteMemberDialog";
 import ActivityCard from "@/components/ActivityCard";
 import { SitePreview } from "@/components/SitePreview";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import { ResizablePanelGroup, ResizablePanel, ResizableHandle } from "@/components/ui/resizable";
 import type { Tables } from "@/integrations/supabase/types";
 
@@ -62,7 +61,7 @@ const Manage = () => {
   const [pendingChanges, setPendingChanges] = useState<PendingAssetChange[]>([]);
   const [showDiffDrawer, setShowDiffDrawer] = useState(false);
   const ACTIVITIES_PER_PAGE = 10;
-  
+
   // Activity filters
   const [filterUserId, setFilterUserId] = useState<string>("all");
   const [filterDateFrom, setFilterDateFrom] = useState<Date | undefined>(undefined);
@@ -112,7 +111,7 @@ const Manage = () => {
 
   const loadSite = async () => {
     if (!siteId) return;
-    
+
     try {
       const { data, error } = await supabase
         .from("sites")
@@ -135,7 +134,7 @@ const Manage = () => {
 
   const loadActivities = async (page: number = 1, append: boolean = false) => {
     if (!siteId) return;
-    
+
     try {
       const from = (page - 1) * ACTIVITIES_PER_PAGE;
       const to = from + ACTIVITIES_PER_PAGE - 1;
@@ -166,17 +165,17 @@ const Manage = () => {
         .range(from, to);
 
       if (error) throw error;
-      
+
       // Fetch profiles for activities
       const userIds = [...new Set(activitiesData?.map(a => a.user_id).filter(Boolean) || [])];
       let profilesMap: Record<string, Profile> = {};
-      
+
       if (userIds.length > 0) {
         const { data: profilesData } = await supabase
           .from("profiles")
           .select("*")
           .in("id", userIds);
-        
+
         if (profilesData) {
           profilesMap = profilesData.reduce((acc, profile) => {
             acc[profile.id] = profile;
@@ -189,9 +188,9 @@ const Manage = () => {
         ...activity,
         user_profile: activity.user_id ? profilesMap[activity.user_id] : null
       }));
-      
+
       setHasMoreActivities(activitiesWithProfiles.length === ACTIVITIES_PER_PAGE);
-      
+
       if (append) {
         setActivities(prev => [...prev, ...activitiesWithProfiles]);
       } else {
@@ -227,7 +226,7 @@ const Manage = () => {
 
   const loadMembers = async () => {
     if (!siteId) return;
-    
+
     try {
       // First get site members
       const { data: membersData, error: membersError } = await supabase
@@ -266,7 +265,7 @@ const Manage = () => {
 
   const loadInvitations = async () => {
     if (!siteId) return;
-    
+
     try {
       const { data, error } = await supabase
         .from("invitations")
@@ -296,7 +295,7 @@ const Manage = () => {
 
   const handleDeleteInvitation = async (invitationId: string) => {
     if (!confirm(`Are you sure you want to delete this invitation?`)) return;
-    
+
     try {
       const { error } = await supabase
         .from("invitations")
@@ -304,7 +303,7 @@ const Manage = () => {
         .eq("id", invitationId);
 
       if (error) throw error;
-      
+
       toast.success("Invitation deleted");
       loadInvitations();
     } catch (error: any) {
@@ -315,7 +314,7 @@ const Manage = () => {
 
   const handleRemoveMember = async (memberUserId: string, memberName: string) => {
     if (!confirm(`Are you sure you want to remove ${memberName} from this site?`)) return;
-    
+
     try {
       const { error } = await supabase
         .from("site_members")
@@ -324,7 +323,7 @@ const Manage = () => {
         .eq("user_id", memberUserId);
 
       if (error) throw error;
-      
+
       toast.success("Member removed successfully");
       loadMembers();
     } catch (error: any) {
@@ -335,7 +334,7 @@ const Manage = () => {
 
   const handlePromoteToOwner = async (memberUserId: string, memberName: string) => {
     if (!confirm(`Are you sure you want to promote ${memberName} to owner? This will give them full control over the site.`)) return;
-    
+
     try {
       const { error } = await supabase
         .from("site_members")
@@ -344,7 +343,7 @@ const Manage = () => {
         .eq("user_id", memberUserId);
 
       if (error) throw error;
-      
+
       toast.success(`${memberName} promoted to owner`);
       loadMembers();
     } catch (error: any) {
@@ -475,7 +474,7 @@ const Manage = () => {
               <p className="text-xs sm:text-sm text-muted-foreground truncate">{site.repo_full_name}</p>
             </div>
             <div className="flex items-center gap-2 flex-shrink-0">
-              <Button 
+              <Button
                 variant="ghost"
                 size="icon"
                 onClick={() => navigate("/profile")}
@@ -483,7 +482,7 @@ const Manage = () => {
               >
                 <UserIcon className="h-5 w-5" />
               </Button>
-              <Button 
+              <Button
                 variant="ghost"
                 size="icon"
                 onClick={handleLeaveSite}
@@ -491,8 +490,8 @@ const Manage = () => {
               >
                 <LogOut className="h-5 w-5" />
               </Button>
-              <Button 
-                variant="outline" 
+              <Button
+                variant="outline"
                 size="sm"
                 onClick={() => window.open(getGithubPagesUrl(site.repo_full_name), '_blank')}
                 className="hidden sm:flex"
@@ -500,8 +499,8 @@ const Manage = () => {
                 <ExternalLink className="mr-2 h-4 w-4" />
                 View Site
               </Button>
-              <Button 
-                variant="outline" 
+              <Button
+                variant="outline"
                 size="icon"
                 onClick={() => window.open(getGithubPagesUrl(site.repo_full_name), '_blank')}
                 className="sm:hidden"
@@ -516,21 +515,21 @@ const Manage = () => {
 
       <ResizablePanelGroup direction="horizontal" className="flex-1">
         {/* Sidebar */}
-        <ResizablePanel defaultSize={20} minSize={15} maxSize={35}>
-          <ScrollArea className="h-full border-r">
+        <ResizablePanel defaultSize={20} minSize={15} maxSize={35} className="overflow-hidden">
+          <div className="h-full flex flex-col min-w-0 border-r overflow-y-auto">
             <div className="p-4 space-y-6">
               {/* Site Details */}
-              <div className="space-y-3">
+              <div className="space-y-3 w-full">
                 <h3 className="text-sm font-semibold">Site Details</h3>
                 <div className="space-y-2 text-xs">
-                  <div>
+                  <div className="w-full">
                     <p className="text-muted-foreground mb-1">Repository</p>
                     <button
                       onClick={() => window.open(getRepositoryUrl(site.repo_full_name), '_blank')}
-                      className="text-primary hover:underline flex items-center gap-1"
+                      className="text-primary hover:underline flex items-center gap-1 w-full max-w-full"
                     >
-                      <ExternalLink className="h-3 w-3" />
-                      <span className="truncate">{site.repo_full_name}</span>
+                      <ExternalLink className="h-3 w-3 flex-shrink-0" />
+                      <span className="truncate min-w-0 flex-1">{site.repo_full_name}</span>
                     </button>
                   </div>
                   <div>
@@ -550,7 +549,7 @@ const Manage = () => {
               <Separator />
 
               {/* Asset Manager */}
-              <div className="space-y-3">
+              <div className="space-y-3 w-full">
                 <h3 className="text-sm font-semibold">Assets</h3>
                 <AssetManagerSidebar
                   siteId={siteId!}
@@ -562,10 +561,12 @@ const Manage = () => {
               <Separator />
 
               {/* Members */}
-              <div className="space-y-3">
-                <div className="flex items-center justify-between">
-                  <h3 className="text-sm font-semibold">Members</h3>
-                  <InviteMemberDialog siteId={siteId!} onInviteCreated={loadInvitations} />
+              <div className="space-y-3 w-full">
+                <div className="flex items-center justify-between gap-2 w-full">
+                  <h3 className="text-sm font-semibold flex-shrink-0">Members</h3>
+                  <div className="flex-shrink-0">
+                    <InviteMemberDialog siteId={siteId!} onInviteCreated={loadInvitations} />
+                  </div>
                 </div>
                 <div className="space-y-2">
                   {members.slice(0, 3).map((member) => {
@@ -573,19 +574,19 @@ const Manage = () => {
                     const initials = member.profile?.full_name
                       ? member.profile.full_name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2)
                       : member.user_id.slice(0, 2).toUpperCase();
-                    
+
                     return (
-                      <div key={member.user_id} className="flex items-center gap-2">
-                        <Avatar className="h-6 w-6">
+                      <div key={member.user_id} className="flex items-center gap-2 w-full max-w-full">
+                        <Avatar className="h-6 w-6 flex-shrink-0">
                           <AvatarImage src={member.profile?.avatar_url || undefined} />
                           <AvatarFallback className="text-xs bg-gradient-to-br from-primary to-accent text-primary-foreground">
                             {initials}
                           </AvatarFallback>
                         </Avatar>
-                        <div className="flex-1 min-w-0">
+                        <div className="flex-1 min-w-0 overflow-hidden">
                           <p className="text-xs font-medium truncate">{displayName}</p>
                         </div>
-                        <Badge variant={member.role === "owner" ? "default" : "secondary"} className="text-xs">
+                        <Badge variant={member.role === "owner" ? "default" : "secondary"} className="text-xs flex-shrink-0 whitespace-nowrap">
                           {member.role === "owner" && <Crown className="mr-1 h-2 w-2" />}
                           {member.role}
                         </Badge>
@@ -601,11 +602,11 @@ const Manage = () => {
               <Separator />
 
               {/* Activity Preview */}
-              <div className="space-y-3">
+              <div className="space-y-3 w-full">
                 <h3 className="text-sm font-semibold">Recent Activity</h3>
                 <div className="space-y-2">
                   {activities.slice(0, 3).map((activity) => (
-                    <div key={activity.id} className="text-xs">
+                    <div key={activity.id} className="text-xs w-full">
                       <p className="font-medium truncate">{activity.action}</p>
                       <p className="text-muted-foreground text-xs">
                         {new Date(activity.created_at).toLocaleDateString()}
@@ -618,106 +619,105 @@ const Manage = () => {
                 </div>
               </div>
             </div>
-          </ScrollArea>
+          </div>
         </ResizablePanel>
-
         <ResizableHandle withHandle />
 
         <ResizablePanel defaultSize={80} minSize={50}>
           <div className="flex flex-col h-full">
             {/* Preview and Controls */}
             <main className="flex-1 flex flex-col p-4 gap-4 overflow-hidden">
-            {/* Commit Controls - Prominent */}
-            {pendingChanges.length > 0 && (
-              <Card className="shadow-lg border-primary/20">
-                <CardContent className="p-4">
-                  <div className="flex items-center justify-between gap-4">
-                    <div className="flex items-center gap-3">
-                      <Package className="h-5 w-5 text-primary" />
-                      <div>
-                        <p className="font-semibold text-sm">
-                          {pendingChanges.length} Pending {pendingChanges.length === 1 ? 'Change' : 'Changes'}
-                        </p>
-                        <p className="text-xs text-muted-foreground">
-                          Ready to commit to repository
-                        </p>
+              {/* Commit Controls - Prominent */}
+              {pendingChanges.length > 0 && (
+                <Card className="shadow-lg border-primary/20">
+                  <CardContent className="p-4">
+                    <div className="flex items-center justify-between gap-4">
+                      <div className="flex items-center gap-3">
+                        <Package className="h-5 w-5 text-primary" />
+                        <div>
+                          <p className="font-semibold text-sm">
+                            {pendingChanges.length} Pending {pendingChanges.length === 1 ? 'Change' : 'Changes'}
+                          </p>
+                          <p className="text-xs text-muted-foreground">
+                            Ready to commit to repository
+                          </p>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => setShowDiffDrawer(true)}
+                        >
+                          <FileText className="h-4 w-4 mr-2" />
+                          View Details
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => {
+                            setPendingChanges([]);
+                            toast.success('All changes cleared');
+                          }}
+                        >
+                          <Trash2 className="h-4 w-4 mr-2" />
+                          Clear All
+                        </Button>
+                        <Button
+                          size="sm"
+                          onClick={async () => {
+                            const message = prompt("Enter commit message:");
+                            if (!message?.trim()) return;
+
+                            try {
+                              const assetChanges = pendingChanges.map(change => ({
+                                repo_path: change.repoPath,
+                                content: change.content
+                              }));
+
+                              const { data, error } = await supabase.functions.invoke('commit-batch-changes', {
+                                body: {
+                                  site_id: siteId,
+                                  commit_message: message,
+                                  asset_changes: assetChanges
+                                }
+                              });
+
+                              if (error) throw error;
+
+                              toast.success('All changes committed!');
+                              setPendingChanges([]);
+                              loadActivities();
+                            } catch (error: any) {
+                              toast.error(error.message || 'Failed to commit');
+                            }
+                          }}
+                        >
+                          <GitCommit className="h-4 w-4 mr-2" />
+                          Commit All
+                        </Button>
                       </div>
                     </div>
-                    <div className="flex items-center gap-2">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => setShowDiffDrawer(true)}
-                      >
-                        <FileText className="h-4 w-4 mr-2" />
-                        View Details
-                      </Button>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => {
-                          setPendingChanges([]);
-                          toast.success('All changes cleared');
-                        }}
-                      >
-                        <Trash2 className="h-4 w-4 mr-2" />
-                        Clear All
-                      </Button>
-                      <Button
-                        size="sm"
-                        onClick={async () => {
-                          const message = prompt("Enter commit message:");
-                          if (!message?.trim()) return;
-                          
-                          try {
-                            const assetChanges = pendingChanges.map(change => ({
-                              repo_path: change.repoPath,
-                              content: change.content
-                            }));
+                  </CardContent>
+                </Card>
+              )}
 
-                            const { data, error } = await supabase.functions.invoke('commit-batch-changes', {
-                              body: {
-                                site_id: siteId,
-                                commit_message: message,
-                                asset_changes: assetChanges
-                              }
-                            });
-
-                            if (error) throw error;
-
-                            toast.success('All changes committed!');
-                            setPendingChanges([]);
-                            loadActivities();
-                          } catch (error: any) {
-                            toast.error(error.message || 'Failed to commit');
-                          }
-                        }}
-                      >
-                        <GitCommit className="h-4 w-4 mr-2" />
-                        Commit All
-                      </Button>
-                    </div>
-                  </div>
+              {/* Live Preview */}
+              <Card className="flex-1 overflow-hidden">
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-base">Live Preview</CardTitle>
+                  <CardDescription className="text-xs">
+                    Changes appear here in real-time before committing
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="p-0 h-[calc(100%-4rem)]">
+                  <SitePreview
+                    siteId={siteId!}
+                    pendingChanges={pendingChanges}
+                  />
                 </CardContent>
               </Card>
-            )}
-
-            {/* Live Preview */}
-            <Card className="flex-1 overflow-hidden">
-              <CardHeader className="pb-3">
-                <CardTitle className="text-base">Live Preview</CardTitle>
-                <CardDescription className="text-xs">
-                  Changes appear here in real-time before committing
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="p-0 h-[calc(100%-4rem)]">
-                <SitePreview 
-                  siteId={siteId!}
-                  pendingChanges={pendingChanges}
-                />
-              </CardContent>
-            </Card>
-          </main>
+            </main>
           </div>
         </ResizablePanel>
       </ResizablePanelGroup>
@@ -751,7 +751,7 @@ const Manage = () => {
               {leaveAction === 'delete' ? 'Delete Site?' : 'Leave Site?'}
             </AlertDialogTitle>
             <AlertDialogDescription>
-              {leaveAction === 'delete' 
+              {leaveAction === 'delete'
                 ? 'You are the last member of this site. Leaving will delete the site. This action cannot be undone.'
                 : 'Are you sure you want to leave this site? You will need to be invited again to regain access.'}
             </AlertDialogDescription>

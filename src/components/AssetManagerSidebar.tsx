@@ -553,24 +553,24 @@ const AssetManagerSidebar = ({ siteId, pendingChanges, setPendingChanges }: Asse
   }
 
   return (
-    <div className="space-y-3">
-      <div className="flex items-center justify-between mb-3">
-        <div className="flex items-center gap-2">
-          <Badge variant="secondary" className="text-xs">v{config.version}</Badge>
-          <span className="text-xs text-muted-foreground">{config.assets.length} assets</span>
+    <div className="space-y-3 w-full max-w-full">
+      <div className="flex items-center justify-between mb-3 gap-2 w-full max-w-full">
+        <div className="flex items-center gap-2 min-w-0 flex-1 overflow-hidden">
+          <Badge variant="secondary" className="text-xs flex-shrink-0">v{config.version}</Badge>
+          <span className="text-xs text-muted-foreground whitespace-nowrap truncate">{config.assets.length} assets</span>
         </div>
         <Button
           variant="ghost"
           size="sm"
           onClick={fetchAssets}
           disabled={loading}
-          className="h-7 w-7 p-0"
+          className="h-7 w-7 p-0 flex-shrink-0"
         >
           <RefreshCw className={`h-3 w-3 ${loading ? 'animate-spin' : ''}`} />
         </Button>
       </div>
 
-      <div className="space-y-2">
+      <div className="space-y-2 w-full max-w-full">
         {config.assets.map((asset, index) => {
           const isExpanded = expandedAssets.has(asset.path);
           const isJsonWithSchema = asset.type === 'json' && asset.schema;
@@ -583,10 +583,11 @@ const AssetManagerSidebar = ({ siteId, pendingChanges, setPendingChanges }: Asse
               key={index}
               open={isExpanded}
               onOpenChange={() => toggleExpanded(asset)}
+              className="w-full"
             >
-              <div className="border border-border rounded-lg overflow-hidden">
-                <CollapsibleTrigger className="w-full p-3 hover:bg-muted/50 transition-colors">
-                  <div className="flex items-start gap-2">
+              <div className="border border-border rounded-lg overflow-hidden w-full">
+                <CollapsibleTrigger className="w-full p-3 hover:bg-muted/50 transition-colors max-w-full">
+                  <div className="flex items-start gap-2 w-full max-w-full">
                     {isExpanded ? (
                       <ChevronDown className="h-4 w-4 text-muted-foreground mt-0.5 flex-shrink-0" />
                     ) : (
@@ -595,9 +596,9 @@ const AssetManagerSidebar = ({ siteId, pendingChanges, setPendingChanges }: Asse
                     <div className="flex-shrink-0 mt-0.5">
                       {getAssetIcon(asset.type)}
                     </div>
-                    <div className="flex-1 text-left min-w-0">
-                      <div className="flex items-center gap-2 mb-1">
-                        <p className="font-medium text-sm truncate">{asset.label || asset.path}</p>
+                    <div className="flex-1 text-left min-w-0 max-w-full overflow-hidden">
+                      <div className="flex items-center gap-2 mb-1 w-full max-w-full">
+                        <p className="font-medium text-sm truncate flex-1 min-w-0">{asset.label || asset.path}</p>
                         <Badge variant="outline" className="text-xs flex-shrink-0">
                           {asset.type}
                         </Badge>
@@ -636,14 +637,14 @@ const AssetManagerSidebar = ({ siteId, pendingChanges, setPendingChanges }: Asse
                               <div className="space-y-2 pt-2 border-t">
                                 <Label className="text-xs font-semibold">Entries</Label>
                                 {Object.keys(jsonFormData[asset.path] || {}).map((key) => (
-                                  <div key={key} className="p-2 border rounded-lg space-y-2">
-                                    <div className="flex items-center justify-between">
-                                      <Label className="text-xs font-semibold">{key}</Label>
+                                  <div key={key} className="p-2 border rounded-lg space-y-2 w-full">
+                                    <div className="flex items-center justify-between gap-2 w-full">
+                                      <Label className="text-xs font-semibold truncate flex-1 min-w-0">{key}</Label>
                                       <Button
                                         variant="ghost"
                                         size="sm"
                                         onClick={() => removeEntry(asset, key)}
-                                        className="h-6 w-6 p-0"
+                                        className="h-6 w-6 p-0 flex-shrink-0"
                                       >
                                         <Trash2 className="h-3 w-3" />
                                       </Button>
@@ -658,18 +659,18 @@ const AssetManagerSidebar = ({ siteId, pendingChanges, setPendingChanges }: Asse
                                   </div>
                                 ))}
 
-                                <div className="flex gap-2 pt-2">
+                                <div className="flex gap-2 pt-2 w-full">
                                   <Input
                                     placeholder="New key..."
                                     value={newKeys[asset.path] || ''}
                                     onChange={(e) => setNewKeys(prev => ({ ...prev, [asset.path]: e.target.value }))}
-                                    className="h-8 text-xs"
+                                    className="h-8 text-xs flex-1 min-w-0"
                                   />
                                   <Button
                                     variant="outline"
                                     size="sm"
                                     onClick={() => addNewEntry(asset)}
-                                    className="h-8"
+                                    className="h-8 flex-shrink-0"
                                   >
                                     <Plus className="h-3 w-3" />
                                   </Button>
@@ -766,7 +767,7 @@ const AssetManagerSidebar = ({ siteId, pendingChanges, setPendingChanges }: Asse
                                 <Label className="text-xs">Existing Files</Label>
                                 <div className="space-y-1 max-h-48 overflow-y-auto">
                                   {directoryFiles[asset.path].map((file) => (
-                                    <div key={file.path} className="flex items-center gap-2 p-2 border rounded-lg hover:bg-muted/50">
+                                    <div key={file.path} className="flex items-center gap-2 p-2 border rounded-lg hover:bg-muted/50 w-full max-w-full">
                                       {isImageFile(file.name) ? (
                                         <img
                                           src={file.download_url}
@@ -778,7 +779,7 @@ const AssetManagerSidebar = ({ siteId, pendingChanges, setPendingChanges }: Asse
                                           <File className="h-6 w-6 text-muted-foreground" />
                                         </div>
                                       )}
-                                      <div className="flex-1 min-w-0">
+                                      <div className="flex-1 min-w-0 overflow-hidden">
                                         <p className="text-xs font-medium truncate">{file.name}</p>
                                         <p className="text-xs text-muted-foreground">
                                           {(file.size / 1024).toFixed(1)} KB

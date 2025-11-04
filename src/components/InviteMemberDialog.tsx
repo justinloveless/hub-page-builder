@@ -76,7 +76,7 @@ const InviteMemberDialog = ({ siteId, onInviteCreated }: InviteMemberDialogProps
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        <Button size="sm">
+        <Button size="sm" className="whitespace-nowrap">
           <UserPlus className="mr-2 h-4 w-4" />
           Invite Manager
         </Button>
@@ -88,7 +88,7 @@ const InviteMemberDialog = ({ siteId, onInviteCreated }: InviteMemberDialogProps
             Create an invitation link to add a new manager to this site. The link will expire in 7 days.
           </DialogDescription>
         </DialogHeader>
-        
+
         {!inviteUrl ? (
           <>
             <div className="space-y-4 py-4">
@@ -143,7 +143,7 @@ const InviteMemberDialog = ({ siteId, onInviteCreated }: InviteMemberDialogProps
                   Share this link with the person you want to invite.
                 </p>
               </div>
-              
+
               <div className="space-y-2">
                 <Label>Invite Code</Label>
                 <div className="flex gap-2">
