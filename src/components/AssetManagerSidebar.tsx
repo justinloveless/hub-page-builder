@@ -183,9 +183,10 @@ const AssetManagerSidebar = ({ siteId, pendingChanges, setPendingChanges }: Asse
     await saveToBatch(asset, newContent);
   };
 
-  const handleJsonFormChange = async (asset: AssetConfig) => {
-    const jsonData = jsonFormData[asset.path];
-    const newContent = JSON.stringify(jsonData, null, 2);
+  const handleJsonFormChange = async (asset: AssetConfig, jsonData?: Record<string, any>) => {
+    // Use provided jsonData or fall back to state
+    const dataToUse = jsonData ?? jsonFormData[asset.path];
+    const newContent = JSON.stringify(dataToUse, null, 2);
     setAssetContents(prev => ({ ...prev, [asset.path]: newContent }));
     await saveToBatch(asset, newContent);
   };
@@ -219,13 +220,6 @@ const AssetManagerSidebar = ({ siteId, pendingChanges, setPendingChanges }: Asse
     toast.success("Saved to batch");
   };
 
-  const updateJsonField = (assetPath: string, key: string, value: any) => {
-    setJsonFormData(prev => ({
-      ...prev,
-      [assetPath]: { ...prev[assetPath], [key]: value }
-    }));
-  };
-
   const addNewEntry = async (asset: AssetConfig) => {
     const newKey = newKeys[asset.path] || '';
     if (!newKey.trim()) {
@@ -247,23 +241,26 @@ const AssetManagerSidebar = ({ siteId, pendingChanges, setPendingChanges }: Asse
       });
     }
 
+    const updatedData = { ...currentData, [newKey]: defaultValue };
     setJsonFormData(prev => ({
       ...prev,
-      [asset.path]: { ...prev[asset.path], [newKey]: defaultValue }
+      [asset.path]: updatedData
     }));
     setNewKeys(prev => ({ ...prev, [asset.path]: '' }));
     toast.success(`Added "${newKey}"`);
-    await handleJsonFormChange(asset);
+    await handleJsonFormChange(asset, updatedData);
   };
 
   const removeEntry = async (asset: AssetConfig, key: string) => {
-    setJsonFormData(prev => {
-      const updated = { ...prev[asset.path] };
-      delete updated[key];
-      return { ...prev, [asset.path]: updated };
-    });
+    const currentData = jsonFormData[asset.path] || {};
+    const updated = { ...currentData };
+    delete updated[key];
+    setJsonFormData(prev => ({
+      ...prev,
+      [asset.path]: updated
+    }));
     toast.success(`Removed "${key}"`);
-    await handleJsonFormChange(asset);
+    await handleJsonFormChange(asset, updated);
   };
 
   const renderSchemaField = (asset: AssetConfig, key: string, fieldSchema: any, parentKey?: string) => {
@@ -274,21 +271,27 @@ const AssetManagerSidebar = ({ siteId, pendingChanges, setPendingChanges }: Asse
       : assetData[key] ?? fieldSchema.default ?? '';
 
     const updateValue = async (newValue: any) => {
+      let updatedData: Record<string, any>;
       if (parentKey) {
+        updatedData = {
+          ...(jsonFormData[asset.path] || {}),
+          [parentKey]: {
+            ...(jsonFormData[asset.path]?.[parentKey] || {}),
+            [key]: newValue
+          }
+        };
         setJsonFormData(prev => ({
           ...prev,
-          [asset.path]: {
-            ...(prev[asset.path] || {}),
-            [parentKey]: {
-              ...(prev[asset.path]?.[parentKey] || {}),
-              [key]: newValue
-            }
-          }
+          [asset.path]: updatedData
         }));
       } else {
-        updateJsonField(asset.path, key, newValue);
+        updatedData = { ...(jsonFormData[asset.path] || {}), [key]: newValue };
+        setJsonFormData(prev => ({
+          ...prev,
+          [asset.path]: updatedData
+        }));
       }
-      await handleJsonFormChange(asset);
+      await handleJsonFormChange(asset, updatedData);
     };
 
     switch (fieldSchema.type) {

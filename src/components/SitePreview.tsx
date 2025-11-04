@@ -22,6 +22,7 @@ export const SitePreview = ({ siteId, pendingChanges }: SitePreviewProps) => {
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const filesRef = useRef<Record<string, { content: string; encoding: string }>>({});
   const objectUrlsRef = useRef<string[]>([]);
+  const scrollPositionRef = useRef<{ x: number; y: number } | null>(null);
 
   // Add message listener for debug logs from iframe
   useEffect(() => {
@@ -41,6 +42,22 @@ export const SitePreview = ({ siteId, pendingChanges }: SitePreviewProps) => {
 
   useEffect(() => {
     if (Object.keys(filesRef.current).length > 0) {
+      // Capture scroll position before regenerating preview
+      const iframeEl = iframeRef.current;
+      if (iframeEl && previewUrl) {
+        try {
+          const iframeDoc = iframeEl.contentDocument || iframeEl.contentWindow?.document;
+          if (iframeDoc) {
+            scrollPositionRef.current = {
+              x: iframeDoc.documentElement.scrollLeft || iframeDoc.body.scrollLeft || iframeEl.contentWindow?.scrollX || 0,
+              y: iframeDoc.documentElement.scrollTop || iframeDoc.body.scrollTop || iframeEl.contentWindow?.scrollY || 0,
+            };
+          }
+        } catch (e) {
+          // If we can't access iframe content (shouldn't happen with blob URLs), ignore
+          console.debug('Could not capture scroll position:', e);
+        }
+      }
       generatePreview();
     }
   }, [pendingChanges]);
@@ -597,6 +614,32 @@ export const SitePreview = ({ siteId, pendingChanges }: SitePreviewProps) => {
           if (oldPreviewUrl) URL.revokeObjectURL(oldPreviewUrl);
           if (oldBatchUrls.length) oldBatchUrls.forEach((u) => URL.revokeObjectURL(u));
         } catch (e) { }
+
+        // Restore scroll position after iframe loads
+        if (scrollPositionRef.current) {
+          const restoreScroll = () => {
+            try {
+              const iframeDoc = iframeEl.contentDocument || iframeEl.contentWindow?.document;
+              const iframeWindow = iframeEl.contentWindow;
+              if (iframeWindow && iframeDoc) {
+                iframeDoc.documentElement.scrollLeft = scrollPositionRef.current!.x;
+                iframeDoc.documentElement.scrollTop = scrollPositionRef.current!.y;
+                iframeDoc.body.scrollLeft = scrollPositionRef.current!.x;
+                iframeDoc.body.scrollTop = scrollPositionRef.current!.y;
+                iframeWindow.scrollTo(scrollPositionRef.current!.x, scrollPositionRef.current!.y);
+              }
+            } catch (e) {
+              // If we can't access iframe content, ignore
+              console.debug('Could not restore scroll position:', e);
+            }
+          };
+
+          // Restore immediately and also after short delays to handle async content loading
+          requestAnimationFrame(restoreScroll);
+          setTimeout(restoreScroll, 100);
+          setTimeout(restoreScroll, 500);
+        }
+
         iframeEl.removeEventListener('load', onLoad);
       };
       iframeEl.addEventListener('load', onLoad);
