@@ -17,9 +17,10 @@ interface PendingBatchChangesProps {
   pendingChanges: PendingAssetChange[];
   setPendingChanges: (changes: PendingAssetChange[]) => void;
   onRefresh?: () => void;
+  showActions?: boolean;
 }
 
-const PendingBatchChanges = ({ siteId, pendingChanges, setPendingChanges, onRefresh }: PendingBatchChangesProps) => {
+const PendingBatchChanges = ({ siteId, pendingChanges, setPendingChanges, onRefresh, showActions = true }: PendingBatchChangesProps) => {
   const [isCommitting, setIsCommitting] = useState(false);
   const [showCommitDialog, setShowCommitDialog] = useState(false);
   const [showClearDialog, setShowClearDialog] = useState(false);
@@ -274,25 +275,27 @@ const PendingBatchChanges = ({ siteId, pendingChanges, setPendingChanges, onRefr
             })}
           </div>
 
-          <div className="flex gap-2 pt-2">
-            <Button
-              onClick={() => setShowClearDialog(true)}
-              variant="outline"
-              size="sm"
-            >
-              <Trash2 className="h-4 w-4 mr-2" />
-              Clear All
-            </Button>
-            <Button
-              onClick={() => setShowCommitDialog(true)}
-              size="sm"
-              disabled={isCommitting}
-              className="ml-auto"
-            >
-              <GitCommit className="h-4 w-4 mr-2" />
-              Commit All
-            </Button>
-          </div>
+          {showActions && (
+            <div className="flex gap-2 pt-2">
+              <Button
+                onClick={() => setShowClearDialog(true)}
+                variant="outline"
+                size="sm"
+              >
+                <Trash2 className="h-4 w-4 mr-2" />
+                Clear All
+              </Button>
+              <Button
+                onClick={() => setShowCommitDialog(true)}
+                size="sm"
+                disabled={isCommitting}
+                className="ml-auto"
+              >
+                <GitCommit className="h-4 w-4 mr-2" />
+                Commit All
+              </Button>
+            </div>
+          )}
         </CardContent>
       </Card>
 

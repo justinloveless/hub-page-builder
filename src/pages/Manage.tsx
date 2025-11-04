@@ -15,6 +15,7 @@ import { Separator } from "@/components/ui/separator";
 import { format } from "date-fns";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import AssetManagerSidebar from "@/components/AssetManagerSidebar";
 import PendingBatchChanges from "@/components/PendingBatchChanges";
 import InviteMemberDialog from "@/components/InviteMemberDialog";
@@ -59,6 +60,7 @@ const Manage = () => {
   const [activitiesPage, setActivitiesPage] = useState(1);
   const [hasMoreActivities, setHasMoreActivities] = useState(true);
   const [pendingChanges, setPendingChanges] = useState<PendingAssetChange[]>([]);
+  const [showDiffDrawer, setShowDiffDrawer] = useState(false);
   const ACTIVITIES_PER_PAGE = 10;
   
   // Activity filters
@@ -645,6 +647,14 @@ const Manage = () => {
                       <Button
                         variant="outline"
                         size="sm"
+                        onClick={() => setShowDiffDrawer(true)}
+                      >
+                        <FileText className="h-4 w-4 mr-2" />
+                        View Details
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
                         onClick={() => {
                           setPendingChanges([]);
                           toast.success('All changes cleared');
@@ -712,27 +722,48 @@ const Manage = () => {
         </ResizablePanel>
       </ResizablePanelGroup>
 
+      {/* Diff Drawer */}
+      <Sheet open={showDiffDrawer} onOpenChange={setShowDiffDrawer}>
+        <SheetContent side="right" className="w-full sm:max-w-2xl overflow-y-auto">
+          <SheetHeader>
+            <SheetTitle>Pending Changes</SheetTitle>
+            <SheetDescription>
+              Review all pending changes before committing
+            </SheetDescription>
+          </SheetHeader>
+          <div className="mt-6">
+            <PendingBatchChanges
+              siteId={siteId!}
+              pendingChanges={pendingChanges}
+              setPendingChanges={setPendingChanges}
+              onRefresh={loadActivities}
+              showActions={false}
+            />
+          </div>
+        </SheetContent>
+      </Sheet>
+
       {/* Alert Dialog for leaving site */}
-        <AlertDialog open={showLeaveDialog} onOpenChange={setShowLeaveDialog}>
-          <AlertDialogContent>
-            <AlertDialogHeader>
-              <AlertDialogTitle>
-                {leaveAction === 'delete' ? 'Delete Site?' : 'Leave Site?'}
-              </AlertDialogTitle>
-              <AlertDialogDescription>
-                {leaveAction === 'delete' 
-                  ? 'You are the last member of this site. Leaving will delete the site. This action cannot be undone.'
-                  : 'Are you sure you want to leave this site? You will need to be invited again to regain access.'}
-              </AlertDialogDescription>
-            </AlertDialogHeader>
-            <AlertDialogFooter>
-              <AlertDialogCancel>Cancel</AlertDialogCancel>
-              <AlertDialogAction onClick={confirmLeaveSite} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
-                {leaveAction === 'delete' ? 'Delete Site' : 'Leave Site'}
-              </AlertDialogAction>
-            </AlertDialogFooter>
-          </AlertDialogContent>
-        </AlertDialog>
+      <AlertDialog open={showLeaveDialog} onOpenChange={setShowLeaveDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              {leaveAction === 'delete' ? 'Delete Site?' : 'Leave Site?'}
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              {leaveAction === 'delete' 
+                ? 'You are the last member of this site. Leaving will delete the site. This action cannot be undone.'
+                : 'Are you sure you want to leave this site? You will need to be invited again to regain access.'}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={confirmLeaveSite} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+              {leaveAction === 'delete' ? 'Delete Site' : 'Leave Site'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 };
