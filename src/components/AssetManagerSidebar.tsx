@@ -605,6 +605,37 @@ const AssetManagerSidebar = ({ siteId, pendingChanges, setPendingChanges }: Asse
     return lastDotIndex > 0 ? fileName.substring(lastDotIndex) : '';
   };
 
+  const getMergedDirectoryFiles = (assetPath: string): AssetFile[] => {
+    const committedFiles = directoryFiles[assetPath] || [];
+    const basePath = assetPath.endsWith('/') ? assetPath : assetPath + '/';
+
+    // Get pending changes for this directory
+    const pendingFiles = pendingChanges
+      .filter(change => change.repoPath.startsWith(basePath))
+      .map(change => {
+        const ext = change.fileName.split('.').pop()?.toLowerCase() || '';
+        const isImage = ['jpg', 'jpeg', 'png', 'gif', 'webp', 'svg'].includes(ext);
+        const mimeType = isImage ? `image/${ext === 'jpg' ? 'jpeg' : ext}` :
+          ext === 'json' ? 'application/json' : 'text/plain';
+
+        return {
+          name: change.fileName,
+          path: change.repoPath,
+          sha: 'pending',
+          size: Math.floor(change.content.length * 0.75), // Approximate size from base64
+          type: 'file',
+          download_url: `data:${mimeType};base64,${change.content}`
+        };
+      });
+
+    // Merge, preferring pending changes over committed files with same path
+    const fileMap = new Map<string, AssetFile>();
+    committedFiles.forEach(file => fileMap.set(file.path, file));
+    pendingFiles.forEach(file => fileMap.set(file.path, file));
+
+    return Array.from(fileMap.values());
+  };
+
   const groupComboAssets = (files: AssetFile[], comboParts: Array<{ assetType: string; allowedExtensions?: string[] }>) => {
     const groups = new Map<string, { files: AssetFile[]; types: string[] }>();
     const standalone: AssetFile[] = [];
@@ -760,6 +791,7 @@ const AssetManagerSidebar = ({ siteId, pendingChanges, setPendingChanges }: Asse
 
     // Create changes for each part
     const changes: PendingAssetChange[] = [];
+    const newFileNames: string[] = [];
 
     for (const part of parts) {
       const ext = part.allowedExtensions?.[0] || '';
@@ -770,6 +802,7 @@ const AssetManagerSidebar = ({ siteId, pendingChanges, setPendingChanges }: Asse
 
       const fileName = comboData.baseName + ext;
       const fullPath = basePath + fileName;
+      newFileNames.push(fileName);
 
       let base64Content: string = '';
 
@@ -809,12 +842,86 @@ const AssetManagerSidebar = ({ siteId, pendingChanges, setPendingChanges }: Asse
       }
     });
 
+    // Update manifest.json to include the new combo asset files
+    await updateManifestWithNewFiles(asset.path, newFileNames, updatedChanges);
+
     setPendingChanges(updatedChanges);
     toast.success(`Added combo asset "${comboData.baseName}" to batch`);
     cancelCreatingCombo(asset.path);
 
-    // Reload directory to show new files
-    await loadDirectoryFiles(asset);
+    // Note: No need to reload - the component will re-render with updated pendingChanges
+    // which will automatically show the new files via getMergedDirectoryFiles
+  };
+
+  const updateManifestWithNewFiles = async (dirPath: string, newFileNames: string[], updatedChanges: PendingAssetChange[]) => {
+    const basePath = dirPath.endsWith('/') ? dirPath : dirPath + '/';
+    const manifestPath = `${basePath}manifest.json`;
+
+    try {
+      // Try to get existing manifest from pending changes first
+      let manifestContent = '';
+      const existingPendingManifest = updatedChanges.find(c => c.repoPath === manifestPath);
+
+      if (existingPendingManifest) {
+        // Decode from base64
+        manifestContent = decodeURIComponent(escape(atob(existingPendingManifest.content)));
+      } else {
+        // Try to fetch from GitHub
+        const { data, error } = await supabase.functions.invoke('fetch-asset-content', {
+          body: { site_id: siteId, asset_path: manifestPath },
+        });
+
+        if (!error && data.found) {
+          manifestContent = data.content;
+        }
+      }
+
+      // Parse or create manifest
+      let manifest: { files: string[] };
+      if (manifestContent) {
+        manifest = JSON.parse(manifestContent);
+      } else {
+        // Create new manifest if it doesn't exist
+        manifest = { files: [] };
+      }
+
+      // Add new files if they're not already in the manifest
+      let updated = false;
+      for (const fileName of newFileNames) {
+        if (!manifest.files.includes(fileName)) {
+          manifest.files.push(fileName);
+          updated = true;
+        }
+      }
+
+      if (updated) {
+        // Sort files
+        manifest.files.sort();
+
+        // Encode updated manifest
+        const updatedManifestContent = JSON.stringify(manifest, null, 2);
+        const base64Manifest = btoa(unescape(encodeURIComponent(updatedManifestContent)));
+
+        // Update or add manifest to pending changes
+        const manifestChange: PendingAssetChange = {
+          repoPath: manifestPath,
+          content: base64Manifest,
+          fileName: 'manifest.json'
+        };
+
+        const existingIndex = updatedChanges.findIndex(c => c.repoPath === manifestPath);
+        if (existingIndex >= 0) {
+          updatedChanges[existingIndex] = manifestChange;
+        } else {
+          updatedChanges.push(manifestChange);
+        }
+
+        console.log('[AssetManager] Updated manifest.json with new files:', newFileNames);
+      }
+    } catch (error) {
+      console.error('[AssetManager] Failed to update manifest:', error);
+      // Don't fail the whole operation if manifest update fails
+    }
   };
 
   const fetchAssets = async () => {
@@ -1159,10 +1266,10 @@ const AssetManagerSidebar = ({ siteId, pendingChanges, setPendingChanges }: Asse
                         ) : (
                           <>
                             {/* Combo Asset Type */}
-                            {asset.contains?.type === 'combo' && asset.contains.parts && directoryFiles[asset.path] && directoryFiles[asset.path].length > 0 ? (
+                            {asset.contains?.type === 'combo' && asset.contains.parts && getMergedDirectoryFiles(asset.path).length > 0 ? (
                               <>
                                 {(() => {
-                                  const { groups, standalone } = groupComboAssets(directoryFiles[asset.path], asset.contains.parts);
+                                  const { groups, standalone } = groupComboAssets(getMergedDirectoryFiles(asset.path), asset.contains.parts);
                                   return (
                                     <>
                                       {groups.length > 0 && (
@@ -1365,11 +1472,11 @@ const AssetManagerSidebar = ({ siteId, pendingChanges, setPendingChanges }: Asse
                               </>
                             ) : (
                               /* Standard Directory */
-                              directoryFiles[asset.path] && directoryFiles[asset.path].length > 0 && (
+                              getMergedDirectoryFiles(asset.path).length > 0 && (
                                 <div className="space-y-2">
                                   <Label className="text-xs">Existing Files</Label>
                                   <div className="space-y-1 max-h-48 overflow-y-auto">
-                                    {directoryFiles[asset.path].map((file) => (
+                                    {getMergedDirectoryFiles(asset.path).map((file) => (
                                       <div key={file.path} className="flex items-center gap-2 p-2 border rounded-lg hover:bg-muted/50 w-full max-w-full">
                                         {isImageFile(file.name) ? (
                                           <img
