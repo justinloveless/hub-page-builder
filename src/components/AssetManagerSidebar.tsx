@@ -21,6 +21,15 @@ interface AssetConfig {
   maxSize?: number;
   allowedExtensions?: string[];
   schema?: Record<string, any>;
+  contains?: {
+    type: string;
+    parts?: Array<{
+      assetType: string;
+      allowedExtensions?: string[];
+      maxSize?: number;
+      schema?: Record<string, any>;
+    }>;
+  };
 }
 
 interface AssetFile {
@@ -57,6 +66,10 @@ const AssetManagerSidebar = ({ siteId, pendingChanges, setPendingChanges }: Asse
   const [loadingFiles, setLoadingFiles] = useState<Record<string, boolean>>({});
   const [deletingFile, setDeletingFile] = useState<string | null>(null);
   const [imageUrls, setImageUrls] = useState<Record<string, string>>({});
+  const [comboFileContents, setComboFileContents] = useState<Record<string, string>>({});
+  const [loadingComboFile, setLoadingComboFile] = useState<Record<string, boolean>>({});
+  const [creatingCombo, setCreatingCombo] = useState<Record<string, boolean>>({});
+  const [newComboData, setNewComboData] = useState<Record<string, { baseName: string; parts: Record<string, { content: string; file?: File; jsonData?: Record<string, any> }> }>>({});
 
   useEffect(() => {
     fetchAssets();
@@ -263,16 +276,34 @@ const AssetManagerSidebar = ({ siteId, pendingChanges, setPendingChanges }: Asse
     await handleJsonFormChange(asset, updated);
   };
 
-  const renderSchemaField = (asset: AssetConfig, key: string, fieldSchema: any, parentKey?: string) => {
-    const fullKey = parentKey ? `${parentKey}.${key}` : key;
+  const renderSchemaField = (asset: AssetConfig, key: string, fieldSchema: any, parentKey?: string, arrayIndex?: number) => {
+    const fullKey = parentKey
+      ? (arrayIndex !== undefined ? `${parentKey}[${arrayIndex}].${key}` : `${parentKey}.${key}`)
+      : key;
     const assetData = jsonFormData[asset.path] || {};
-    const value = parentKey
-      ? assetData[parentKey]?.[key] ?? fieldSchema.default ?? ''
-      : assetData[key] ?? fieldSchema.default ?? '';
+
+    let value: any;
+    if (arrayIndex !== undefined && parentKey) {
+      value = assetData[parentKey]?.[arrayIndex]?.[key] ?? fieldSchema.default ?? '';
+    } else if (parentKey) {
+      value = assetData[parentKey]?.[key] ?? fieldSchema.default ?? '';
+    } else {
+      value = assetData[key] ?? fieldSchema.default ?? '';
+    }
 
     const updateValue = async (newValue: any) => {
       let updatedData: Record<string, any>;
-      if (parentKey) {
+      if (arrayIndex !== undefined && parentKey) {
+        const arrayData = [...(jsonFormData[asset.path]?.[parentKey] || [])];
+        arrayData[arrayIndex] = {
+          ...(arrayData[arrayIndex] || {}),
+          [key]: newValue
+        };
+        updatedData = {
+          ...(jsonFormData[asset.path] || {}),
+          [parentKey]: arrayData
+        };
+      } else if (parentKey) {
         updatedData = {
           ...(jsonFormData[asset.path] || {}),
           [parentKey]: {
@@ -280,21 +311,161 @@ const AssetManagerSidebar = ({ siteId, pendingChanges, setPendingChanges }: Asse
             [key]: newValue
           }
         };
-        setJsonFormData(prev => ({
-          ...prev,
-          [asset.path]: updatedData
-        }));
       } else {
         updatedData = { ...(jsonFormData[asset.path] || {}), [key]: newValue };
-        setJsonFormData(prev => ({
-          ...prev,
-          [asset.path]: updatedData
-        }));
       }
+      setJsonFormData(prev => ({
+        ...prev,
+        [asset.path]: updatedData
+      }));
       await handleJsonFormChange(asset, updatedData);
     };
 
     switch (fieldSchema.type) {
+      case 'array':
+        if (fieldSchema.items) {
+          const arrayValue = parentKey ? assetData[parentKey]?.[key] : assetData[key];
+          const items = Array.isArray(arrayValue) ? arrayValue : [];
+
+          const addArrayItem = async () => {
+            const newItem: any = {};
+            if (fieldSchema.items.type === 'object' && fieldSchema.items.properties) {
+              Object.entries(fieldSchema.items.properties).forEach(([propKey, propSchema]: [string, any]) => {
+                newItem[propKey] = propSchema.default ?? '';
+              });
+            }
+
+            const newItems = [...items, newItem];
+            const updatedData = parentKey
+              ? { ...(jsonFormData[asset.path] || {}), [parentKey]: { ...(jsonFormData[asset.path]?.[parentKey] || {}), [key]: newItems } }
+              : { ...(jsonFormData[asset.path] || {}), [key]: newItems };
+
+            setJsonFormData(prev => ({
+              ...prev,
+              [asset.path]: updatedData
+            }));
+            await handleJsonFormChange(asset, updatedData);
+          };
+
+          const removeArrayItem = async (index: number) => {
+            const newItems = items.filter((_, i) => i !== index);
+            const updatedData = parentKey
+              ? { ...(jsonFormData[asset.path] || {}), [parentKey]: { ...(jsonFormData[asset.path]?.[parentKey] || {}), [key]: newItems } }
+              : { ...(jsonFormData[asset.path] || {}), [key]: newItems };
+
+            setJsonFormData(prev => ({
+              ...prev,
+              [asset.path]: updatedData
+            }));
+            await handleJsonFormChange(asset, updatedData);
+          };
+
+          return (
+            <div key={fullKey} className="space-y-2 p-3 border rounded-lg bg-accent/5">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h4 className="font-semibold text-xs uppercase tracking-wide text-muted-foreground">
+                    {fieldSchema.title || key}
+                  </h4>
+                  {fieldSchema.description && (
+                    <p className="text-xs text-muted-foreground mt-1">{fieldSchema.description}</p>
+                  )}
+                </div>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={addArrayItem}
+                  className="h-7 flex-shrink-0"
+                >
+                  <Plus className="h-3 w-3 mr-1" />
+                  Add
+                </Button>
+              </div>
+
+              <div className="space-y-2">
+                {items.map((item, index) => (
+                  <div key={index} className="p-2 border rounded-lg bg-background space-y-2">
+                    <div className="flex items-center justify-between">
+                      <Label className="text-xs font-semibold">Item {index + 1}</Label>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => removeArrayItem(index)}
+                        className="h-6 w-6 p-0"
+                      >
+                        <Trash2 className="h-3 w-3" />
+                      </Button>
+                    </div>
+                    {fieldSchema.items.type === 'object' && fieldSchema.items.properties && (
+                      <div className="space-y-2 pl-2">
+                        {Object.entries(fieldSchema.items.properties).map(([propKey, propSchema]: [string, any]) => {
+                          const propValue = item[propKey] ?? propSchema.default ?? '';
+                          const propFullKey = `${fullKey}[${index}].${propKey}`;
+
+                          const updateArrayItemProp = async (newPropValue: any) => {
+                            const newItems = [...items];
+                            newItems[index] = { ...newItems[index], [propKey]: newPropValue };
+                            const updatedData = parentKey
+                              ? { ...(jsonFormData[asset.path] || {}), [parentKey]: { ...(jsonFormData[asset.path]?.[parentKey] || {}), [key]: newItems } }
+                              : { ...(jsonFormData[asset.path] || {}), [key]: newItems };
+
+                            setJsonFormData(prev => ({
+                              ...prev,
+                              [asset.path]: updatedData
+                            }));
+                            await handleJsonFormChange(asset, updatedData);
+                          };
+
+                          return (
+                            <div key={propFullKey} className="space-y-1">
+                              <Label htmlFor={propFullKey} className="text-xs">
+                                {propSchema.title || propKey}
+                              </Label>
+                              {propSchema.description && (
+                                <p className="text-xs text-muted-foreground">{propSchema.description}</p>
+                              )}
+                              {propSchema.type === 'string' && propSchema.multiline ? (
+                                <Textarea
+                                  id={propFullKey}
+                                  value={propValue}
+                                  onChange={(e) => updateArrayItemProp(e.target.value)}
+                                  placeholder={propSchema.placeholder}
+                                  className="min-h-[60px] text-xs"
+                                />
+                              ) : propSchema.type === 'number' || propSchema.type === 'integer' ? (
+                                <Input
+                                  id={propFullKey}
+                                  type="number"
+                                  value={propValue}
+                                  onChange={(e) => updateArrayItemProp(propSchema.type === 'integer' ? parseInt(e.target.value) || 0 : parseFloat(e.target.value) || 0)}
+                                  placeholder={propSchema.placeholder}
+                                  className="h-8 text-xs"
+                                />
+                              ) : (
+                                <Input
+                                  id={propFullKey}
+                                  value={propValue}
+                                  onChange={(e) => updateArrayItemProp(e.target.value)}
+                                  placeholder={propSchema.placeholder}
+                                  className="h-8 text-xs"
+                                />
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+                ))}
+                {items.length === 0 && (
+                  <p className="text-xs text-muted-foreground text-center py-2">No items yet. Click "Add" to create one.</p>
+                )}
+              </div>
+            </div>
+          );
+        }
+        return null;
+
       case 'object':
         if (fieldSchema.properties) {
           return (
@@ -422,6 +593,228 @@ const AssetManagerSidebar = ({ siteId, pendingChanges, setPendingChanges }: Asse
   const isImageFile = (fileName: string): boolean => {
     const imageExtensions = ['.jpg', '.jpeg', '.png', '.gif', '.webp', '.svg', '.bmp', '.ico'];
     return imageExtensions.some(ext => fileName.toLowerCase().endsWith(ext));
+  };
+
+  const getFileBaseName = (fileName: string): string => {
+    const lastDotIndex = fileName.lastIndexOf('.');
+    return lastDotIndex > 0 ? fileName.substring(0, lastDotIndex) : fileName;
+  };
+
+  const getFileExtension = (fileName: string): string => {
+    const lastDotIndex = fileName.lastIndexOf('.');
+    return lastDotIndex > 0 ? fileName.substring(lastDotIndex) : '';
+  };
+
+  const groupComboAssets = (files: AssetFile[], comboParts: Array<{ assetType: string; allowedExtensions?: string[] }>) => {
+    const groups = new Map<string, { files: AssetFile[]; types: string[] }>();
+    const standalone: AssetFile[] = [];
+
+    files.forEach(file => {
+      const baseName = getFileBaseName(file.name);
+      const ext = getFileExtension(file.name);
+
+      // Find which combo part this file belongs to
+      const partType = comboParts.find(part =>
+        part.allowedExtensions?.some(allowed => ext.toLowerCase() === allowed.toLowerCase())
+      )?.assetType;
+
+      if (partType) {
+        if (!groups.has(baseName)) {
+          groups.set(baseName, { files: [], types: [] });
+        }
+        const group = groups.get(baseName)!;
+        group.files.push(file);
+        group.types.push(partType);
+      } else {
+        standalone.push(file);
+      }
+    });
+
+    return { groups: Array.from(groups.entries()), standalone };
+  };
+
+  const loadComboFileContent = async (filePath: string) => {
+    setLoadingComboFile(prev => ({ ...prev, [filePath]: true }));
+    try {
+      const { data, error } = await supabase.functions.invoke('fetch-asset-content', {
+        body: { site_id: siteId, asset_path: filePath },
+      });
+
+      if (error) throw error;
+
+      if (data.found) {
+        setComboFileContents(prev => ({ ...prev, [filePath]: data.content }));
+      }
+    } catch (error: any) {
+      console.error("Failed to load combo file content:", error);
+      toast.error("Failed to load file content");
+    } finally {
+      setLoadingComboFile(prev => ({ ...prev, [filePath]: false }));
+    }
+  };
+
+  const handleComboFileContentChange = async (filePath: string, newContent: string) => {
+    setComboFileContents(prev => ({ ...prev, [filePath]: newContent }));
+
+    const base64Content = btoa(unescape(encodeURIComponent(newContent)));
+    const fileName = filePath.split('/').pop() || 'file';
+
+    // Fetch original content for diff
+    let originalContent = "";
+    try {
+      const { data: originalData } = await supabase.functions.invoke('fetch-asset-content', {
+        body: { site_id: siteId, asset_path: filePath },
+      });
+      if (originalData?.found) {
+        originalContent = originalData.content;
+      }
+    } catch (error) {
+      console.error("Failed to fetch original content:", error);
+    }
+
+    const newChange: PendingAssetChange = {
+      repoPath: filePath,
+      content: base64Content,
+      originalContent: originalContent ? btoa(unescape(encodeURIComponent(originalContent))) : undefined,
+      fileName
+    };
+
+    const updatedChanges = pendingChanges.filter(c => c.repoPath !== filePath);
+    setPendingChanges([...updatedChanges, newChange]);
+    toast.success("Saved to batch");
+  };
+
+  const getFileAssetType = (fileName: string, comboParts: Array<{ assetType: string; allowedExtensions?: string[] }>) => {
+    const ext = getFileExtension(fileName);
+    return comboParts.find(part =>
+      part.allowedExtensions?.some(allowed => ext.toLowerCase() === allowed.toLowerCase())
+    )?.assetType;
+  };
+
+  const startCreatingCombo = (asset: AssetConfig) => {
+    setCreatingCombo(prev => ({ ...prev, [asset.path]: true }));
+
+    // Initialize parts with default values based on schema
+    const parts: Record<string, { content: string; file?: File; jsonData?: Record<string, any> }> = {};
+
+    asset.contains?.parts?.forEach(part => {
+      if (part.assetType === 'json' && part.schema?.properties) {
+        // Initialize JSON data with default values from schema
+        const jsonData: Record<string, any> = {};
+        Object.entries(part.schema.properties).forEach(([key, fieldSchema]: [string, any]) => {
+          jsonData[key] = fieldSchema.default ?? '';
+        });
+        parts[part.assetType] = { content: '', jsonData };
+      }
+    });
+
+    setNewComboData(prev => ({
+      ...prev,
+      [asset.path]: {
+        baseName: '',
+        parts
+      }
+    }));
+  };
+
+  const cancelCreatingCombo = (assetPath: string) => {
+    setCreatingCombo(prev => ({ ...prev, [assetPath]: false }));
+    setNewComboData(prev => {
+      const updated = { ...prev };
+      delete updated[assetPath];
+      return updated;
+    });
+  };
+
+  const submitNewCombo = async (asset: AssetConfig) => {
+    const comboData = newComboData[asset.path];
+    if (!comboData || !comboData.baseName.trim()) {
+      toast.error("Please enter a base name for the combo asset");
+      return;
+    }
+
+    const parts = asset.contains?.parts || [];
+    const basePath = asset.path.endsWith('/') ? asset.path : asset.path + '/';
+
+    // Validate all parts are provided
+    for (const part of parts) {
+      const ext = part.allowedExtensions?.[0] || '';
+      const partKey = part.assetType;
+      const partData = comboData.parts[partKey];
+
+      if (!partData) {
+        toast.error(`Please provide content for ${part.assetType} part`);
+        return;
+      }
+
+      // Check if there's actual content
+      const hasFile = !!partData.file;
+      const hasContent = !!partData.content && partData.content.trim().length > 0;
+      const hasJsonData = partData.jsonData && Object.keys(partData.jsonData).length > 0;
+
+      if (!hasFile && !hasContent && !hasJsonData) {
+        toast.error(`Please provide content for ${part.assetType} part`);
+        return;
+      }
+    }
+
+    // Create changes for each part
+    const changes: PendingAssetChange[] = [];
+
+    for (const part of parts) {
+      const ext = part.allowedExtensions?.[0] || '';
+      const partKey = part.assetType;
+      const partData = comboData.parts[partKey];
+
+      if (!partData) continue;
+
+      const fileName = comboData.baseName + ext;
+      const fullPath = basePath + fileName;
+
+      let base64Content: string = '';
+
+      if (partData.file) {
+        // File upload (image, etc.)
+        const reader = new FileReader();
+        base64Content = await new Promise<string>((resolve, reject) => {
+          reader.onloadend = () => {
+            resolve((reader.result as string).split(',')[1]);
+          };
+          reader.onerror = reject;
+          reader.readAsDataURL(partData.file!);
+        });
+      } else {
+        // Text/JSON content
+        const contentToEncode = partData.jsonData
+          ? JSON.stringify(partData.jsonData, null, 2)
+          : partData.content;
+        base64Content = btoa(unescape(encodeURIComponent(contentToEncode)));
+      }
+
+      changes.push({
+        repoPath: fullPath,
+        content: base64Content,
+        fileName: fileName
+      });
+    }
+
+    // Add all changes to batch
+    const updatedChanges = [...pendingChanges];
+    changes.forEach(change => {
+      const existing = updatedChanges.findIndex(c => c.repoPath === change.repoPath);
+      if (existing >= 0) {
+        updatedChanges[existing] = change;
+      } else {
+        updatedChanges.push(change);
+      }
+    });
+
+    setPendingChanges(updatedChanges);
+    toast.success(`Added combo asset "${comboData.baseName}" to batch`);
+    cancelCreatingCombo(asset.path);
+
+    // Reload directory to show new files
+    await loadDirectoryFiles(asset);
   };
 
   const fetchAssets = async () => {
@@ -765,88 +1158,558 @@ const AssetManagerSidebar = ({ siteId, pendingChanges, setPendingChanges }: Asse
                           <Skeleton className="h-20 w-full" />
                         ) : (
                           <>
-                            {directoryFiles[asset.path] && directoryFiles[asset.path].length > 0 && (
-                              <div className="space-y-2">
-                                <Label className="text-xs">Existing Files</Label>
-                                <div className="space-y-1 max-h-48 overflow-y-auto">
-                                  {directoryFiles[asset.path].map((file) => (
-                                    <div key={file.path} className="flex items-center gap-2 p-2 border rounded-lg hover:bg-muted/50 w-full max-w-full">
-                                      {isImageFile(file.name) ? (
-                                        <img
-                                          src={file.download_url}
-                                          alt={file.name}
-                                          className="w-12 h-12 object-cover rounded border flex-shrink-0"
-                                        />
-                                      ) : (
-                                        <div className="w-12 h-12 flex items-center justify-center bg-muted rounded border flex-shrink-0">
-                                          <File className="h-6 w-6 text-muted-foreground" />
+                            {/* Combo Asset Type */}
+                            {asset.contains?.type === 'combo' && asset.contains.parts && directoryFiles[asset.path] && directoryFiles[asset.path].length > 0 ? (
+                              <>
+                                {(() => {
+                                  const { groups, standalone } = groupComboAssets(directoryFiles[asset.path], asset.contains.parts);
+                                  return (
+                                    <>
+                                      {groups.length > 0 && (
+                                        <div className="space-y-2">
+                                          <Label className="text-xs">Combo Assets</Label>
+                                          <div className="space-y-2 max-h-96 overflow-y-auto">
+                                            {groups.map(([baseName, group]) => (
+                                              <div key={baseName} className="p-3 border rounded-lg bg-accent/5 space-y-2">
+                                                <div className="flex items-center justify-between">
+                                                  <h5 className="text-xs font-semibold truncate">{baseName}</h5>
+                                                  <Badge variant="secondary" className="text-xs">{group.files.length} parts</Badge>
+                                                </div>
+                                                <div className="space-y-2">
+                                                  {group.files.map((file) => {
+                                                    const fileType = getFileAssetType(file.name, asset.contains.parts!);
+                                                    const isJson = fileType === 'json';
+                                                    const isText = fileType === 'text' || fileType === 'markdown';
+                                                    const isImage = fileType === 'image' || isImageFile(file.name);
+
+                                                    return (
+                                                      <div key={file.path} className="border rounded bg-background">
+                                                        {/* File Header */}
+                                                        <div className="flex items-center gap-2 p-2 border-b">
+                                                          {isImage ? (
+                                                            <img
+                                                              src={file.download_url}
+                                                              alt={file.name}
+                                                              className="w-8 h-8 object-cover rounded border flex-shrink-0"
+                                                            />
+                                                          ) : (
+                                                            <div className="w-8 h-8 flex items-center justify-center bg-muted rounded border flex-shrink-0">
+                                                              <File className="h-4 w-4 text-muted-foreground" />
+                                                            </div>
+                                                          )}
+                                                          <div className="flex-1 min-w-0">
+                                                            <p className="text-xs font-medium truncate">{file.name}</p>
+                                                            <p className="text-xs text-muted-foreground">
+                                                              {(file.size / 1024).toFixed(1)} KB · {fileType}
+                                                            </p>
+                                                          </div>
+                                                          <Button
+                                                            variant="ghost"
+                                                            size="sm"
+                                                            onClick={() => handleDeleteFile(asset, file.path, file.sha)}
+                                                            disabled={deletingFile === file.path}
+                                                            className="h-6 w-6 p-0 flex-shrink-0"
+                                                            title="Delete file"
+                                                          >
+                                                            {deletingFile === file.path ? (
+                                                              <RefreshCw className="h-3 w-3 animate-spin" />
+                                                            ) : (
+                                                              <Trash2 className="h-3 w-3" />
+                                                            )}
+                                                          </Button>
+                                                        </div>
+
+                                                        {/* File Content */}
+                                                        {isImage && (
+                                                          <div className="p-2">
+                                                            <img
+                                                              src={file.download_url}
+                                                              alt={file.name}
+                                                              className="w-full h-auto rounded border"
+                                                            />
+                                                          </div>
+                                                        )}
+
+                                                        {(isJson || isText) && (
+                                                          <div className="p-2 space-y-2">
+                                                            {!comboFileContents[file.path] && !loadingComboFile[file.path] && (
+                                                              <Button
+                                                                variant="outline"
+                                                                size="sm"
+                                                                onClick={() => loadComboFileContent(file.path)}
+                                                                className="w-full h-8 text-xs"
+                                                              >
+                                                                Load Content
+                                                              </Button>
+                                                            )}
+
+                                                            {loadingComboFile[file.path] && (
+                                                              <Skeleton className="h-20 w-full" />
+                                                            )}
+
+                                                            {comboFileContents[file.path] && (
+                                                              <>
+                                                                {isJson ? (
+                                                                  <div className="space-y-2">
+                                                                    {(() => {
+                                                                      try {
+                                                                        const jsonData = JSON.parse(comboFileContents[file.path]);
+                                                                        return (
+                                                                          <div className="space-y-2">
+                                                                            {Object.entries(jsonData).map(([key, value]) => (
+                                                                              <div key={key} className="space-y-1">
+                                                                                <Label className="text-xs">{key}</Label>
+                                                                                <Input
+                                                                                  value={String(value)}
+                                                                                  onChange={(e) => {
+                                                                                    const updated = { ...jsonData, [key]: e.target.value };
+                                                                                    handleComboFileContentChange(file.path, JSON.stringify(updated, null, 2));
+                                                                                  }}
+                                                                                  className="h-8 text-xs"
+                                                                                />
+                                                                              </div>
+                                                                            ))}
+                                                                          </div>
+                                                                        );
+                                                                      } catch (e) {
+                                                                        return (
+                                                                          <Textarea
+                                                                            value={comboFileContents[file.path]}
+                                                                            onChange={(e) => setComboFileContents(prev => ({ ...prev, [file.path]: e.target.value }))}
+                                                                            onBlur={(e) => handleComboFileContentChange(file.path, e.target.value)}
+                                                                            className="min-h-[80px] font-mono text-xs"
+                                                                            placeholder="Invalid JSON"
+                                                                          />
+                                                                        );
+                                                                      }
+                                                                    })()}
+                                                                  </div>
+                                                                ) : (
+                                                                  <Textarea
+                                                                    value={comboFileContents[file.path]}
+                                                                    onChange={(e) => setComboFileContents(prev => ({ ...prev, [file.path]: e.target.value }))}
+                                                                    onBlur={(e) => handleComboFileContentChange(file.path, e.target.value)}
+                                                                    className="min-h-[80px] font-mono text-xs"
+                                                                  />
+                                                                )}
+                                                                <p className="text-xs text-muted-foreground">Changes are automatically saved to batch</p>
+                                                              </>
+                                                            )}
+                                                          </div>
+                                                        )}
+                                                      </div>
+                                                    );
+                                                  })}
+                                                </div>
+                                              </div>
+                                            ))}
+                                          </div>
                                         </div>
                                       )}
-                                      <div className="flex-1 min-w-0 overflow-hidden">
-                                        <p className="text-xs font-medium truncate">{file.name}</p>
-                                        <p className="text-xs text-muted-foreground">
-                                          {(file.size / 1024).toFixed(1)} KB
-                                        </p>
+                                      {standalone.length > 0 && (
+                                        <div className="space-y-2">
+                                          <Label className="text-xs">Other Files</Label>
+                                          <div className="space-y-1 max-h-48 overflow-y-auto">
+                                            {standalone.map((file) => (
+                                              <div key={file.path} className="flex items-center gap-2 p-2 border rounded-lg hover:bg-muted/50">
+                                                {isImageFile(file.name) ? (
+                                                  <img
+                                                    src={file.download_url}
+                                                    alt={file.name}
+                                                    className="w-12 h-12 object-cover rounded border flex-shrink-0"
+                                                  />
+                                                ) : (
+                                                  <div className="w-12 h-12 flex items-center justify-center bg-muted rounded border flex-shrink-0">
+                                                    <File className="h-6 w-6 text-muted-foreground" />
+                                                  </div>
+                                                )}
+                                                <div className="flex-1 min-w-0">
+                                                  <p className="text-xs font-medium truncate">{file.name}</p>
+                                                  <p className="text-xs text-muted-foreground">
+                                                    {(file.size / 1024).toFixed(1)} KB
+                                                  </p>
+                                                </div>
+                                                <div className="flex items-center gap-1 flex-shrink-0">
+                                                  <Button
+                                                    variant="ghost"
+                                                    size="sm"
+                                                    onClick={() => window.open(file.download_url, '_blank')}
+                                                    className="h-7 w-7 p-0"
+                                                    title="Open file"
+                                                  >
+                                                    <FileText className="h-3 w-3" />
+                                                  </Button>
+                                                  <Button
+                                                    variant="ghost"
+                                                    size="sm"
+                                                    onClick={() => handleDeleteFile(asset, file.path, file.sha)}
+                                                    disabled={deletingFile === file.path}
+                                                    className="h-7 w-7 p-0"
+                                                    title="Delete file"
+                                                  >
+                                                    {deletingFile === file.path ? (
+                                                      <RefreshCw className="h-3 w-3 animate-spin" />
+                                                    ) : (
+                                                      <Trash2 className="h-3 w-3" />
+                                                    )}
+                                                  </Button>
+                                                </div>
+                                              </div>
+                                            ))}
+                                          </div>
+                                        </div>
+                                      )}
+                                    </>
+                                  );
+                                })()}
+                              </>
+                            ) : (
+                              /* Standard Directory */
+                              directoryFiles[asset.path] && directoryFiles[asset.path].length > 0 && (
+                                <div className="space-y-2">
+                                  <Label className="text-xs">Existing Files</Label>
+                                  <div className="space-y-1 max-h-48 overflow-y-auto">
+                                    {directoryFiles[asset.path].map((file) => (
+                                      <div key={file.path} className="flex items-center gap-2 p-2 border rounded-lg hover:bg-muted/50 w-full max-w-full">
+                                        {isImageFile(file.name) ? (
+                                          <img
+                                            src={file.download_url}
+                                            alt={file.name}
+                                            className="w-12 h-12 object-cover rounded border flex-shrink-0"
+                                          />
+                                        ) : (
+                                          <div className="w-12 h-12 flex items-center justify-center bg-muted rounded border flex-shrink-0">
+                                            <File className="h-6 w-6 text-muted-foreground" />
+                                          </div>
+                                        )}
+                                        <div className="flex-1 min-w-0 overflow-hidden">
+                                          <p className="text-xs font-medium truncate">{file.name}</p>
+                                          <p className="text-xs text-muted-foreground">
+                                            {(file.size / 1024).toFixed(1)} KB
+                                          </p>
+                                        </div>
+                                        <div className="flex items-center gap-1 flex-shrink-0">
+                                          <Button
+                                            variant="ghost"
+                                            size="sm"
+                                            onClick={() => window.open(file.download_url, '_blank')}
+                                            className="h-7 w-7 p-0"
+                                            title="Open file"
+                                          >
+                                            <FileText className="h-3 w-3" />
+                                          </Button>
+                                          <Button
+                                            variant="ghost"
+                                            size="sm"
+                                            onClick={() => handleDeleteFile(asset, file.path, file.sha)}
+                                            disabled={deletingFile === file.path}
+                                            className="h-7 w-7 p-0"
+                                            title="Delete file"
+                                          >
+                                            {deletingFile === file.path ? (
+                                              <RefreshCw className="h-3 w-3 animate-spin" />
+                                            ) : (
+                                              <Trash2 className="h-3 w-3" />
+                                            )}
+                                          </Button>
+                                        </div>
                                       </div>
-                                      <div className="flex items-center gap-1 flex-shrink-0">
-                                        <Button
-                                          variant="ghost"
-                                          size="sm"
-                                          onClick={() => window.open(file.download_url, '_blank')}
-                                          className="h-7 w-7 p-0"
-                                          title="Open file"
-                                        >
-                                          <FileText className="h-3 w-3" />
-                                        </Button>
-                                        <Button
-                                          variant="ghost"
-                                          size="sm"
-                                          onClick={() => handleDeleteFile(asset, file.path, file.sha)}
-                                          disabled={deletingFile === file.path}
-                                          className="h-7 w-7 p-0"
-                                          title="Delete file"
-                                        >
-                                          {deletingFile === file.path ? (
-                                            <RefreshCw className="h-3 w-3 animate-spin" />
-                                          ) : (
-                                            <Trash2 className="h-3 w-3" />
-                                          )}
-                                        </Button>
-                                      </div>
+                                    ))}
+                                  </div>
+                                </div>
+                              )
+                            )}
+
+                            {/* Add New Assets */}
+                            {asset.contains?.type === 'combo' && asset.contains.parts ? (
+                              /* Combo Asset Creator */
+                              <div className="space-y-3 p-3 border rounded-lg bg-accent/5">
+                                {!creatingCombo[asset.path] ? (
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => startCreatingCombo(asset)}
+                                    className="w-full"
+                                  >
+                                    <Plus className="h-3 w-3 mr-2" />
+                                    Create New Combo Asset
+                                  </Button>
+                                ) : (
+                                  <div className="space-y-3">
+                                    <div className="flex items-center justify-between">
+                                      <Label className="text-xs font-semibold">New Combo Asset</Label>
+                                      <Button
+                                        variant="ghost"
+                                        size="sm"
+                                        onClick={() => cancelCreatingCombo(asset.path)}
+                                        className="h-6 px-2 text-xs"
+                                      >
+                                        Cancel
+                                      </Button>
                                     </div>
-                                  ))}
+
+                                    {/* Base Name Input */}
+                                    <div className="space-y-1">
+                                      <Label htmlFor="combo-basename" className="text-xs">
+                                        Base Name (without extension)
+                                      </Label>
+                                      <Input
+                                        id="combo-basename"
+                                        value={newComboData[asset.path]?.baseName || ''}
+                                        onChange={(e) => {
+                                          setNewComboData(prev => ({
+                                            ...prev,
+                                            [asset.path]: {
+                                              ...prev[asset.path],
+                                              baseName: e.target.value,
+                                              parts: prev[asset.path]?.parts || {}
+                                            }
+                                          }));
+                                        }}
+                                        placeholder="e.g., photo1, document-a"
+                                        className="h-8 text-xs"
+                                      />
+                                    </div>
+
+                                    {/* Parts */}
+                                    <div className="space-y-2">
+                                      <Label className="text-xs font-semibold">Parts</Label>
+                                      {asset.contains.parts.map((part, partIdx) => {
+                                        const partKey = part.assetType;
+                                        const isImage = partKey === 'image';
+                                        const isJson = partKey === 'json';
+                                        const isText = partKey === 'text' || partKey === 'markdown';
+                                        const hasPart = !!newComboData[asset.path]?.parts[partKey];
+
+                                        return (
+                                          <div key={partIdx} className="p-2 border rounded bg-background space-y-2">
+                                            <div className="flex items-center justify-between">
+                                              <div className="flex items-center gap-2">
+                                                <Badge variant="outline" className="text-xs">{part.assetType}</Badge>
+                                                <span className="text-xs text-muted-foreground">
+                                                  {part.allowedExtensions?.join(', ')}
+                                                </span>
+                                              </div>
+                                              {hasPart && (
+                                                <Badge variant="secondary" className="text-xs">✓</Badge>
+                                              )}
+                                            </div>
+
+                                            {isImage && (
+                                              <div className="space-y-1">
+                                                <Label htmlFor={`combo-file-${partIdx}`} className="text-xs">
+                                                  Upload {part.assetType}
+                                                </Label>
+                                                <Input
+                                                  id={`combo-file-${partIdx}`}
+                                                  type="file"
+                                                  accept={part.allowedExtensions?.join(',')}
+                                                  onChange={(e) => {
+                                                    const file = e.target.files?.[0];
+                                                    if (file) {
+                                                      if (part.maxSize && file.size > part.maxSize) {
+                                                        toast.error(`File size exceeds maximum of ${formatFileSize(part.maxSize)}`);
+                                                        return;
+                                                      }
+                                                      setNewComboData(prev => ({
+                                                        ...prev,
+                                                        [asset.path]: {
+                                                          ...prev[asset.path],
+                                                          baseName: prev[asset.path]?.baseName || '',
+                                                          parts: {
+                                                            ...prev[asset.path]?.parts,
+                                                            [partKey]: { content: '', file }
+                                                          }
+                                                        }
+                                                      }));
+                                                    }
+                                                  }}
+                                                  className="text-xs"
+                                                />
+                                                {hasPart && newComboData[asset.path]?.parts[partKey]?.file && (
+                                                  <p className="text-xs text-muted-foreground">
+                                                    Selected: {newComboData[asset.path].parts[partKey].file!.name}
+                                                  </p>
+                                                )}
+                                              </div>
+                                            )}
+
+                                            {isJson && (
+                                              <div className="space-y-2">
+                                                {part.schema?.properties ? (
+                                                  /* Schema-based form */
+                                                  <div className="space-y-2">
+                                                    <Label className="text-xs">JSON Content (Form)</Label>
+                                                    {Object.entries(part.schema.properties).map(([fieldKey, fieldSchema]: [string, any]) => {
+                                                      const comboPartData = newComboData[asset.path]?.parts[partKey];
+                                                      const jsonData = comboPartData?.jsonData || {};
+                                                      const value = jsonData[fieldKey] ?? fieldSchema.default ?? '';
+
+                                                      const updateJsonField = (newValue: any) => {
+                                                        setNewComboData(prev => ({
+                                                          ...prev,
+                                                          [asset.path]: {
+                                                            ...prev[asset.path],
+                                                            baseName: prev[asset.path]?.baseName || '',
+                                                            parts: {
+                                                              ...prev[asset.path]?.parts,
+                                                              [partKey]: {
+                                                                content: '',
+                                                                jsonData: {
+                                                                  ...(prev[asset.path]?.parts[partKey]?.jsonData || {}),
+                                                                  [fieldKey]: newValue
+                                                                }
+                                                              }
+                                                            }
+                                                          }
+                                                        }));
+                                                      };
+
+                                                      return (
+                                                        <div key={fieldKey} className="space-y-1">
+                                                          <Label htmlFor={`combo-json-${partIdx}-${fieldKey}`} className="text-xs">
+                                                            {fieldSchema.title || fieldKey}
+                                                          </Label>
+                                                          {fieldSchema.description && (
+                                                            <p className="text-xs text-muted-foreground">{fieldSchema.description}</p>
+                                                          )}
+                                                          {fieldSchema.type === 'string' && fieldSchema.multiline ? (
+                                                            <Textarea
+                                                              id={`combo-json-${partIdx}-${fieldKey}`}
+                                                              value={value}
+                                                              onChange={(e) => updateJsonField(e.target.value)}
+                                                              placeholder={fieldSchema.placeholder}
+                                                              className="min-h-[60px] text-xs"
+                                                            />
+                                                          ) : fieldSchema.type === 'number' || fieldSchema.type === 'integer' ? (
+                                                            <Input
+                                                              id={`combo-json-${partIdx}-${fieldKey}`}
+                                                              type="number"
+                                                              value={value}
+                                                              onChange={(e) => updateJsonField(fieldSchema.type === 'integer' ? parseInt(e.target.value) || 0 : parseFloat(e.target.value) || 0)}
+                                                              placeholder={fieldSchema.placeholder}
+                                                              className="h-8 text-xs"
+                                                            />
+                                                          ) : (
+                                                            <Input
+                                                              id={`combo-json-${partIdx}-${fieldKey}`}
+                                                              value={value}
+                                                              onChange={(e) => updateJsonField(e.target.value)}
+                                                              placeholder={fieldSchema.placeholder}
+                                                              className="h-8 text-xs"
+                                                            />
+                                                          )}
+                                                        </div>
+                                                      );
+                                                    })}
+                                                  </div>
+                                                ) : (
+                                                  /* Fallback textarea */
+                                                  <div className="space-y-1">
+                                                    <Label htmlFor={`combo-json-${partIdx}`} className="text-xs">
+                                                      JSON Content
+                                                    </Label>
+                                                    <Textarea
+                                                      id={`combo-json-${partIdx}`}
+                                                      value={newComboData[asset.path]?.parts[partKey]?.content || ''}
+                                                      onChange={(e) => {
+                                                        setNewComboData(prev => ({
+                                                          ...prev,
+                                                          [asset.path]: {
+                                                            ...prev[asset.path],
+                                                            baseName: prev[asset.path]?.baseName || '',
+                                                            parts: {
+                                                              ...prev[asset.path]?.parts,
+                                                              [partKey]: { content: e.target.value }
+                                                            }
+                                                          }
+                                                        }));
+                                                      }}
+                                                      placeholder='{"key": "value"}'
+                                                      className="min-h-[60px] font-mono text-xs"
+                                                    />
+                                                  </div>
+                                                )}
+                                              </div>
+                                            )}
+
+                                            {isText && (
+                                              <div className="space-y-1">
+                                                <Label htmlFor={`combo-text-${partIdx}`} className="text-xs">
+                                                  Text Content
+                                                </Label>
+                                                <Textarea
+                                                  id={`combo-text-${partIdx}`}
+                                                  value={newComboData[asset.path]?.parts[partKey]?.content || ''}
+                                                  onChange={(e) => {
+                                                    setNewComboData(prev => ({
+                                                      ...prev,
+                                                      [asset.path]: {
+                                                        ...prev[asset.path],
+                                                        baseName: prev[asset.path]?.baseName || '',
+                                                        parts: {
+                                                          ...prev[asset.path]?.parts,
+                                                          [partKey]: { content: e.target.value }
+                                                        }
+                                                      }
+                                                    }));
+                                                  }}
+                                                  placeholder="Enter text content..."
+                                                  className="min-h-[60px] text-xs"
+                                                />
+                                              </div>
+                                            )}
+
+                                            <p className="text-xs text-muted-foreground">
+                                              Max: {formatFileSize(part.maxSize)}
+                                            </p>
+                                          </div>
+                                        );
+                                      })}
+                                    </div>
+
+                                    {/* Submit Button */}
+                                    <Button
+                                      onClick={() => submitNewCombo(asset)}
+                                      className="w-full"
+                                      size="sm"
+                                    >
+                                      Add to Batch
+                                    </Button>
+                                  </div>
+                                )}
+                              </div>
+                            ) : (
+                              /* Standard File Upload */
+                              <div className="space-y-2">
+                                <Label htmlFor={`file-${index}`} className="text-xs">
+                                  Add New File
+                                </Label>
+                                <Input
+                                  id={`file-${index}`}
+                                  type="file"
+                                  accept={asset.allowedExtensions?.join(',') || '*'}
+                                  onChange={(e) => {
+                                    const file = e.target.files?.[0];
+                                    if (file) {
+                                      if (asset.maxSize && file.size > asset.maxSize) {
+                                        toast.error(`File size exceeds maximum of ${(asset.maxSize / 1024 / 1024).toFixed(1)} MB`);
+                                        return;
+                                      }
+                                      handleFileUpload(asset, file);
+                                      e.target.value = '';
+                                    }
+                                  }}
+                                  className="text-xs"
+                                />
+                                <div className="flex flex-col gap-1 text-xs text-muted-foreground">
+                                  <span>Max size: {formatFileSize(asset.maxSize)}</span>
+                                  {asset.allowedExtensions && (
+                                    <span>Types: {asset.allowedExtensions.join(', ')}</span>
+                                  )}
                                 </div>
                               </div>
                             )}
-
-                            <div className="space-y-2">
-                              <Label htmlFor={`file-${index}`} className="text-xs">
-                                Add New File
-                              </Label>
-                              <Input
-                                id={`file-${index}`}
-                                type="file"
-                                accept={asset.allowedExtensions?.join(',') || '*'}
-                                onChange={(e) => {
-                                  const file = e.target.files?.[0];
-                                  if (file) {
-                                    if (asset.maxSize && file.size > asset.maxSize) {
-                                      toast.error(`File size exceeds maximum of ${(asset.maxSize / 1024 / 1024).toFixed(1)} MB`);
-                                      return;
-                                    }
-                                    handleFileUpload(asset, file);
-                                    e.target.value = '';
-                                  }
-                                }}
-                                className="text-xs"
-                              />
-                              <div className="flex flex-col gap-1 text-xs text-muted-foreground">
-                                <span>Max size: {formatFileSize(asset.maxSize)}</span>
-                                {asset.allowedExtensions && (
-                                  <span>Types: {asset.allowedExtensions.join(', ')}</span>
-                                )}
-                              </div>
-                            </div>
                           </>
                         )}
                       </div>
