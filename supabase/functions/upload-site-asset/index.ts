@@ -153,6 +153,55 @@ Deno.serve(async (req) => {
 
     console.log('File uploaded successfully')
 
+    // Check if this file is in a directory and update manifest.json if it exists
+    const pathParts = file_path.split('/')
+    if (pathParts.length > 1) {
+      const fileName = pathParts[pathParts.length - 1]
+      const dirPath = pathParts.slice(0, -1).join('/')
+      const manifestPath = `${dirPath}/manifest.json`
+
+      try {
+        // Try to get the existing manifest
+        const { data: manifestFile } = await octokit.request('GET /repos/{owner}/{repo}/contents/{path}', {
+          owner,
+          repo,
+          path: manifestPath,
+          ref: targetBranch,
+        })
+
+        const manifestSha = (manifestFile as any).sha
+        const manifestContent = atob((manifestFile as any).content.replace(/\s/g, ''))
+        const manifest = JSON.parse(manifestContent)
+
+        // Add the file to the manifest if it's not already there
+        if (!manifest.files.includes(fileName)) {
+          manifest.files.push(fileName)
+          manifest.files.sort() // Keep files sorted
+
+          // Update the manifest
+          const updatedManifestContent = btoa(JSON.stringify(manifest, null, 2))
+          await octokit.request('PUT /repos/{owner}/{repo}/contents/{path}', {
+            owner,
+            repo,
+            path: manifestPath,
+            message: `Update manifest: add ${fileName}`,
+            content: updatedManifestContent,
+            branch: targetBranch,
+            sha: manifestSha,
+          })
+
+          console.log('Updated manifest.json with new file')
+        }
+      } catch (manifestError: any) {
+        if (manifestError.status === 404) {
+          console.log('No manifest.json found for this directory, skipping manifest update')
+        } else {
+          console.error('Error updating manifest:', manifestError)
+          // Don't fail the upload if manifest update fails
+        }
+      }
+    }
+
     // Log activity
     await supabaseClient
       .from('activity_log')

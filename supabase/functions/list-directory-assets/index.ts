@@ -119,7 +119,7 @@ Deno.serve(async (req) => {
       isPKCS8: normalizedKey.includes('BEGIN PRIVATE KEY'),
       length: normalizedKey.length,
     });
-    
+
     const app = new App({
       appId: appConfig.app_id,
       privateKey: normalizedKey,
@@ -129,52 +129,121 @@ Deno.serve(async (req) => {
     console.log('Got GitHub installation client');
     const [owner, repo] = site.repo_full_name.split('/');
 
-    // Try to get the contents of the path
+    // Try to read the manifest.json from the directory
+    const manifestPath = asset_path.endsWith('/')
+      ? `${asset_path}manifest.json`
+      : `${asset_path}/manifest.json`;
+
     try {
-      const { data: contents } = await octokit.request(
+      const { data: manifestFile } = await octokit.request(
         'GET /repos/{owner}/{repo}/contents/{path}',
         {
           owner,
           repo,
-          path: asset_path,
+          path: manifestPath,
           ref: site.default_branch || 'main',
         }
       );
 
-      // If it's a directory, return the list of files
-      if (Array.isArray(contents)) {
-        const files = contents.map((item: any) => ({
-          name: item.name,
-          path: item.path,
-          sha: item.sha,
-          size: item.size,
-          type: item.type,
-          download_url: item.download_url,
-        }));
+      // Decode the manifest content
+      const manifestContent = atob((manifestFile as any).content.replace(/\s/g, ''));
+      const manifest = JSON.parse(manifestContent);
 
-        return new Response(JSON.stringify({ files }), {
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        });
-      } else {
-        // If it's a single file, return it as an array with one item
-        return new Response(JSON.stringify({
-          files: [{
-            name: contents.name,
-            path: contents.path,
-            sha: contents.sha,
-            size: contents.size,
-            type: contents.type,
-            download_url: contents.download_url,
-          }]
-        }), {
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        });
-      }
+      // Now fetch details for each file in the manifest
+      const filePromises = manifest.files.map(async (fileName: string) => {
+        const filePath = asset_path.endsWith('/')
+          ? `${asset_path}${fileName}`
+          : `${asset_path}/${fileName}`;
+
+        try {
+          const { data: fileData } = await octokit.request(
+            'GET /repos/{owner}/{repo}/contents/{path}',
+            {
+              owner,
+              repo,
+              path: filePath,
+              ref: site.default_branch || 'main',
+            }
+          );
+
+          return {
+            name: (fileData as any).name,
+            path: (fileData as any).path,
+            sha: (fileData as any).sha,
+            size: (fileData as any).size,
+            type: (fileData as any).type,
+            download_url: (fileData as any).download_url,
+          };
+        } catch (error: any) {
+          // If file doesn't exist, skip it
+          if (error.status === 404) {
+            console.warn(`File ${filePath} listed in manifest but not found in repo`);
+            return null;
+          }
+          throw error;
+        }
+      });
+
+      const filesData = await Promise.all(filePromises);
+      const files = filesData.filter((file) => file !== null);
+
+      return new Response(JSON.stringify({ files }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
     } catch (error: any) {
       if (error.status === 404) {
-        return new Response(JSON.stringify({ files: [] }), {
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        });
+        // If manifest doesn't exist, fall back to listing directory contents
+        console.log('Manifest not found, falling back to directory listing');
+        try {
+          const { data: contents } = await octokit.request(
+            'GET /repos/{owner}/{repo}/contents/{path}',
+            {
+              owner,
+              repo,
+              path: asset_path,
+              ref: site.default_branch || 'main',
+            }
+          );
+
+          // If it's a directory, return the list of files (excluding manifest.json)
+          if (Array.isArray(contents)) {
+            const files = contents
+              .filter((item: any) => item.name !== 'manifest.json')
+              .map((item: any) => ({
+                name: item.name,
+                path: item.path,
+                sha: item.sha,
+                size: item.size,
+                type: item.type,
+                download_url: item.download_url,
+              }));
+
+            return new Response(JSON.stringify({ files }), {
+              headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+            });
+          } else {
+            // If it's a single file, return it as an array with one item
+            return new Response(JSON.stringify({
+              files: [{
+                name: contents.name,
+                path: contents.path,
+                sha: contents.sha,
+                size: contents.size,
+                type: contents.type,
+                download_url: contents.download_url,
+              }]
+            }), {
+              headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+            });
+          }
+        } catch (fallbackError: any) {
+          if (fallbackError.status === 404) {
+            return new Response(JSON.stringify({ files: [] }), {
+              headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+            });
+          }
+          throw fallbackError;
+        }
       }
       throw error;
     }

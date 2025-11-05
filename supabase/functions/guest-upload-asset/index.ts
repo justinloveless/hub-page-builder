@@ -23,7 +23,7 @@ Deno.serve(async (req) => {
   try {
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
-    
+
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
     const { token, file_content, file_name } = await req.json();
@@ -141,6 +141,52 @@ Deno.serve(async (req) => {
       sha: existingSha,
     });
 
+    // Update manifest.json if it exists in the directory
+    const pathParts = filePath.split('/');
+    if (pathParts.length > 1) {
+      const fileName = pathParts[pathParts.length - 1];
+      const dirPath = pathParts.slice(0, -1).join('/');
+      const manifestPath = `${dirPath}/manifest.json`;
+
+      try {
+        // Try to get the existing manifest
+        const { data: manifestFile } = await authenticatedOctokit.repos.getContent({
+          owner,
+          repo,
+          path: manifestPath,
+          ref: share.sites.default_branch,
+        });
+
+        if ('content' in manifestFile && 'sha' in manifestFile) {
+          const manifestContent = atob(manifestFile.content.replace(/\s/g, ''));
+          const manifest = JSON.parse(manifestContent);
+
+          // Add the file to the manifest if it's not already there
+          if (!manifest.files.includes(fileName)) {
+            manifest.files.push(fileName);
+            manifest.files.sort(); // Keep files sorted
+
+            // Update the manifest
+            const updatedManifestContent = btoa(JSON.stringify(manifest, null, 2));
+            await authenticatedOctokit.repos.createOrUpdateFileContents({
+              owner,
+              repo,
+              path: manifestPath,
+              message: `Update manifest: add ${fileName}`,
+              content: updatedManifestContent,
+              branch: share.sites.default_branch,
+              sha: manifestFile.sha,
+            });
+
+            console.log('Updated manifest.json with guest upload');
+          }
+        }
+      } catch (manifestError: any) {
+        // If manifest doesn't exist or there's an error, continue without failing
+        console.log('Could not update manifest:', manifestError.message);
+      }
+    }
+
     // Update upload count
     await supabase
       .from('asset_shares')
@@ -165,7 +211,7 @@ Deno.serve(async (req) => {
     console.log('Guest upload successful:', filePath);
 
     return new Response(
-      JSON.stringify({ 
+      JSON.stringify({
         success: true,
         file_path: filePath,
         commit_sha: uploadResult.data.commit.sha,

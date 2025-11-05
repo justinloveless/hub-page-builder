@@ -29,7 +29,7 @@ Deno.serve(async (req) => {
   try {
     const supabaseUrl = Deno.env.get('SUPABASE_URL');
     const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
-    
+
     if (!supabaseUrl || !supabaseKey) {
       throw new Error('Missing Supabase environment variables');
     }
@@ -142,9 +142,25 @@ Deno.serve(async (req) => {
 
     const baseTreeSha = commitData.tree.sha;
 
+    // Group files by their parent directory for manifest updates
+    const directoriesWithFiles = new Map<string, Set<string>>();
+
+    for (const change of asset_changes) {
+      const pathParts = change.repo_path.split('/');
+      if (pathParts.length > 1) {
+        const fileName = pathParts[pathParts.length - 1];
+        const dirPath = pathParts.slice(0, -1).join('/');
+
+        if (!directoriesWithFiles.has(dirPath)) {
+          directoriesWithFiles.set(dirPath, new Set());
+        }
+        directoriesWithFiles.get(dirPath)!.add(fileName);
+      }
+    }
+
     // Create blobs for each asset change
     const treeEntries = [];
-    
+
     for (const change of asset_changes) {
       const { data: blobData } = await octokit.request('POST /repos/{owner}/{repo}/git/blobs', {
         owner,
@@ -161,6 +177,62 @@ Deno.serve(async (req) => {
         type: 'blob' as const,
         sha: blobData.sha,
       });
+    }
+
+    // Update manifests for directories that have files being changed
+    for (const [dirPath, newFiles] of directoriesWithFiles.entries()) {
+      const manifestPath = `${dirPath}/manifest.json`;
+
+      try {
+        // Try to get the existing manifest
+        const { data: manifestFile } = await octokit.request('GET /repos/{owner}/{repo}/contents/{path}', {
+          owner,
+          repo,
+          path: manifestPath,
+          ref: site.default_branch,
+        });
+
+        const manifestContent = atob((manifestFile as any).content.replace(/\s/g, ''));
+        const manifest = JSON.parse(manifestContent);
+
+        // Add any new files to the manifest
+        let manifestUpdated = false;
+        for (const fileName of newFiles) {
+          if (!manifest.files.includes(fileName)) {
+            manifest.files.push(fileName);
+            manifestUpdated = true;
+          }
+        }
+
+        if (manifestUpdated) {
+          manifest.files.sort(); // Keep files sorted
+
+          // Create a blob for the updated manifest
+          const updatedManifestContent = JSON.stringify(manifest, null, 2);
+          const { data: manifestBlob } = await octokit.request('POST /repos/{owner}/{repo}/git/blobs', {
+            owner,
+            repo,
+            content: btoa(updatedManifestContent),
+            encoding: 'base64',
+          });
+
+          console.log(`Updated manifest for ${dirPath}`);
+
+          treeEntries.push({
+            path: manifestPath,
+            mode: '100644' as const,
+            type: 'blob' as const,
+            sha: manifestBlob.sha,
+          });
+        }
+      } catch (manifestError: any) {
+        if (manifestError.status === 404) {
+          console.log(`No manifest.json found for ${dirPath}, skipping manifest update`);
+        } else {
+          console.error(`Error updating manifest for ${dirPath}:`, manifestError);
+          // Continue with batch commit even if manifest update fails
+        }
+      }
     }
 
     // Create a new tree with all the changes
@@ -219,7 +291,7 @@ Deno.serve(async (req) => {
 
   } catch (error: any) {
     console.error('Error committing batch changes:', error);
-    return new Response(JSON.stringify({ 
+    return new Response(JSON.stringify({
       error: error.message || 'Failed to commit batch changes'
     }), {
       status: 500,
