@@ -6,6 +6,37 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
+// Security configuration
+const MAX_FILE_SIZE_BYTES = 10 * 1024 * 1024; // 10MB
+const RATE_LIMIT_WINDOW_MS = 60000; // 1 minute
+const MAX_REQUESTS_PER_WINDOW = 100;
+const rateLimitMap = new Map<string, { count: number; resetAt: number }>();
+
+function sanitizePath(path: string): string {
+  const sanitized = path.replace(/\.\./g, '').replace(/^\/+/, '');
+  if (sanitized.includes('..') || sanitized.startsWith('/')) {
+    throw new Error('Invalid path: path traversal detected');
+  }
+  return sanitized;
+}
+
+function checkRateLimit(identifier: string): boolean {
+  const now = Date.now();
+  const record = rateLimitMap.get(identifier);
+  
+  if (!record || now > record.resetAt) {
+    rateLimitMap.set(identifier, { count: 1, resetAt: now + RATE_LIMIT_WINDOW_MS });
+    return true;
+  }
+  
+  if (record.count >= MAX_REQUESTS_PER_WINDOW) {
+    return false;
+  }
+  
+  record.count++;
+  return true;
+}
+
 // Normalize PEM key for Octokit
 function normalizePemKey(pem: string): string {
   let s = pem.trim()
@@ -52,6 +83,13 @@ Deno.serve(async (req) => {
       throw new Error('Unauthorized')
     }
 
+    // Rate limiting check
+    const rateLimitKey = `upload-asset:${user.id}`;
+    if (!checkRateLimit(rateLimitKey)) {
+      console.warn(`Rate limit exceeded for user: ${user.id}`);
+      throw new Error('Too many requests. Please try again later.');
+    }
+
     // Parse request body
     const { site_id, file_path, content, message, branch, sha } = await req.json()
 
@@ -59,7 +97,18 @@ Deno.serve(async (req) => {
       throw new Error('Missing required fields: site_id, file_path, content')
     }
 
-    console.log('Uploading asset to:', file_path)
+    // Sanitize file path to prevent path traversal
+    const sanitizedPath = sanitizePath(file_path);
+
+    // Validate file size
+    const binaryString = atob(content);
+    const fileSizeBytes = binaryString.length;
+    if (fileSizeBytes > MAX_FILE_SIZE_BYTES) {
+      console.warn(`File too large: ${fileSizeBytes} bytes (max: ${MAX_FILE_SIZE_BYTES})`);
+      throw new Error(`File too large. Maximum size is ${MAX_FILE_SIZE_BYTES / 1024 / 1024}MB`);
+    }
+
+    console.log('Uploading asset to:', sanitizedPath)
 
     // Get site details
     const { data: site, error: siteError } = await supabaseClient
@@ -123,7 +172,7 @@ Deno.serve(async (req) => {
         const { data: existingFile } = await octokit.request('GET /repos/{owner}/{repo}/contents/{path}', {
           owner,
           repo,
-          path: file_path,
+          path: sanitizedPath,
           ref: targetBranch,
         })
         fileSha = (existingFile as any).sha
@@ -140,11 +189,11 @@ Deno.serve(async (req) => {
     }
 
     // Upload or update the file
-    const commitMessage = message || `Update ${file_path}`
+    const commitMessage = message || `Update ${sanitizedPath}`
     const response = await octokit.request('PUT /repos/{owner}/{repo}/contents/{path}', {
       owner,
       repo,
-      path: file_path,
+      path: sanitizedPath,
       message: commitMessage,
       content: content, // Should be base64 encoded
       branch: targetBranch,
@@ -154,7 +203,7 @@ Deno.serve(async (req) => {
     console.log('File uploaded successfully')
 
     // Check if this file is in a directory and update manifest.json if it exists
-    const pathParts = file_path.split('/')
+    const pathParts = sanitizedPath.split('/')
     if (pathParts.length > 1) {
       const fileName = pathParts[pathParts.length - 1]
       const dirPath = pathParts.slice(0, -1).join('/')
@@ -210,7 +259,7 @@ Deno.serve(async (req) => {
         user_id: user.id,
         action: 'upload_asset',
         metadata: {
-          file_path,
+          file_path: sanitizedPath,
           branch: targetBranch,
           commit_sha: response.data.commit.sha,
         },

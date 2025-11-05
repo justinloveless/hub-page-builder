@@ -6,6 +6,28 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
+// Rate limiting configuration
+const RATE_LIMIT_WINDOW_MS = 60000; // 1 minute
+const MAX_REQUESTS_PER_WINDOW = 10;
+const rateLimitMap = new Map<string, { count: number; resetAt: number }>();
+
+function checkRateLimit(identifier: string): boolean {
+  const now = Date.now();
+  const record = rateLimitMap.get(identifier);
+  
+  if (!record || now > record.resetAt) {
+    rateLimitMap.set(identifier, { count: 1, resetAt: now + RATE_LIMIT_WINDOW_MS });
+    return true;
+  }
+  
+  if (record.count >= MAX_REQUESTS_PER_WINDOW) {
+    return false;
+  }
+  
+  record.count++;
+  return true;
+}
+
 interface AcceptInvitationRequest {
   token?: string;
   invite_code?: string;
@@ -33,6 +55,19 @@ serve(async (req: Request) => {
     
     if (userError || !user) {
       throw new Error("Unauthorized");
+    }
+
+    // Rate limiting check
+    const rateLimitKey = `accept-invitation:${user.id}`;
+    if (!checkRateLimit(rateLimitKey)) {
+      console.warn(`Rate limit exceeded for user: ${user.id}`);
+      return new Response(
+        JSON.stringify({ error: "Too many requests. Please try again later." }),
+        {
+          status: 429,
+          headers: { "Content-Type": "application/json", ...corsHeaders },
+        }
+      );
     }
 
     const { token, invite_code }: AcceptInvitationRequest = await req.json();

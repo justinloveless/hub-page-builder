@@ -6,6 +6,36 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
+// Security configuration
+const RATE_LIMIT_WINDOW_MS = 60000; // 1 minute
+const MAX_REQUESTS_PER_WINDOW = 100;
+const rateLimitMap = new Map<string, { count: number; resetAt: number }>();
+
+function sanitizePath(path: string): string {
+  const sanitized = path.replace(/\.\./g, '').replace(/^\/+/, '');
+  if (sanitized.includes('..') || sanitized.startsWith('/')) {
+    throw new Error('Invalid path: path traversal detected');
+  }
+  return sanitized;
+}
+
+function checkRateLimit(identifier: string): boolean {
+  const now = Date.now();
+  const record = rateLimitMap.get(identifier);
+  
+  if (!record || now > record.resetAt) {
+    rateLimitMap.set(identifier, { count: 1, resetAt: now + RATE_LIMIT_WINDOW_MS });
+    return true;
+  }
+  
+  if (record.count >= MAX_REQUESTS_PER_WINDOW) {
+    return false;
+  }
+  
+  record.count++;
+  return true;
+}
+
 function normalizePemKey(pem: string): string {
   let s = pem.trim()
   // strip wrapping quotes if present
@@ -53,6 +83,16 @@ Deno.serve(async (req) => {
       });
     }
 
+    // Rate limiting check
+    const rateLimitKey = `delete-asset:${user.id}`;
+    if (!checkRateLimit(rateLimitKey)) {
+      console.warn(`Rate limit exceeded for user: ${user.id}`);
+      return new Response(JSON.stringify({ error: 'Too many requests. Please try again later.' }), {
+        status: 429,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
     const { site_id, file_path, sha, message } = await req.json();
 
     if (!site_id || !file_path || !sha) {
@@ -61,6 +101,9 @@ Deno.serve(async (req) => {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
+
+    // Sanitize file path to prevent path traversal
+    const sanitizedPath = sanitizePath(file_path);
 
     // Verify user is a member of the site
     const { data: membership } = await supabase
@@ -130,13 +173,13 @@ Deno.serve(async (req) => {
     const [owner, repo] = site.repo_full_name.split('/');
 
     // Delete the file
-    const commitMessage = message || `Delete ${file_path}`;
+    const commitMessage = message || `Delete ${sanitizedPath}`;
     const { data: deleteData } = await octokit.request(
       'DELETE /repos/{owner}/{repo}/contents/{path}',
       {
         owner,
         repo,
-        path: file_path,
+        path: sanitizedPath,
         message: commitMessage,
         sha: sha,
         branch: site.default_branch || 'main',
@@ -149,7 +192,7 @@ Deno.serve(async (req) => {
     });
 
     // Check if this file is in a directory and update manifest.json if it exists
-    const pathParts = file_path.split('/');
+    const pathParts = sanitizedPath.split('/');
     if (pathParts.length > 1) {
       const fileName = pathParts[pathParts.length - 1];
       const dirPath = pathParts.slice(0, -1).join('/');
@@ -203,7 +246,7 @@ Deno.serve(async (req) => {
       user_id: user.id,
       action: 'delete_asset',
       metadata: {
-        file_path,
+        file_path: sanitizedPath,
         branch: site.default_branch || 'main',
         commit_sha: deleteData.commit.sha,
       },

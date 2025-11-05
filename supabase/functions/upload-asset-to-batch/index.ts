@@ -5,6 +5,37 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
+// Security configuration
+const MAX_FILE_SIZE_BYTES = 10 * 1024 * 1024; // 10MB
+const RATE_LIMIT_WINDOW_MS = 60000; // 1 minute
+const MAX_REQUESTS_PER_WINDOW = 100;
+const rateLimitMap = new Map<string, { count: number; resetAt: number }>();
+
+function sanitizePath(path: string): string {
+  const sanitized = path.replace(/\.\./g, '').replace(/^\/+/, '');
+  if (sanitized.includes('..') || sanitized.startsWith('/')) {
+    throw new Error('Invalid path: path traversal detected');
+  }
+  return sanitized;
+}
+
+function checkRateLimit(identifier: string): boolean {
+  const now = Date.now();
+  const record = rateLimitMap.get(identifier);
+  
+  if (!record || now > record.resetAt) {
+    rateLimitMap.set(identifier, { count: 1, resetAt: now + RATE_LIMIT_WINDOW_MS });
+    return true;
+  }
+  
+  if (record.count >= MAX_REQUESTS_PER_WINDOW) {
+    return false;
+  }
+  
+  record.count++;
+  return true;
+}
+
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
@@ -38,6 +69,16 @@ Deno.serve(async (req) => {
       });
     }
 
+    // Rate limiting check
+    const rateLimitKey = `upload-batch:${user.id}`;
+    if (!checkRateLimit(rateLimitKey)) {
+      console.warn(`Rate limit exceeded for user: ${user.id}`);
+      return new Response(JSON.stringify({ error: 'Too many requests. Please try again later.' }), {
+        status: 429,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
     const { site_id, file_path, content } = await req.json();
 
     if (!site_id || !file_path || !content) {
@@ -47,7 +88,10 @@ Deno.serve(async (req) => {
       });
     }
 
-    console.log('Uploading asset to batch for site:', site_id, 'path:', file_path);
+    // Sanitize file path to prevent path traversal
+    const sanitizedPath = sanitizePath(file_path);
+
+    console.log('Uploading asset to batch for site:', site_id, 'path:', sanitizedPath);
 
     // Verify user is a member of the site
     const { data: membership, error: membershipError } = await supabase
@@ -68,6 +112,17 @@ Deno.serve(async (req) => {
     const binaryString = atob(content);
     const fileSizeBytes = binaryString.length;
 
+    // Validate file size
+    if (fileSizeBytes > MAX_FILE_SIZE_BYTES) {
+      console.warn(`File too large: ${fileSizeBytes} bytes (max: ${MAX_FILE_SIZE_BYTES})`);
+      return new Response(JSON.stringify({ 
+        error: `File too large. Maximum size is ${MAX_FILE_SIZE_BYTES / 1024 / 1024}MB` 
+      }), {
+        status: 400,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
     // Create a Blob from the base64 content
     const bytes = new Uint8Array(binaryString.length);
     for (let i = 0; i < binaryString.length; i++) {
@@ -76,7 +131,7 @@ Deno.serve(async (req) => {
 
     // Generate a unique storage path
     const timestamp = Date.now();
-    const storagePath = `${site_id}/${timestamp}-${file_path.replace(/\//g, '-')}`;
+    const storagePath = `${site_id}/${timestamp}-${sanitizedPath.replace(/\//g, '-')}`;
 
     // Upload to Supabase storage
     const { error: uploadError } = await supabase
@@ -99,7 +154,7 @@ Deno.serve(async (req) => {
       .from('asset_versions')
       .select('id, storage_path')
       .eq('site_id', site_id)
-      .eq('repo_path', file_path)
+      .eq('repo_path', sanitizedPath)
       .eq('status', 'pending')
       .maybeSingle();
 
@@ -131,7 +186,7 @@ Deno.serve(async (req) => {
         .from('asset_versions')
         .insert({
           site_id,
-          repo_path: file_path,
+          repo_path: sanitizedPath,
           storage_path: storagePath,
           status: 'pending',
           file_size_bytes: fileSizeBytes,
