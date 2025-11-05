@@ -7,6 +7,81 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
+// Security constants
+const MAX_FILE_SIZE_BYTES = 10 * 1024 * 1024; // 10MB
+const MAX_FILENAME_LENGTH = 255;
+
+// Path traversal protection
+function sanitizePath(path: string): string {
+  const sanitized = path.replace(/\.\./g, '').replace(/^\/+/, '');
+  if (sanitized.includes('..') || sanitized.startsWith('/')) {
+    throw new Error('Invalid path: path traversal detected');
+  }
+  return sanitized;
+}
+
+// Validate file extension matches allowed list
+function validateExtension(filename: string, allowedExtensions: string[] | null): void {
+  if (!allowedExtensions || allowedExtensions.length === 0) return;
+  
+  const ext = filename.split('.').pop()?.toLowerCase();
+  if (!ext) {
+    throw new Error('File must have an extension');
+  }
+  
+  // Check if extension is in allowed list (extensions in DB have leading dots)
+  const extWithDot = `.${ext}`;
+  if (!allowedExtensions.includes(extWithDot)) {
+    throw new Error(`File type .${ext} not allowed. Allowed types: ${allowedExtensions.join(', ')}`);
+  }
+}
+
+// Validate filename
+function validateFilename(filename: string): void {
+  if (!filename || filename.length === 0) {
+    throw new Error('Filename cannot be empty');
+  }
+  
+  if (filename.length > MAX_FILENAME_LENGTH) {
+    throw new Error(`Filename too long. Maximum ${MAX_FILENAME_LENGTH} characters`);
+  }
+  
+  // Check for dangerous characters
+  if (/[<>:"|?*\x00-\x1f]/.test(filename)) {
+    throw new Error('Filename contains invalid characters');
+  }
+  
+  // Prevent hidden files
+  if (filename.startsWith('.')) {
+    throw new Error('Hidden files are not allowed');
+  }
+}
+
+// Decode and validate base64 content
+function decodeAndValidateContent(base64Content: string): { valid: boolean; sizeBytes: number; error?: string } {
+  try {
+    // Check if it's valid base64
+    if (!/^[A-Za-z0-9+/]*={0,2}$/.test(base64Content.replace(/\s/g, ''))) {
+      return { valid: false, sizeBytes: 0, error: 'Invalid base64 encoding' };
+    }
+    
+    const decoded = atob(base64Content);
+    const sizeBytes = decoded.length;
+    
+    if (sizeBytes > MAX_FILE_SIZE_BYTES) {
+      return { 
+        valid: false, 
+        sizeBytes, 
+        error: `File too large: ${(sizeBytes / 1024 / 1024).toFixed(2)}MB. Maximum ${MAX_FILE_SIZE_BYTES / 1024 / 1024}MB` 
+      };
+    }
+    
+    return { valid: true, sizeBytes };
+  } catch (error) {
+    return { valid: false, sizeBytes: 0, error: 'Failed to decode base64 content' };
+  }
+}
+
 function normalizePemKey(pem: string): string {
   return pem
     .replace(/\\n/g, '\n')
@@ -28,9 +103,41 @@ Deno.serve(async (req) => {
 
     const { token, file_content, file_name } = await req.json();
 
+    // Input validation
     if (!token || !file_content || !file_name) {
+      console.error('Missing required fields');
       return new Response(
         JSON.stringify({ error: 'Missing required fields' }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    // Validate token format (should be 64-char hex string from crypto.getRandomValues)
+    if (!/^[a-f0-9]{64}$/.test(token)) {
+      console.error('Invalid token format');
+      return new Response(
+        JSON.stringify({ error: 'Invalid token format' }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    // Validate filename
+    try {
+      validateFilename(file_name);
+    } catch (error: any) {
+      console.error('Invalid filename:', file_name, error.message);
+      return new Response(
+        JSON.stringify({ error: error.message }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    // Validate and decode file content
+    const contentValidation = decodeAndValidateContent(file_content);
+    if (!contentValidation.valid) {
+      console.error('Invalid file content:', contentValidation.error);
+      return new Response(
+        JSON.stringify({ error: contentValidation.error }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
@@ -43,6 +150,7 @@ Deno.serve(async (req) => {
       .maybeSingle();
 
     if (shareError || !share) {
+      console.error('Invalid share token:', token);
       return new Response(
         JSON.stringify({ error: 'Invalid share token' }),
         { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
@@ -51,6 +159,7 @@ Deno.serve(async (req) => {
 
     // Check if share is expired
     if (new Date(share.expires_at) < new Date()) {
+      console.error('Share link expired:', token);
       return new Response(
         JSON.stringify({ error: 'Share link has expired' }),
         { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
@@ -59,21 +168,34 @@ Deno.serve(async (req) => {
 
     // Check upload limit
     if (share.max_uploads && share.upload_count >= share.max_uploads) {
+      console.error('Upload limit reached for share:', token);
       return new Response(
         JSON.stringify({ error: 'Upload limit reached' }),
         { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
-    // Check file extension
-    if (share.allowed_extensions && share.allowed_extensions.length > 0) {
-      const fileExt = file_name.split('.').pop()?.toLowerCase();
-      if (!fileExt || !share.allowed_extensions.includes(`.${fileExt}`)) {
-        return new Response(
-          JSON.stringify({ error: `File type not allowed. Allowed: ${share.allowed_extensions.join(', ')}` }),
-          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        );
-      }
+    // Validate file extension against allowed list
+    try {
+      validateExtension(file_name, share.allowed_extensions);
+    } catch (error: any) {
+      console.error('Invalid file extension:', file_name, error.message);
+      return new Response(
+        JSON.stringify({ error: error.message }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    // Sanitize the asset path to prevent path traversal
+    let sanitizedAssetPath: string;
+    try {
+      sanitizedAssetPath = sanitizePath(share.asset_path);
+    } catch (error: any) {
+      console.error('Path traversal attempt detected:', share.asset_path);
+      return new Response(
+        JSON.stringify({ error: 'Invalid asset path' }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
     }
 
     // Get GitHub App configuration
@@ -112,7 +234,10 @@ Deno.serve(async (req) => {
     });
 
     const [owner, repo] = share.sites.repo_full_name.split('/');
-    const filePath = `${share.asset_path}/${file_name}`.replace(/\/+/g, '/');
+    // Use sanitized path
+    const filePath = `${sanitizedAssetPath}/${file_name}`.replace(/\/+/g, '/');
+
+    console.log('Uploading to path:', filePath);
 
     // Check if file exists
     let existingSha: string | undefined;
@@ -203,6 +328,7 @@ Deno.serve(async (req) => {
         metadata: {
           file_path: filePath,
           file_name: file_name,
+          file_size_bytes: contentValidation.sizeBytes,
           commit_sha: uploadResult.data.commit.sha,
           share_id: share.id,
         },

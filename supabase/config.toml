@@ -3,6 +3,12 @@ project_id = "inrivbbifhraowqlqzsp"
 [functions.create-site]
 verify_jwt = true
 
+[functions.guest-upload-asset]
+verify_jwt = false
+
+[functions.upload-asset-to-batch]
+verify_jwt = true
+
 [functions.github-installation-details]
 verify_jwt = true
 
@@ -33,6 +39,6 @@ verify_jwt = true
 [functions.create-asset-share]
 verify_jwt = true
 
-[functions.guest-upload-asset]
-verify_jwt = false
+[functions.commit-batch-changes]
+verify_jwt = true
 
