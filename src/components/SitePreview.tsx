@@ -192,7 +192,7 @@ export const SitePreview = ({ siteId, pendingChanges }: SitePreviewProps) => {
       objectUrlsRef.current.push(urlObj);
     });
 
-    // Create fetch interceptor script
+    // Create interceptor script
     const interceptorScript = `
       <script>
         (function() {
@@ -539,6 +539,8 @@ export const SitePreview = ({ siteId, pendingChanges }: SitePreviewProps) => {
             }
           }
 
+          console.log('[Site Preview] File map configured');
+          
           document.addEventListener('DOMContentLoaded', function() { console.log('[Site Preview] DOMContentLoaded'); });
           window.addEventListener('load', function() { console.log('[Site Preview] Window load'); });
           console.log('[Site Preview] Interceptor script completed');
@@ -573,12 +575,218 @@ export const SitePreview = ({ siteId, pendingChanges }: SitePreviewProps) => {
       return match;
     });
 
-    // Replace script tags with inline scripts (don't replace paths - let interceptor handle them)
+    // Build import map - transform ALL JS files before creating data URLs
+    const importMap: Record<string, string> = {};
+    Object.keys(virtualFiles).forEach(path => {
+      if (path.endsWith('.js')) {
+        const file = virtualFiles[path];
+        let content = file.encoding === 'base64'
+          ? decodeURIComponent(escape(atob(file.content)))
+          : file.content;
+
+        console.log(`[SitePreview] Processing JS file for import map: ${path}`);
+
+        // Transform imports in this file (recursively, since it might import other modules)
+        // Transform static imports
+        content = content.replace(
+          /import\s+(?:(?:{[^}]*}|\*\s+as\s+\w+|\w+)(?:\s*,\s*)?)+\s+from\s+['"]([^'"]+)['"]/g,
+          (match, importPath) => {
+            // Don't transform if already a data URL
+            if (importPath.startsWith('data:')) return match;
+            console.log(`[SitePreview] Found static import in ${path}: ${importPath}`);
+            return match; // Will be resolved later
+          }
+        );
+
+        // Check for template literal dynamic imports
+        const hasTemplateLiteralImports = /import\s*\(\s*`[^`]*`\s*\)/.test(content);
+        if (hasTemplateLiteralImports) {
+          console.log(`[SitePreview] ${path} has template literal dynamic imports - adding resolver`);
+        }
+
+        const dataUrl = `data:text/javascript;base64,${btoa(unescape(encodeURIComponent(content)))}`;
+
+        // Add multiple path variations to import map
+        importMap[path] = dataUrl;
+        importMap[`./${path}`] = dataUrl;
+        importMap[`/${path}`] = dataUrl;
+
+        // Also add filename-only for convenience
+        const filename = path.split('/').pop();
+        if (filename && filename !== path) {
+          importMap[filename] = dataUrl;
+          importMap[`./${filename}`] = dataUrl;
+        }
+      }
+    });
+
+    // Now transform all JS in import map to use data URLs for their imports
+    Object.keys(virtualFiles).forEach(path => {
+      if (path.endsWith('.js')) {
+        const file = virtualFiles[path];
+        let content = file.encoding === 'base64'
+          ? decodeURIComponent(escape(atob(file.content)))
+          : file.content;
+
+        // Transform static imports to use import map
+        content = content.replace(
+          /import\s+(?:(?:{[^}]*}|\*\s+as\s+\w+|\w+)(?:\s*,\s*)?)+\s+from\s+['"]([^'"]+)['"]/g,
+          (match, importPath) => {
+            if (importPath.startsWith('data:')) return match;
+            const dataUrl = importMap[importPath] || importMap[`./${importPath}`] || importMap[`/${importPath}`];
+            if (dataUrl) {
+              console.log(`[SitePreview] Transformed import in ${path}: ${importPath} -> data URL`);
+              return match.replace(importPath, dataUrl);
+            }
+            return match;
+          }
+        );
+
+        // Handle template literal dynamic imports
+        const hasTemplateLiteralImports = /import\s*\(\s*`[^`]*`\s*\)/.test(content);
+        if (hasTemplateLiteralImports) {
+          // Add resolver
+          const resolverCode = `
+// Dynamic import resolver
+if (typeof window.__moduleImportMap === 'undefined') {
+  window.__moduleImportMap = ${JSON.stringify(importMap)};
+  window.__resolveDynamicImport = function(path) {
+    console.log('[Preview] Resolving:', path);
+    const resolved = window.__moduleImportMap[path] || window.__moduleImportMap['./' + path] || window.__moduleImportMap['/' + path];
+    if (resolved) return import(resolved);
+    console.error('[Preview] Could not resolve:', path);
+    return Promise.reject(new Error('Could not resolve: ' + path));
+  };
+}
+`;
+          content = resolverCode + content;
+
+          // Transform template literal imports
+          content = content.replace(
+            /(await\s+)?import\s*\(\s*`([^`]+)`\s*\)/g,
+            (match, awaitPrefix, templateContent) => {
+              console.log(`[SitePreview] Transformed template import in ${path}: ${templateContent}`);
+              return `${awaitPrefix || ''}__resolveDynamicImport(\`${templateContent}\`)`;
+            }
+          );
+        }
+
+        // Update import map with transformed content
+        const transformedDataUrl = `data:text/javascript;base64,${btoa(unescape(encodeURIComponent(content)))}`;
+        importMap[path] = transformedDataUrl;
+        importMap[`./${path}`] = transformedDataUrl;
+        importMap[`/${path}`] = transformedDataUrl;
+        const filename = path.split('/').pop();
+        if (filename && filename !== path) {
+          importMap[filename] = transformedDataUrl;
+          importMap[`./${filename}`] = transformedDataUrl;
+        }
+      }
+    });
+
+    // Inline module scripts with transformed imports
     indexHtml = indexHtml.replace(/<script([^>]*)src=["']([^"']+)["']([^>]*)><\/script>/gi, (match, before, src, after) => {
-      const jsPath = src.replace(/^\.\//, '');
-      const jsContent = getFileContent(jsPath);
-      if (jsContent) {
-        return `<script${before}${after}>${jsContent}</script>`;
+      // Check if it's a module script
+      const isModule = before.includes('type="module"') || before.includes("type='module'") ||
+        after.includes('type="module"') || after.includes("type='module'");
+
+      if (isModule) {
+        const jsPath = src.replace(/^\.\//, '').replace(/^\//, '');
+        console.log('[SitePreview] Inlining module script:', jsPath);
+
+        // Get the JS content
+        const jsContent = getFileContent(jsPath);
+        if (!jsContent) {
+          console.warn('[SitePreview] Could not find module:', jsPath);
+          return match;
+        }
+
+        // Transform imports to use data URLs directly
+        let transformed = jsContent;
+
+        // Transform static imports
+        transformed = transformed.replace(
+          /import\s+(?:(?:{[^}]*}|\*\s+as\s+\w+|\w+)(?:\s*,\s*)?)+\s+from\s+['"]([^'"]+)['"]/g,
+          (match, importPath) => {
+            const dataUrl = importMap[importPath] || importMap[`./${importPath}`] || importMap[`/${importPath}`];
+            if (dataUrl) {
+              return match.replace(importPath, dataUrl);
+            }
+            console.warn('[SitePreview] Could not resolve static import:', importPath);
+            return match;
+          }
+        );
+
+        // Transform dynamic imports (non-template literals)
+        transformed = transformed.replace(
+          /import\s*\(['"]([^'"]+)['"]\)/g,
+          (match, importPath) => {
+            const dataUrl = importMap[importPath] || importMap[`./${importPath}`] || importMap[`/${importPath}`];
+            if (dataUrl) {
+              return `import('${dataUrl}')`;
+            }
+            console.warn('[SitePreview] Could not resolve dynamic import:', importPath);
+            return match;
+          }
+        );
+
+        // Transform export...from statements
+        transformed = transformed.replace(
+          /export\s+\*\s+from\s+['"]([^'"]+)['"]/g,
+          (match, importPath) => {
+            const dataUrl = importMap[importPath] || importMap[`./${importPath}`] || importMap[`/${importPath}`];
+            return dataUrl ? match.replace(importPath, dataUrl) : match;
+          }
+        ).replace(
+          /export\s+{[^}]*}\s+from\s+['"]([^'"]+)['"]/g,
+          (match, importPath) => {
+            const dataUrl = importMap[importPath] || importMap[`./${importPath}`] || importMap[`/${importPath}`];
+            return dataUrl ? match.replace(importPath, dataUrl) : match;
+          }
+        );
+
+        // Handle template literal dynamic imports - add resolver function
+        const hasTemplateLiteralImports = /import\s*\(\s*`[^`]*`\s*\)/.test(transformed);
+        if (hasTemplateLiteralImports) {
+          console.log('[SitePreview] Module has template literal dynamic imports, adding resolver');
+          // Add import map to window for runtime resolution
+          const resolverCode = `
+// Dynamic import resolver for template literals
+if (typeof window.__moduleImportMap === 'undefined') {
+  window.__moduleImportMap = ${JSON.stringify(importMap)};
+  window.__resolveDynamicImport = function(path) {
+    console.log('[Preview] Resolving dynamic import:', path);
+    const resolved = window.__moduleImportMap[path] || window.__moduleImportMap['./' + path] || window.__moduleImportMap['/' + path];
+    if (resolved) {
+      console.log('[Preview] Resolved to:', resolved.substring(0, 50) + '...');
+      return import(resolved);
+    }
+    console.error('[Preview] Could not resolve dynamic import:', path);
+    return Promise.reject(new Error('Could not resolve: ' + path));
+  };
+}
+`;
+          transformed = resolverCode + transformed;
+
+          // Replace template literal imports with resolver calls - more robust regex
+          transformed = transformed.replace(
+            /(await\s+)?import\s*\(\s*`([^`]+)`\s*\)/g,
+            (match, awaitPrefix, templateContent) => {
+              console.log('[SitePreview] Transforming template literal import:', templateContent);
+              return `${awaitPrefix || ''}__resolveDynamicImport(\`${templateContent}\`)`;
+            }
+          );
+        }
+
+        // Inline as regular module (not module-shim since we transformed everything)
+        return `<script${before.replace(/src=["'][^"']+["']/g, '')}${after.replace(/src=["'][^"']+["']/g, '')} type="module">${transformed}</script>`;
+      } else {
+        // Non-module scripts - inline them as before
+        const jsPath = src.replace(/^\.\//, '');
+        const jsContent = getFileContent(jsPath);
+        if (jsContent) {
+          return `<script${before}${after}>${jsContent}</script>`;
+        }
       }
       return match;
     });
