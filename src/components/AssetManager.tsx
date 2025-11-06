@@ -6,7 +6,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { Folder, FileText, Image, AlertCircle, RefreshCw, GitPullRequest, Upload } from "lucide-react";
+import { Folder, FileText, Image, AlertCircle, RefreshCw, GitPullRequest, Upload, Users } from "lucide-react";
 import AssetUploadDialog from "./AssetUploadDialog";
 import CreateShareDialog from "./CreateShareDialog";
 import type { PendingAssetChange } from "@/pages/Manage";
@@ -107,6 +107,18 @@ const AssetManager = ({ siteId, pendingChanges, setPendingChanges }: AssetManage
               </CardDescription>
             </div>
             <div className="flex items-center gap-2 flex-wrap">
+              {config && config.assets && config.assets.length > 0 && (
+                <CreateShareDialog
+                  siteId={siteId}
+                  assets={config.assets}
+                  trigger={
+                    <Button variant="outline" size="sm">
+                      <Users className="h-4 w-4 mr-2" />
+                      Collaborate
+                    </Button>
+                  }
+                />
+              )}
               <Button
                 variant="outline"
                 size="sm"
@@ -261,10 +273,6 @@ const AssetManager = ({ siteId, pendingChanges, setPendingChanges }: AssetManage
                       <Upload className="mr-2 h-4 w-4" />
                       Upload
                     </Button>
-                    <CreateShareDialog 
-                      siteId={siteId}
-                      assetPath={asset.path.includes('/') ? asset.path.substring(0, asset.path.lastIndexOf('/')) : '.'}
-                    />
                   </div>
                 </div>
               ))}

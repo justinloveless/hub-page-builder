@@ -8,7 +8,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { Folder, FileText, Image, AlertCircle, RefreshCw, GitPullRequest, ChevronDown, ChevronRight, Plus, Trash2, File } from "lucide-react";
+import { Folder, FileText, Image, AlertCircle, RefreshCw, GitPullRequest, ChevronDown, ChevronRight, Plus, Trash2, File, Users } from "lucide-react";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import CreateShareDialog from "./CreateShareDialog";
 import type { PendingAssetChange } from "@/pages/Manage";
@@ -1073,15 +1073,26 @@ const AssetManagerSidebar = ({ siteId, pendingChanges, setPendingChanges }: Asse
           <Badge variant="secondary" className="text-xs flex-shrink-0">v{config.version}</Badge>
           <span className="text-xs text-muted-foreground whitespace-nowrap truncate">{config.assets.length} assets</span>
         </div>
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={handleRefresh}
-          disabled={loading}
-          className="h-7 w-7 p-0 flex-shrink-0"
-        >
-          <RefreshCw className={`h-3 w-3 ${loading ? 'animate-spin' : ''}`} />
-        </Button>
+        <div className="flex items-center gap-1 flex-shrink-0">
+          <CreateShareDialog
+            siteId={siteId}
+            assets={config.assets}
+            trigger={
+              <Button variant="ghost" size="sm" className="h-7 px-2">
+                <Users className="h-3 w-3" />
+              </Button>
+            }
+          />
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={handleRefresh}
+            disabled={loading}
+            className="h-7 w-7 p-0 flex-shrink-0"
+          >
+            <RefreshCw className={`h-3 w-3 ${loading ? 'animate-spin' : ''}`} />
+          </Button>
+        </div>
       </div>
 
       <div className="space-y-2 w-full max-w-full">
@@ -1100,7 +1111,7 @@ const AssetManagerSidebar = ({ siteId, pendingChanges, setPendingChanges }: Asse
               className="w-full"
             >
               <div className="border border-border rounded-lg overflow-hidden w-full">
-                <CollapsibleTrigger className="w-full p-3 hover:bg-muted/50 transition-colors max-w-full">
+                <CollapsibleTrigger className={`w-full p-3 hover:bg-muted/50 transition-colors max-w-full ${isExpanded ? 'sticky top-0 z-10 bg-background shadow-sm' : ''}`}>
                   <div className="flex items-start gap-2 w-full max-w-full">
                     {isExpanded ? (
                       <ChevronDown className="h-4 w-4 text-muted-foreground mt-0.5 flex-shrink-0" />
@@ -1833,10 +1844,6 @@ const AssetManagerSidebar = ({ siteId, pendingChanges, setPendingChanges }: Asse
                       </div>
                     )}
 
-                    <CreateShareDialog
-                      siteId={siteId}
-                      assetPath={asset.path.includes('/') ? asset.path.substring(0, asset.path.lastIndexOf('/')) : '.'}
-                    />
                   </div>
                 </CollapsibleContent>
               </div>
