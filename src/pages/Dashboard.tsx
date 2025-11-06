@@ -9,6 +9,7 @@ import SiteCard from "@/components/SiteCard";
 import AddSiteDialog from "@/components/AddSiteDialog";
 import JoinWithCodeDialog from "@/components/JoinWithCodeDialog";
 import type { Tables } from "@/integrations/supabase/types";
+import logo from "@/assets/staticsnack-logo.png";
 
 type Site = Tables<"sites">;
 
@@ -94,9 +95,7 @@ const Dashboard = () => {
       <header className="border-b border-border bg-card/50 backdrop-blur-sm sticky top-0 z-50">
         <div className="container mx-auto px-4 h-16 flex items-center justify-between">
           <div className="flex items-center gap-2 sm:gap-3 min-w-0">
-            <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-primary to-accent flex items-center justify-center flex-shrink-0">
-              <span className="text-primary-foreground font-bold text-lg">SS</span>
-            </div>
+            <img src={logo} alt="StaticSnack" className="w-10 h-10 rounded-lg flex-shrink-0" />
             <h1 className="text-lg sm:text-xl font-bold truncate">StaticSnack</h1>
           </div>
 

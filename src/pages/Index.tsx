@@ -1,6 +1,7 @@
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Github, Zap, Shield, Users } from "lucide-react";
+import logo from "@/assets/staticsnack-logo.png";
 
 const Index = () => {
   const navigate = useNavigate();
@@ -11,9 +12,7 @@ const Index = () => {
       <header className="border-b border-border bg-card/50 backdrop-blur-sm">
         <div className="container mx-auto px-4 h-16 flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-primary to-accent flex items-center justify-center">
-              <Github className="w-6 h-6 text-primary-foreground" />
-            </div>
+            <img src={logo} alt="StaticSnack" className="w-10 h-10 rounded-lg" />
             <h1 className="text-xl font-bold">StaticSnack</h1>
           </div>
           <Button onClick={() => navigate("/auth")}>Get Started</Button>

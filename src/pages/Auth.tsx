@@ -8,6 +8,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "sonner";
 import { Loader2, Github } from "lucide-react";
+import logo from "@/assets/staticsnack-logo.png";
 
 const Auth = () => {
   const [email, setEmail] = useState("");
@@ -84,9 +85,7 @@ const Auth = () => {
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-background via-background to-secondary/20 p-4">
       <div className="w-full max-w-md">
         <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-gradient-to-br from-primary to-accent mb-4">
-            <Github className="w-8 h-8 text-primary-foreground" />
-          </div>
+          <img src={logo} alt="StaticSnack" className="w-16 h-16 rounded-2xl mx-auto mb-4" />
           <h1 className="text-3xl font-bold bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">
             StaticSnack
           </h1>
