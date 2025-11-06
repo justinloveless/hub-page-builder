@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -12,6 +12,8 @@ import { Folder, FileText, Image, AlertCircle, RefreshCw, GitPullRequest, Chevro
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import CreateShareDialog from "./CreateShareDialog";
 import type { PendingAssetChange } from "@/pages/Manage";
+import { useSiteAssets } from "@/hooks/useSiteAssets";
+import { useQueryClient } from "@tanstack/react-query";
 
 interface AssetConfig {
   path: string;
@@ -53,10 +55,9 @@ interface AssetManagerSidebarProps {
 }
 
 const AssetManagerSidebar = ({ siteId, pendingChanges, setPendingChanges }: AssetManagerSidebarProps) => {
-  const [loading, setLoading] = useState(false);
+  const queryClient = useQueryClient();
+  const { data: assetsData, isLoading: loading, refetch } = useSiteAssets(siteId);
   const [creatingPr, setCreatingPr] = useState(false);
-  const [config, setConfig] = useState<SiteAssetsConfig | null>(null);
-  const [found, setFound] = useState<boolean | null>(null);
   const [expandedAssets, setExpandedAssets] = useState<Set<string>>(new Set());
   const [assetContents, setAssetContents] = useState<Record<string, string>>({});
   const [loadingContent, setLoadingContent] = useState<Record<string, boolean>>({});
@@ -71,9 +72,12 @@ const AssetManagerSidebar = ({ siteId, pendingChanges, setPendingChanges }: Asse
   const [creatingCombo, setCreatingCombo] = useState<Record<string, boolean>>({});
   const [newComboData, setNewComboData] = useState<Record<string, { baseName: string; parts: Record<string, { content: string; file?: File; jsonData?: Record<string, any> }> }>>({});
 
-  useEffect(() => {
-    fetchAssets();
-  }, [siteId]);
+  const found = assetsData?.found ?? null;
+  const config = assetsData?.config ?? null;
+
+  const handleRefresh = async () => {
+    await refetch();
+  };
 
   const toggleExpanded = async (asset: AssetConfig) => {
     const newExpanded = new Set(expandedAssets);
@@ -924,37 +928,6 @@ const AssetManagerSidebar = ({ siteId, pendingChanges, setPendingChanges }: Asse
     }
   };
 
-  const fetchAssets = async () => {
-    setLoading(true);
-    try {
-      const { data: sessionData } = await supabase.auth.getSession();
-      if (!sessionData.session) {
-        toast.error("Not authenticated");
-        return;
-      }
-
-      const { data, error } = await supabase.functions.invoke('fetch-site-assets', {
-        body: { site_id: siteId },
-      });
-
-      if (error) throw error;
-
-      setFound(data.found);
-      if (data.found) {
-        setConfig(data.config);
-        toast.success("Site assets loaded");
-      } else {
-        toast.info(data.message || "site-assets.json not found");
-      }
-    } catch (error: any) {
-      console.error("Failed to fetch assets:", error);
-      setFound(false);
-      toast.error(error.message || "Failed to fetch site assets");
-    } finally {
-      setLoading(false);
-    }
-  };
-
   const createTemplatePr = async () => {
     setCreatingPr(true);
     try {
@@ -1065,7 +1038,7 @@ const AssetManagerSidebar = ({ siteId, pendingChanges, setPendingChanges }: Asse
         <Button
           variant="ghost"
           size="sm"
-          onClick={fetchAssets}
+          onClick={handleRefresh}
           disabled={loading}
           className="h-7 w-7 p-0 flex-shrink-0"
         >
