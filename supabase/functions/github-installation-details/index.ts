@@ -107,18 +107,18 @@ Deno.serve(async (req) => {
       installation_id: installation_id
     })
 
-    // Record this installation for the user
+    // Record this installation for the user (upserts by user_id)
     const { error: upsertError } = await supabaseClient
       .from('github_installations')
       .upsert({
-        id: installation_id,
         user_id: user.id,
+        installation_id: installation_id,
         account_login: installationData.account.login,
         account_type: installationData.account.type,
         account_avatar_url: installationData.account.avatar_url,
         updated_at: new Date().toISOString(),
       }, {
-        onConflict: 'id,user_id'
+        onConflict: 'user_id'
       })
 
     if (upsertError) {

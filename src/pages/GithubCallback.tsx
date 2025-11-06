@@ -61,7 +61,7 @@ const GithubCallback = () => {
           }, window.location.origin);
 
           console.log('Message sent, closing popup...');
-          setTimeout(() => window.close(), 500);
+          window.close();
         } else {
           // If no opener, redirect to dashboard
           console.log('No opener window found, redirecting to dashboard');
@@ -76,7 +76,7 @@ const GithubCallback = () => {
             type: 'GITHUB_OAUTH_ERROR',
             error: error.message || 'Failed to connect to GitHub'
           }, window.location.origin);
-          setTimeout(() => window.close(), 500);
+          window.close();
         } else {
           toast.error(error.message || 'Failed to connect to GitHub');
           navigate('/dashboard');

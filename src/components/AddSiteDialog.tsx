@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import {
@@ -88,6 +88,34 @@ const AddSiteDialog = ({ onSiteAdded }: AddSiteDialogProps) => {
     return existingSites.some(site => site.repo_full_name === repoFullName);
   };
 
+  const handleFetchInstallations = useCallback(async () => {
+    setConnectingGithub(true);
+    // Clear existing installations before fetching
+    setInstallations([]);
+
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) throw new Error("Not authenticated");
+
+      // Call edge function to list installations
+      const { data, error } = await supabase.functions.invoke('list-github-installations');
+
+      if (error) throw error;
+      if (!data?.installations || data.installations.length === 0) {
+        throw new Error("No GitHub App installations found. Please install the app first.");
+      }
+
+      console.log('Found installations:', data.installations);
+      setInstallations(data.installations);
+      toast.success(`Found ${data.installations.length} installation(s) with repositories`);
+    } catch (error: any) {
+      console.error("Error fetching installations:", error);
+      toast.error(error.message || "Failed to fetch GitHub installations");
+    } finally {
+      setConnectingGithub(false);
+    }
+  }, []);
+
   useEffect(() => {
     // Listen for GitHub OAuth callback
     const handleMessage = (event: MessageEvent) => {
@@ -102,25 +130,15 @@ const AddSiteDialog = ({ onSiteAdded }: AddSiteDialogProps) => {
 
         console.log('GitHub connection successful:', { installation_id, repoCount: repositories?.length });
 
-        // If we have repositories, use the first one to pre-fill
-        if (repositories && repositories.length > 0) {
-          const repo = repositories[0];
-          setFormData({
-            name: repo.name,
-            repoFullName: repo.full_name,
-            defaultBranch: repo.default_branch || "main",
-            githubInstallationId: installation_id.toString(),
-          });
-        } else {
-          setFormData(prev => ({
-            ...prev,
-            githubInstallationId: installation_id.toString(),
-          }));
-        }
+        // Clear existing installations and fetch fresh data
+        setInstallations([]);
 
         toast.success("Connected to GitHub successfully!");
         setConnectingGithub(false);
         setPopupWindow(null);
+
+        // Automatically fetch all installations and repositories
+        setTimeout(() => handleFetchInstallations(), 500);
       } else if (event.data?.type === 'GITHUB_OAUTH_ERROR') {
         console.error('GitHub OAuth error:', event.data.error);
         toast.error(event.data.error || "Failed to connect to GitHub");
@@ -131,7 +149,7 @@ const AddSiteDialog = ({ onSiteAdded }: AddSiteDialogProps) => {
 
     window.addEventListener('message', handleMessage);
     return () => window.removeEventListener('message', handleMessage);
-  }, []);
+  }, [handleFetchInstallations]);
 
   // Monitor popup window and handle timeout
   useEffect(() => {
@@ -165,32 +183,6 @@ const AddSiteDialog = ({ onSiteAdded }: AddSiteDialogProps) => {
       clearTimeout(timeout);
     };
   }, [popupWindow, connectingGithub]);
-
-  const handleFetchInstallations = async () => {
-    setConnectingGithub(true);
-
-    try {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) throw new Error("Not authenticated");
-
-      // Call edge function to list installations
-      const { data, error } = await supabase.functions.invoke('list-github-installations');
-
-      if (error) throw error;
-      if (!data?.installations || data.installations.length === 0) {
-        throw new Error("No GitHub App installations found. Please install the app first.");
-      }
-
-      console.log('Found installations:', data.installations);
-      setInstallations(data.installations);
-      toast.success(`Found ${data.installations.length} installation(s) with repositories`);
-    } catch (error: any) {
-      console.error("Error fetching installations:", error);
-      toast.error(error.message || "Failed to fetch GitHub installations");
-    } finally {
-      setConnectingGithub(false);
-    }
-  };
 
   const handleSelectRepository = async (repo: Repository, installationId: number) => {
     setLoading(true);
@@ -256,7 +248,7 @@ const AddSiteDialog = ({ onSiteAdded }: AddSiteDialogProps) => {
       // Build OAuth URL
       const redirectUri = `${window.location.origin}/github/callback`;
       const state = crypto.randomUUID();
-      sessionStorage.setItem('github_oauth_state', state);
+      localStorage.setItem('github_oauth_state', state);
 
       const oauthUrl = `https://github.com/apps/${config.slug}/installations/new?state=${state}&redirect_uri=${encodeURIComponent(redirectUri)}`;
 
@@ -269,7 +261,7 @@ const AddSiteDialog = ({ onSiteAdded }: AddSiteDialogProps) => {
       const popup = window.open(
         oauthUrl,
         'GitHub OAuth',
-        `width=${width},height=${height},left=${left},top=${top},noopener,noreferrer`
+        `width=${width},height=${height},left=${left},top=${top}`
       );
 
       if (!popup) {

@@ -47,8 +47,8 @@ Deno.serve(async (req) => {
     // Verify the user owns this GitHub installation
     const { data: installation, error: installationError } = await supabaseClient
       .from('github_installations')
-      .select('id')
-      .eq('id', parseInt(github_installation_id))
+      .select('installation_id')
+      .eq('installation_id', parseInt(github_installation_id))
       .eq('user_id', user.id)
       .single()
 

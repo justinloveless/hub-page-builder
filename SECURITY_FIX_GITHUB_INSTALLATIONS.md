@@ -38,16 +38,17 @@
 
 ```sql
 CREATE TABLE public.github_installations (
-  id BIGINT PRIMARY KEY,              -- GitHub installation ID
-  user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+  user_id UUID PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
+  installation_id BIGINT NOT NULL,    -- GitHub installation ID
   account_login TEXT NOT NULL,
   account_type TEXT NOT NULL,
   account_avatar_url TEXT,
   created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(),
-  updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(),
-  UNIQUE (id, user_id)
+  updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now()
 );
 ```
+
+**Note:** Each user can only have one GitHub installation record. When reinstalling the app, the `installation_id` is updated.
 
 **RLS Policies:**
 - Users can only view their own installations
@@ -62,18 +63,18 @@ CREATE TABLE public.github_installations (
 
 **Code:**
 ```typescript
-// Record this installation for the user
+// Record this installation for the user (upserts by user_id)
 const { error: upsertError } = await supabaseClient
   .from('github_installations')
   .upsert({
-    id: installation_id,
     user_id: user.id,
+    installation_id: installation_id,
     account_login: installationData.account.login,
     account_type: installationData.account.type,
     account_avatar_url: installationData.account.avatar_url,
     updated_at: new Date().toISOString(),
   }, {
-    onConflict: 'id,user_id'
+    onConflict: 'user_id'
   })
 ```
 
@@ -110,8 +111,8 @@ const { data: userInstallations, error: dbError } = await supabaseClient
 // Verify the user owns this GitHub installation
 const { data: installation, error: installationError } = await supabaseClient
   .from('github_installations')
-  .select('id')
-  .eq('id', parseInt(github_installation_id))
+  .select('installation_id')
+  .eq('installation_id', parseInt(github_installation_id))
   .eq('user_id', user.id)
   .single()
 

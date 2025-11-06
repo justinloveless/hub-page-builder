@@ -107,11 +107,11 @@ Deno.serve(async (req) => {
     const installationDetails = await Promise.all(
       userInstallations.map(async (installation: any) => {
         try {
-          const installationOctokit = await app.getInstallationOctokit(installation.id)
+          const installationOctokit = await app.getInstallationOctokit(installation.installation_id)
           const { data: reposData } = await installationOctokit.request('GET /installation/repositories')
 
           return {
-            id: installation.id,
+            id: installation.installation_id,
             account: {
               login: installation.account_login,
               type: installation.account_type,
@@ -128,9 +128,9 @@ Deno.serve(async (req) => {
             updated_at: installation.updated_at,
           }
         } catch (error) {
-          console.error(`Error fetching details for installation ${installation.id}:`, error)
+          console.error(`Error fetching details for installation ${installation.installation_id}:`, error)
           return {
-            id: installation.id,
+            id: installation.installation_id,
             account: {
               login: installation.account_login,
               type: installation.account_type,
