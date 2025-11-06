@@ -10,19 +10,22 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
 import { toast } from "sonner";
-import { ArrowLeft, ExternalLink, GitBranch, Users, FileText, Activity, Copy, Trash2, Check, User as UserIcon, Settings, UserCog, Crown, LogOut, Filter, CalendarIcon, X, Package, GitCommit, Upload, Shield } from "lucide-react";
+import { ArrowLeft, ExternalLink, GitBranch, Users, FileText, Activity, Copy, Trash2, Check, User as UserIcon, Settings, UserCog, Crown, LogOut, Filter, CalendarIcon, X, Package, GitCommit, Upload, Shield, Menu } from "lucide-react";
 import { Separator } from "@/components/ui/separator";
 import { format } from "date-fns";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Drawer, DrawerContent, DrawerHeader, DrawerTitle } from "@/components/ui/drawer";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import AssetManagerSidebar from "@/components/AssetManagerSidebar";
 import PendingBatchChanges from "@/components/PendingBatchChanges";
 import InviteMemberDialog from "@/components/InviteMemberDialog";
 import ActivityCard from "@/components/ActivityCard";
 import { SitePreview } from "@/components/SitePreview";
 import { ResizablePanelGroup, ResizablePanel, ResizableHandle } from "@/components/ui/resizable";
+import { useIsMobile } from "@/hooks/use-mobile";
 import type { Tables } from "@/integrations/supabase/types";
 
 export interface PendingAssetChange {
@@ -49,6 +52,7 @@ interface ActivityWithProfile extends ActivityLog {
 const Manage = () => {
   const navigate = useNavigate();
   const { siteId } = useParams<{ siteId: string }>();
+  const isMobile = useIsMobile();
   const [loading, setLoading] = useState(true);
   const [copiedInviteId, setCopiedInviteId] = useState<string | null>(null);
   const [site, setSite] = useState<Site | null>(null);
@@ -61,6 +65,7 @@ const Manage = () => {
   const [hasMoreActivities, setHasMoreActivities] = useState(true);
   const [pendingChanges, setPendingChanges] = useState<PendingAssetChange[]>([]);
   const [showDiffDrawer, setShowDiffDrawer] = useState(false);
+  const [showMobileSidebar, setShowMobileSidebar] = useState(false);
   const ACTIVITIES_PER_PAGE = 10;
 
   // Activity filters
@@ -648,6 +653,210 @@ const Manage = () => {
     );
   }
 
+  const sidebarContent = (
+    <div className="h-full flex flex-col min-w-0 overflow-y-auto">
+      <div className={`space-y-6 ${isMobile ? 'p-6' : 'p-4'}`}>
+        {/* Site Details */}
+        <div className="space-y-3 w-full">
+          <h3 className={`font-semibold ${isMobile ? 'text-base' : 'text-sm'}`}>Site Details</h3>
+          <div className={`space-y-2 ${isMobile ? 'text-sm' : 'text-xs'}`}>
+            <div className="w-full">
+              <p className="text-muted-foreground mb-1">Repository</p>
+              <button
+                onClick={() => window.open(getRepositoryUrl(site.repo_full_name), '_blank')}
+                className="text-primary hover:underline flex items-center gap-1 w-full max-w-full"
+              >
+                <ExternalLink className={`flex-shrink-0 ${isMobile ? 'h-4 w-4' : 'h-3 w-3'}`} />
+                <span className="truncate min-w-0 flex-1">{site.repo_full_name}</span>
+              </button>
+            </div>
+            <div>
+              <p className="text-muted-foreground mb-1">Branch</p>
+              <Badge variant="secondary" className={isMobile ? 'text-sm' : 'text-xs'}>
+                <GitBranch className={`mr-1 ${isMobile ? 'h-4 w-4' : 'h-3 w-3'}`} />
+                {site.default_branch}
+              </Badge>
+            </div>
+            <div>
+              <p className="text-muted-foreground mb-1">Created</p>
+              <p>{new Date(site.created_at).toLocaleDateString()}</p>
+            </div>
+          </div>
+        </div>
+
+        <Separator />
+
+        {/* Asset Manager */}
+        <div className="space-y-3 w-full">
+          <h3 className={`font-semibold ${isMobile ? 'text-base' : 'text-sm'}`}>Assets</h3>
+          <AssetManagerSidebar
+            siteId={siteId!}
+            pendingChanges={pendingChanges}
+            setPendingChanges={setPendingChanges}
+          />
+        </div>
+
+        <Separator />
+
+        {/* Members */}
+        <div className="space-y-3 w-full">
+          <div className="flex items-center justify-between gap-2 w-full">
+            <h3 className={`font-semibold flex-shrink-0 ${isMobile ? 'text-base' : 'text-sm'}`}>Members</h3>
+            <div className="flex-shrink-0">
+              <InviteMemberDialog siteId={siteId!} onInviteCreated={loadInvitations} />
+            </div>
+          </div>
+          <div className="space-y-2">
+            {members.slice(0, 3).map((member) => {
+              const displayName = member.profile?.full_name || `User ${member.user_id.slice(0, 8)}`;
+              const initials = member.profile?.full_name
+                ? member.profile.full_name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2)
+                : member.user_id.slice(0, 2).toUpperCase();
+
+              return (
+                <div key={member.user_id} className="flex items-center gap-2 w-full max-w-full">
+                  <Avatar className={`flex-shrink-0 ${isMobile ? 'h-8 w-8' : 'h-6 w-6'}`}>
+                    <AvatarImage src={member.profile?.avatar_url || undefined} />
+                    <AvatarFallback className={`bg-gradient-to-br from-primary to-accent text-primary-foreground ${isMobile ? 'text-sm' : 'text-xs'}`}>
+                      {initials}
+                    </AvatarFallback>
+                  </Avatar>
+                  <div className="flex-1 min-w-0 overflow-hidden">
+                    <p className={`font-medium truncate ${isMobile ? 'text-sm' : 'text-xs'}`}>{displayName}</p>
+                  </div>
+                  <Badge variant={member.role === "owner" ? "default" : "secondary"} className={`flex-shrink-0 whitespace-nowrap ${isMobile ? 'text-sm' : 'text-xs'}`}>
+                    {member.role === "owner" && <Crown className={`mr-1 ${isMobile ? 'h-3 w-3' : 'h-2 w-2'}`} />}
+                    {member.role}
+                  </Badge>
+                </div>
+              );
+            })}
+            {members.length > 3 && (
+              <p className={`text-muted-foreground ${isMobile ? 'text-sm' : 'text-xs'}`}>+{members.length - 3} more</p>
+            )}
+          </div>
+        </div>
+
+        <Separator />
+
+        {/* Activity Preview */}
+        <div className="space-y-3 w-full">
+          <div className="flex items-center justify-between gap-2">
+            <h3 className={`font-semibold ${isMobile ? 'text-base' : 'text-sm'}`}>Recent Activity</h3>
+            <Button
+              variant="ghost"
+              size="sm"
+              className={`${isMobile ? 'h-8 px-3 text-sm' : 'h-6 px-2 text-xs'}`}
+              onClick={handleOpenActivityDialog}
+            >
+              Show More
+            </Button>
+          </div>
+          <div className="space-y-3">
+            {activities.slice(0, 3).map((activity) => {
+              const displayName = activity.user_profile?.full_name || `User ${activity.user_id?.slice(0, 8) || 'System'}`;
+              const metadata = activity.metadata as any;
+
+              return (
+                <div key={activity.id} className={`w-full space-y-1 ${isMobile ? 'text-sm' : 'text-xs'}`}>
+                  <div className="flex items-start justify-between gap-2">
+                    {/* Left side: Action and details */}
+                    <div className="flex-1 min-w-0 space-y-1">
+                      <p className="font-medium truncate">{activity.action}</p>
+
+                      {/* File Path */}
+                      {metadata?.file_path && (
+                        <div className={`flex items-center gap-1 text-muted-foreground ${isMobile ? 'text-sm' : 'text-xs'}`}>
+                          <FileText className={`flex-shrink-0 ${isMobile ? 'h-4 w-4' : 'h-3 w-3'}`} />
+                          <span className="font-mono truncate">{metadata.file_path}</span>
+                        </div>
+                      )}
+
+                      {/* File Name (if no file_path) */}
+                      {!metadata?.file_path && metadata?.file_name && (
+                        <div className={`flex items-center gap-1 text-muted-foreground ${isMobile ? 'text-sm' : 'text-xs'}`}>
+                          <FileText className={`flex-shrink-0 ${isMobile ? 'h-4 w-4' : 'h-3 w-3'}`} />
+                          <span className="font-mono truncate">{metadata.file_name}</span>
+                        </div>
+                      )}
+
+                      {/* Asset Count */}
+                      {metadata?.asset_count && (
+                        <div className={`flex items-center gap-1 text-muted-foreground ${isMobile ? 'text-sm' : 'text-xs'}`}>
+                          <Upload className={isMobile ? 'h-4 w-4' : 'h-3 w-3'} />
+                          {metadata.asset_count} {metadata.asset_count === 1 ? 'file' : 'files'}
+                        </div>
+                      )}
+
+                      {/* Email for invitations */}
+                      {metadata?.email && (
+                        <p className={`text-muted-foreground ${isMobile ? 'text-sm' : 'text-xs'}`}>
+                          Sent to: <span className="font-medium">{metadata.email}</span>
+                        </p>
+                      )}
+
+                      {/* Role changes */}
+                      {metadata?.role && (
+                        <div className={`flex items-center gap-1 text-muted-foreground ${isMobile ? 'text-sm' : 'text-xs'}`}>
+                          <Shield className={isMobile ? 'h-4 w-4' : 'h-3 w-3'} />
+                          Role: {metadata.role}
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Right side: User and date */}
+                    <div className={`flex-shrink-0 text-right space-y-0.5 ${isMobile ? 'text-sm' : 'text-xs'}`}>
+                      <p className="text-muted-foreground">
+                        <span className="font-medium">{displayName}</span>
+                      </p>
+                      <p className="text-muted-foreground">
+                        {new Date(activity.created_at).toLocaleDateString()}
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Links at the bottom */}
+                  {(metadata?.pr_url && metadata?.pr_number) || metadata?.commit_sha ? (
+                    <div className="flex items-center gap-2 flex-wrap">
+                      {/* PR Link */}
+                      {metadata?.pr_url && metadata?.pr_number && (
+                        <a
+                          href={metadata.pr_url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className={`inline-flex items-center gap-1 text-primary hover:underline ${isMobile ? 'text-sm' : 'text-xs'}`}
+                        >
+                          <GitBranch className={isMobile ? 'h-4 w-4' : 'h-3 w-3'} />
+                          PR #{metadata.pr_number}
+                        </a>
+                      )}
+
+                      {/* Commit Link */}
+                      {metadata?.commit_sha && (
+                        <a
+                          href={`https://github.com/${site.repo_full_name}/commit/${metadata.commit_sha}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className={`inline-flex items-center gap-1 text-primary hover:underline ${isMobile ? 'text-sm' : 'text-xs'}`}
+                        >
+                          <ExternalLink className={isMobile ? 'h-4 w-4' : 'h-3 w-3'} />
+                          Commit {metadata.commit_sha.substring(0, 7)}
+                        </a>
+                      )}
+                    </div>
+                  ) : null}
+                </div>
+              );
+            })}
+            {activities.length === 0 && (
+              <p className={`text-muted-foreground ${isMobile ? 'text-sm' : 'text-xs'}`}>No recent activity</p>
+            )}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+
   return (
     <div className="h-screen w-full flex flex-col bg-background overflow-hidden">
       {/* Header */}
@@ -667,6 +876,16 @@ const Manage = () => {
               <p className="text-xs sm:text-sm text-muted-foreground truncate">{site.repo_full_name}</p>
             </div>
             <div className="flex items-center gap-2 flex-shrink-0">
+              {isMobile && (
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => setShowMobileSidebar(true)}
+                  title="Menu"
+                >
+                  <Menu className="h-5 w-5" />
+                </Button>
+              )}
               <Button
                 variant="ghost"
                 size="icon"
@@ -706,298 +925,197 @@ const Manage = () => {
         </div>
       </header>
 
-      <ResizablePanelGroup direction="horizontal" className="flex-1 min-h-0">
-        {/* Sidebar */}
-        <ResizablePanel defaultSize={20} minSize={15} maxSize={35} className="overflow-hidden min-h-0">
-          <div className="h-full flex flex-col min-w-0 border-r overflow-y-auto">
-            <div className="p-4 space-y-6">
-              {/* Site Details */}
-              <div className="space-y-3 w-full">
-                <h3 className="text-sm font-semibold">Site Details</h3>
-                <div className="space-y-2 text-xs">
-                  <div className="w-full">
-                    <p className="text-muted-foreground mb-1">Repository</p>
-                    <button
-                      onClick={() => window.open(getRepositoryUrl(site.repo_full_name), '_blank')}
-                      className="text-primary hover:underline flex items-center gap-1 w-full max-w-full"
-                    >
-                      <ExternalLink className="h-3 w-3 flex-shrink-0" />
-                      <span className="truncate min-w-0 flex-1">{site.repo_full_name}</span>
-                    </button>
-                  </div>
-                  <div>
-                    <p className="text-muted-foreground mb-1">Branch</p>
-                    <Badge variant="secondary" className="text-xs">
-                      <GitBranch className="mr-1 h-3 w-3" />
-                      {site.default_branch}
-                    </Badge>
-                  </div>
-                  <div>
-                    <p className="text-muted-foreground mb-1">Created</p>
-                    <p>{new Date(site.created_at).toLocaleDateString()}</p>
-                  </div>
+      {/* Mobile Drawer */}
+      {isMobile && (
+        <Drawer open={showMobileSidebar} onOpenChange={setShowMobileSidebar}>
+          <DrawerContent className="max-h-[85vh]">
+            <DrawerHeader>
+              <DrawerTitle>Site Management</DrawerTitle>
+            </DrawerHeader>
+            <ScrollArea className="flex-1 overflow-auto">
+              {sidebarContent}
+            </ScrollArea>
+          </DrawerContent>
+        </Drawer>
+      )}
+
+      {/* Desktop Layout with Resizable Panels */}
+      {!isMobile ? (
+        <ResizablePanelGroup direction="horizontal" className="flex-1 min-h-0">
+          {/* Sidebar */}
+          <ResizablePanel defaultSize={20} minSize={15} maxSize={35} className="overflow-hidden min-h-0">
+            <div className="h-full flex flex-col min-w-0 border-r">
+              {sidebarContent}
+            </div>
+          </ResizablePanel>
+          <ResizableHandle withHandle />
+
+          <ResizablePanel defaultSize={80} minSize={50} className="overflow-hidden min-h-0">
+            <div className="flex flex-col h-full min-h-0">
+              {/* Preview and Controls */}
+              <main className="flex-1 flex flex-col p-4 gap-4 overflow-hidden min-h-0">
+                {/* Live Preview */}
+                <Card className="flex-1 overflow-hidden flex flex-col">
+                  <CardHeader className="pb-3 flex-shrink-0">
+                    <div className="flex items-center justify-between gap-4">
+                      <div className="flex-1 min-w-0">
+                        <CardTitle className="text-base">Live Preview</CardTitle>
+                        <CardDescription className="text-xs">
+                          {pendingChanges.length > 0
+                            ? `${pendingChanges.length} pending ${pendingChanges.length === 1 ? 'change' : 'changes'} ready to commit`
+                            : 'Changes appear here in real-time before committing'}
+                        </CardDescription>
+                      </div>
+                      {pendingChanges.length > 0 && (
+                        <div className="flex items-center gap-2 flex-shrink-0">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => setShowDiffDrawer(true)}
+                          >
+                            <FileText className="h-4 w-4 mr-2" />
+                            View Details
+                          </Button>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => {
+                              setPendingChanges([]);
+                              toast.success('All changes cleared');
+                            }}
+                          >
+                            <Trash2 className="h-4 w-4 mr-2" />
+                            Clear All
+                          </Button>
+                          <Button
+                            size="sm"
+                            onClick={async () => {
+                              const message = prompt("Enter commit message:");
+                              if (!message?.trim()) return;
+
+                              try {
+                                const assetChanges = pendingChanges.map(change => ({
+                                  repo_path: change.repoPath,
+                                  content: change.content
+                                }));
+
+                                const { data, error } = await supabase.functions.invoke('commit-batch-changes', {
+                                  body: {
+                                    site_id: siteId,
+                                    commit_message: message,
+                                    asset_changes: assetChanges
+                                  }
+                                });
+
+                                if (error) throw error;
+
+                                toast.success('All changes committed!');
+                                setPendingChanges([]);
+                                loadActivities();
+                              } catch (error: any) {
+                                toast.error(error.message || 'Failed to commit');
+                              }
+                            }}
+                          >
+                            <GitCommit className="h-4 w-4 mr-2" />
+                            Commit All
+                          </Button>
+                        </div>
+                      )}
+                    </div>
+                  </CardHeader>
+                  <CardContent className="p-0 flex-1 overflow-hidden">
+                    <SitePreview
+                      siteId={siteId!}
+                      pendingChanges={pendingChanges}
+                    />
+                  </CardContent>
+                </Card>
+              </main>
+            </div>
+          </ResizablePanel>
+        </ResizablePanelGroup>
+      ) : (
+        // Mobile view - full-width preview
+        <div className="flex-1 flex flex-col overflow-hidden min-h-0">
+          <main className="flex-1 flex flex-col p-4 gap-4 overflow-hidden min-h-0">
+            <Card className="flex-1 overflow-hidden flex flex-col">
+              <CardHeader className="pb-3 flex-shrink-0">
+                <div className="flex flex-col gap-2">
+                  <CardTitle className="text-base">Live Preview</CardTitle>
+                  <CardDescription className="text-xs">
+                    {pendingChanges.length > 0
+                      ? `${pendingChanges.length} pending ${pendingChanges.length === 1 ? 'change' : 'changes'} ready to commit`
+                      : 'Changes appear here in real-time before committing'}
+                  </CardDescription>
+                  {pendingChanges.length > 0 && (
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setShowDiffDrawer(true)}
+                      >
+                        <FileText className="h-4 w-4 mr-2" />
+                        View Details
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => {
+                          setPendingChanges([]);
+                          toast.success('All changes cleared');
+                        }}
+                      >
+                        <Trash2 className="h-4 w-4 mr-2" />
+                        Clear All
+                      </Button>
+                      <Button
+                        size="sm"
+                        onClick={async () => {
+                          const message = prompt("Enter commit message:");
+                          if (!message?.trim()) return;
+
+                          try {
+                            const assetChanges = pendingChanges.map(change => ({
+                              repo_path: change.repoPath,
+                              content: change.content
+                            }));
+
+                            const { data, error } = await supabase.functions.invoke('commit-batch-changes', {
+                              body: {
+                                site_id: siteId,
+                                commit_message: message,
+                                asset_changes: assetChanges
+                              }
+                            });
+
+                            if (error) throw error;
+
+                            toast.success('All changes committed!');
+                            setPendingChanges([]);
+                            loadActivities();
+                          } catch (error: any) {
+                            toast.error(error.message || 'Failed to commit');
+                          }
+                        }}
+                      >
+                        <GitCommit className="h-4 w-4 mr-2" />
+                        Commit All
+                      </Button>
+                    </div>
+                  )}
                 </div>
-              </div>
-
-              <Separator />
-
-              {/* Asset Manager */}
-              <div className="space-y-3 w-full">
-                <h3 className="text-sm font-semibold">Assets</h3>
-                <AssetManagerSidebar
+              </CardHeader>
+              <CardContent className="p-0 flex-1 overflow-hidden">
+                <SitePreview
                   siteId={siteId!}
                   pendingChanges={pendingChanges}
-                  setPendingChanges={setPendingChanges}
                 />
-              </div>
-
-              <Separator />
-
-              {/* Members */}
-              <div className="space-y-3 w-full">
-                <div className="flex items-center justify-between gap-2 w-full">
-                  <h3 className="text-sm font-semibold flex-shrink-0">Members</h3>
-                  <div className="flex-shrink-0">
-                    <InviteMemberDialog siteId={siteId!} onInviteCreated={loadInvitations} />
-                  </div>
-                </div>
-                <div className="space-y-2">
-                  {members.slice(0, 3).map((member) => {
-                    const displayName = member.profile?.full_name || `User ${member.user_id.slice(0, 8)}`;
-                    const initials = member.profile?.full_name
-                      ? member.profile.full_name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2)
-                      : member.user_id.slice(0, 2).toUpperCase();
-
-                    return (
-                      <div key={member.user_id} className="flex items-center gap-2 w-full max-w-full">
-                        <Avatar className="h-6 w-6 flex-shrink-0">
-                          <AvatarImage src={member.profile?.avatar_url || undefined} />
-                          <AvatarFallback className="text-xs bg-gradient-to-br from-primary to-accent text-primary-foreground">
-                            {initials}
-                          </AvatarFallback>
-                        </Avatar>
-                        <div className="flex-1 min-w-0 overflow-hidden">
-                          <p className="text-xs font-medium truncate">{displayName}</p>
-                        </div>
-                        <Badge variant={member.role === "owner" ? "default" : "secondary"} className="text-xs flex-shrink-0 whitespace-nowrap">
-                          {member.role === "owner" && <Crown className="mr-1 h-2 w-2" />}
-                          {member.role}
-                        </Badge>
-                      </div>
-                    );
-                  })}
-                  {members.length > 3 && (
-                    <p className="text-xs text-muted-foreground">+{members.length - 3} more</p>
-                  )}
-                </div>
-              </div>
-
-              <Separator />
-
-              {/* Activity Preview */}
-              <div className="space-y-3 w-full">
-                <div className="flex items-center justify-between gap-2">
-                  <h3 className="text-sm font-semibold">Recent Activity</h3>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="h-6 px-2 text-xs"
-                    onClick={handleOpenActivityDialog}
-                  >
-                    Show More
-                  </Button>
-                </div>
-                <div className="space-y-3">
-                  {activities.slice(0, 3).map((activity) => {
-                    const displayName = activity.user_profile?.full_name || `User ${activity.user_id?.slice(0, 8) || 'System'}`;
-                    const metadata = activity.metadata as any;
-
-                    return (
-                      <div key={activity.id} className="text-xs w-full space-y-1">
-                        <div className="flex items-start justify-between gap-2">
-                          {/* Left side: Action and details */}
-                          <div className="flex-1 min-w-0 space-y-1">
-                            <p className="font-medium truncate">{activity.action}</p>
-
-                            {/* File Path */}
-                            {metadata?.file_path && (
-                              <div className="flex items-center gap-1 text-xs text-muted-foreground">
-                                <FileText className="h-3 w-3 flex-shrink-0" />
-                                <span className="font-mono truncate">{metadata.file_path}</span>
-                              </div>
-                            )}
-
-                            {/* File Name (if no file_path) */}
-                            {!metadata?.file_path && metadata?.file_name && (
-                              <div className="flex items-center gap-1 text-xs text-muted-foreground">
-                                <FileText className="h-3 w-3 flex-shrink-0" />
-                                <span className="font-mono truncate">{metadata.file_name}</span>
-                              </div>
-                            )}
-
-                            {/* Asset Count */}
-                            {metadata?.asset_count && (
-                              <div className="flex items-center gap-1 text-xs text-muted-foreground">
-                                <Upload className="h-3 w-3" />
-                                {metadata.asset_count} {metadata.asset_count === 1 ? 'file' : 'files'}
-                              </div>
-                            )}
-
-                            {/* Email for invitations */}
-                            {metadata?.email && (
-                              <p className="text-xs text-muted-foreground">
-                                Sent to: <span className="font-medium">{metadata.email}</span>
-                              </p>
-                            )}
-
-                            {/* Role changes */}
-                            {metadata?.role && (
-                              <div className="flex items-center gap-1 text-xs text-muted-foreground">
-                                <Shield className="h-3 w-3" />
-                                Role: {metadata.role}
-                              </div>
-                            )}
-                          </div>
-
-                          {/* Right side: User and date */}
-                          <div className="flex-shrink-0 text-right space-y-0.5">
-                            <p className="text-muted-foreground text-xs">
-                              <span className="font-medium">{displayName}</span>
-                            </p>
-                            <p className="text-muted-foreground text-xs">
-                              {new Date(activity.created_at).toLocaleDateString()}
-                            </p>
-                          </div>
-                        </div>
-
-                        {/* Links at the bottom */}
-                        {(metadata?.pr_url && metadata?.pr_number) || metadata?.commit_sha ? (
-                          <div className="flex items-center gap-2 flex-wrap">
-                            {/* PR Link */}
-                            {metadata?.pr_url && metadata?.pr_number && (
-                              <a
-                                href={metadata.pr_url}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="inline-flex items-center gap-1 text-xs text-primary hover:underline"
-                              >
-                                <GitBranch className="h-3 w-3" />
-                                PR #{metadata.pr_number}
-                              </a>
-                            )}
-
-                            {/* Commit Link */}
-                            {metadata?.commit_sha && (
-                              <a
-                                href={`https://github.com/${site.repo_full_name}/commit/${metadata.commit_sha}`}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="inline-flex items-center gap-1 text-xs text-primary hover:underline"
-                              >
-                                <ExternalLink className="h-3 w-3" />
-                                Commit {metadata.commit_sha.substring(0, 7)}
-                              </a>
-                            )}
-                          </div>
-                        ) : null}
-                      </div>
-                    );
-                  })}
-                  {activities.length === 0 && (
-                    <p className="text-xs text-muted-foreground">No recent activity</p>
-                  )}
-                </div>
-              </div>
-            </div>
-          </div>
-        </ResizablePanel>
-        <ResizableHandle withHandle />
-
-        <ResizablePanel defaultSize={80} minSize={50} className="overflow-hidden min-h-0">
-          <div className="flex flex-col h-full min-h-0">
-            {/* Preview and Controls */}
-            <main className="flex-1 flex flex-col p-4 gap-4 overflow-hidden min-h-0">
-              {/* Live Preview */}
-              <Card className="flex-1 overflow-hidden flex flex-col">
-                <CardHeader className="pb-3 flex-shrink-0">
-                  <div className="flex items-center justify-between gap-4">
-                    <div className="flex-1 min-w-0">
-                      <CardTitle className="text-base">Live Preview</CardTitle>
-                      <CardDescription className="text-xs">
-                        {pendingChanges.length > 0
-                          ? `${pendingChanges.length} pending ${pendingChanges.length === 1 ? 'change' : 'changes'} ready to commit`
-                          : 'Changes appear here in real-time before committing'}
-                      </CardDescription>
-                    </div>
-                    {pendingChanges.length > 0 && (
-                      <div className="flex items-center gap-2 flex-shrink-0">
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => setShowDiffDrawer(true)}
-                        >
-                          <FileText className="h-4 w-4 mr-2" />
-                          View Details
-                        </Button>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => {
-                            setPendingChanges([]);
-                            toast.success('All changes cleared');
-                          }}
-                        >
-                          <Trash2 className="h-4 w-4 mr-2" />
-                          Clear All
-                        </Button>
-                        <Button
-                          size="sm"
-                          onClick={async () => {
-                            const message = prompt("Enter commit message:");
-                            if (!message?.trim()) return;
-
-                            try {
-                              const assetChanges = pendingChanges.map(change => ({
-                                repo_path: change.repoPath,
-                                content: change.content
-                              }));
-
-                              const { data, error } = await supabase.functions.invoke('commit-batch-changes', {
-                                body: {
-                                  site_id: siteId,
-                                  commit_message: message,
-                                  asset_changes: assetChanges
-                                }
-                              });
-
-                              if (error) throw error;
-
-                              toast.success('All changes committed!');
-                              setPendingChanges([]);
-                              loadActivities();
-                            } catch (error: any) {
-                              toast.error(error.message || 'Failed to commit');
-                            }
-                          }}
-                        >
-                          <GitCommit className="h-4 w-4 mr-2" />
-                          Commit All
-                        </Button>
-                      </div>
-                    )}
-                  </div>
-                </CardHeader>
-                <CardContent className="p-0 flex-1 overflow-hidden">
-                  <SitePreview
-                    siteId={siteId!}
-                    pendingChanges={pendingChanges}
-                  />
-                </CardContent>
-              </Card>
-            </main>
-          </div>
-        </ResizablePanel>
-      </ResizablePanelGroup>
+              </CardContent>
+            </Card>
+          </main>
+        </div>
+      )}
 
       {/* Diff Drawer */}
       <Sheet open={showDiffDrawer} onOpenChange={setShowDiffDrawer}>
