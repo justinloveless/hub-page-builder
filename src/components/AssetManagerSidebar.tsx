@@ -336,21 +336,6 @@ const AssetManagerSidebar = ({ siteId, pendingChanges, setPendingChanges }: Asse
       let updatedChanges = pendingChanges.filter(c => c.repoPath !== file.path);
       updatedChanges = [...updatedChanges, newChange];
 
-      // If the file is committed (has real sha), we need to delete it
-      if (file.sha !== 'pending') {
-        // Delete the old file
-        const { error: deleteError } = await supabase.functions.invoke('delete-site-asset', {
-          body: {
-            site_id: siteId,
-            file_path: file.path,
-            sha: file.sha,
-            message: `Rename ${file.name} to ${newFileName}`,
-          },
-        });
-
-        if (deleteError) throw deleteError;
-      }
-
       setPendingChanges(updatedChanges);
       setRenamingFile(null);
       setNewFileName("");
@@ -458,20 +443,6 @@ const AssetManagerSidebar = ({ siteId, pendingChanges, setPendingChanges }: Asse
         let updatedChanges = pendingChanges.filter(c => c.repoPath !== file.path);
         updatedChanges = [...updatedChanges, newChange];
         setPendingChanges(updatedChanges);
-
-        // Delete old file if committed
-        if (file.sha !== 'pending') {
-          const { error: deleteError } = await supabase.functions.invoke('delete-site-asset', {
-            body: {
-              site_id: siteId,
-              file_path: file.path,
-              sha: file.sha,
-              message: `Rename ${baseName} to ${newFileName}`,
-            },
-          });
-
-          if (deleteError) throw deleteError;
-        }
       }
 
       setRenamingFile(null);
