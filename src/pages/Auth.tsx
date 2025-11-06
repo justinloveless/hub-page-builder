@@ -88,7 +88,7 @@ const Auth = () => {
             <Github className="w-8 h-8 text-primary-foreground" />
           </div>
           <h1 className="text-3xl font-bold bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">
-            Static Hub
+            StaticSnack
           </h1>
           <p className="text-muted-foreground mt-2">
             Manage your static sites with ease

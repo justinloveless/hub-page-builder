@@ -14,7 +14,7 @@ const Index = () => {
             <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-primary to-accent flex items-center justify-center">
               <Github className="w-6 h-6 text-primary-foreground" />
             </div>
-            <h1 className="text-xl font-bold">Static Hub</h1>
+            <h1 className="text-xl font-bold">StaticSnack</h1>
           </div>
           <Button onClick={() => navigate("/auth")}>Get Started</Button>
         </div>

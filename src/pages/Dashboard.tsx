@@ -95,9 +95,9 @@ const Dashboard = () => {
         <div className="container mx-auto px-4 h-16 flex items-center justify-between">
           <div className="flex items-center gap-2 sm:gap-3 min-w-0">
             <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-primary to-accent flex items-center justify-center flex-shrink-0">
-              <span className="text-primary-foreground font-bold text-lg">SH</span>
+              <span className="text-primary-foreground font-bold text-lg">SS</span>
             </div>
-            <h1 className="text-lg sm:text-xl font-bold truncate">Static Hub</h1>
+            <h1 className="text-lg sm:text-xl font-bold truncate">StaticSnack</h1>
           </div>
 
           <div className="flex items-center gap-2 flex-shrink-0">
