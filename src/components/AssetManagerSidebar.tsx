@@ -94,11 +94,11 @@ const AssetManagerSidebar = ({ siteId, pendingChanges, setPendingChanges }: Asse
       newExpanded.delete(asset.path);
     } else {
       newExpanded.add(asset.path);
-      
+
       // Check cache first, then load if not cached
       const cachedContent = queryClient.getQueryData(['asset-content', siteId, asset.path]);
       const cachedFiles = queryClient.getQueryData(['directory-files', siteId, asset.path]);
-      
+
       // Load content when expanding if not already in cache
       if ((asset.type === 'text' || asset.type === 'json' || asset.type === 'markdown') && !assetContents[asset.path] && !cachedContent) {
         await loadAssetContent(asset);
@@ -117,7 +117,7 @@ const AssetManagerSidebar = ({ siteId, pendingChanges, setPendingChanges }: Asse
           }
         }
       }
-      
+
       // Load directory files when expanding if not already in cache
       if ((asset.type === 'directory' || asset.type === 'folder') && !directoryFiles[asset.path] && !cachedFiles) {
         await loadDirectoryFiles(asset);
@@ -125,7 +125,7 @@ const AssetManagerSidebar = ({ siteId, pendingChanges, setPendingChanges }: Asse
         // Use cached files
         setDirectoryFiles(prev => ({ ...prev, [asset.path]: cachedFiles as any }));
       }
-      
+
       // Load image when expanding if not already loaded
       if ((asset.type === 'image' || asset.type === 'img') && !imageUrls[asset.path]) {
         const cachedImage = queryClient.getQueryData(['asset-content', siteId, asset.path]);
@@ -235,14 +235,14 @@ const AssetManagerSidebar = ({ siteId, pendingChanges, setPendingChanges }: Asse
   const handleReorderDirectoryItems = async (asset: AssetConfig, files: AssetFile[], newOrder: number[]) => {
     try {
       const reorderedFiles = newOrder.map(index => files[index]);
-      
+
       const manifestContent = {
         files: reorderedFiles.map(file => file.name)
       };
 
       const manifestBlob = new Blob([JSON.stringify(manifestContent, null, 2)], { type: 'application/json' });
       const manifestPath = `${asset.path}/manifest.json`;
-      
+
       const base64Content = await new Promise<string>((resolve) => {
         const reader = new FileReader();
         reader.onloadend = () => {
@@ -252,15 +252,14 @@ const AssetManagerSidebar = ({ siteId, pendingChanges, setPendingChanges }: Asse
         reader.readAsDataURL(manifestBlob);
       });
 
-      await saveToBatch({ 
-        ...asset, 
-        path: manifestPath 
+      await saveToBatch({
+        ...asset,
+        path: manifestPath
       }, atob(base64Content));
 
-      toast.success("Directory order updated - changes saved to batch");
       setDraggedItem(null);
       setDragOverItem(null);
-      
+
       // Refresh the directory files
       await loadDirectoryFiles(asset);
     } catch (error: any) {
@@ -338,7 +337,6 @@ const AssetManagerSidebar = ({ siteId, pendingChanges, setPendingChanges }: Asse
 
     const updatedChanges = pendingChanges.filter(c => c.repoPath !== asset.path);
     setPendingChanges([...updatedChanges, newChange]);
-    toast.success("Saved to batch");
   };
 
   const addNewEntry = async (asset: AssetConfig) => {
@@ -820,7 +818,6 @@ const AssetManagerSidebar = ({ siteId, pendingChanges, setPendingChanges }: Asse
 
     const updatedChanges = pendingChanges.filter(c => c.repoPath !== filePath);
     setPendingChanges([...updatedChanges, newChange]);
-    toast.success("Saved to batch");
   };
 
   const getFileAssetType = (fileName: string, comboParts: Array<{ assetType: string; allowedExtensions?: string[] }>) => {
@@ -1360,7 +1357,7 @@ const AssetManagerSidebar = ({ siteId, pendingChanges, setPendingChanges }: Asse
                                   const { groups, standalone } = groupComboAssets(getMergedDirectoryFiles(asset.path), asset.contains.parts);
                                   return (
                                     <>
-                                       {groups.length > 0 && (
+                                      {groups.length > 0 && (
                                         <div className="space-y-3">
                                           {groups.map(([baseName, group]) => {
                                             // Sort files by type: images first, then text, then json
@@ -1571,13 +1568,13 @@ const AssetManagerSidebar = ({ siteId, pendingChanges, setPendingChanges }: Asse
                               </>
                             ) : (
                               /* Standard Directory */
-                               getMergedDirectoryFiles(asset.path).length > 0 && (
+                              getMergedDirectoryFiles(asset.path).length > 0 && (
                                 <div className="space-y-2">
                                   <Label className="text-xs">Existing Files</Label>
                                   <div className="space-y-1">
                                     {getMergedDirectoryFiles(asset.path).map((file, fileIndex) => (
-                                      <div 
-                                        key={file.path} 
+                                      <div
+                                        key={file.path}
                                         draggable
                                         onDragStart={() => setDraggedItem(fileIndex)}
                                         onDragOver={(e) => { e.preventDefault(); setDragOverItem(fileIndex); }}
