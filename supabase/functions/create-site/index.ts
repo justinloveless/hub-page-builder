@@ -44,6 +44,18 @@ Deno.serve(async (req) => {
       throw new Error('Missing required fields')
     }
 
+    // Verify the user owns this GitHub installation
+    const { data: installation, error: installationError } = await supabaseClient
+      .from('github_installations')
+      .select('id')
+      .eq('id', parseInt(github_installation_id))
+      .eq('user_id', user.id)
+      .single()
+
+    if (installationError || !installation) {
+      throw new Error('GitHub installation not found or not owned by user. Please connect your GitHub account first.')
+    }
+
     // Insert the site
     const { data: site, error: siteError } = await supabaseClient
       .from('sites')
@@ -72,7 +84,7 @@ Deno.serve(async (req) => {
 
     return new Response(
       JSON.stringify({ site }),
-      { 
+      {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         status: 200,
       }
@@ -81,7 +93,7 @@ Deno.serve(async (req) => {
     const errorMessage = error instanceof Error ? error.message : 'An unknown error occurred'
     return new Response(
       JSON.stringify({ error: errorMessage }),
-      { 
+      {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         status: 400,
       }

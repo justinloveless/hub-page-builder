@@ -88,7 +88,7 @@ Deno.serve(async (req) => {
       isPKCS8: normalizedKey.includes('BEGIN PRIVATE KEY'),
       length: normalizedKey.length,
     })
-    
+
     const app = new App({
       appId: config.app_id,
       privateKey: normalizedKey,
@@ -101,6 +101,30 @@ Deno.serve(async (req) => {
     // Get installation repositories
     const { data: reposData } = await octokit.request('GET /installation/repositories')
     console.log(`Found ${reposData.repositories.length} repositories`)
+
+    // Get installation details
+    const { data: installationData } = await app.octokit.request('GET /app/installations/{installation_id}', {
+      installation_id: installation_id
+    })
+
+    // Record this installation for the user
+    const { error: upsertError } = await supabaseClient
+      .from('github_installations')
+      .upsert({
+        id: installation_id,
+        user_id: user.id,
+        account_login: installationData.account.login,
+        account_type: installationData.account.type,
+        account_avatar_url: installationData.account.avatar_url,
+        updated_at: new Date().toISOString(),
+      }, {
+        onConflict: 'id,user_id'
+      })
+
+    if (upsertError) {
+      console.error('Error recording installation:', upsertError)
+      // Don't fail the request, just log the error
+    }
 
     return new Response(
       JSON.stringify({

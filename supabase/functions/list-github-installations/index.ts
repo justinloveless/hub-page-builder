@@ -70,7 +70,31 @@ Deno.serve(async (req) => {
       throw new Error('GITHUB_APP_PKEY environment variable not set')
     }
 
-    console.log('Listing all installations for GitHub App')
+    console.log(`Listing GitHub installations for user ${user.id}`)
+
+    // Get installations owned by this user from the database
+    const { data: userInstallations, error: dbError } = await supabaseClient
+      .from('github_installations')
+      .select('*')
+      .eq('user_id', user.id)
+
+    if (dbError) {
+      console.error('Error fetching user installations:', dbError)
+      throw new Error('Failed to fetch installations')
+    }
+
+    if (!userInstallations || userInstallations.length === 0) {
+      console.log('No installations found for user')
+      return new Response(
+        JSON.stringify({ installations: [] }),
+        {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          status: 200,
+        }
+      )
+    }
+
+    console.log(`Found ${userInstallations.length} installations for user`)
 
     // Create Octokit App instance
     const normalizedKey = normalizePemKey(privateKeyPem)
@@ -79,23 +103,19 @@ Deno.serve(async (req) => {
       privateKey: normalizedKey,
     })
 
-    // Use app-level authentication to list all installations
-    const { data: installations } = await app.octokit.request('GET /app/installations')
-    console.log(`Found ${installations.length} total installations`)
-
-    // For each installation, get basic info
+    // For each user installation, get repository details
     const installationDetails = await Promise.all(
-      installations.map(async (installation: any) => {
+      userInstallations.map(async (installation: any) => {
         try {
           const installationOctokit = await app.getInstallationOctokit(installation.id)
           const { data: reposData } = await installationOctokit.request('GET /installation/repositories')
-          
+
           return {
             id: installation.id,
             account: {
-              login: installation.account.login,
-              type: installation.account.type,
-              avatar_url: installation.account.avatar_url,
+              login: installation.account_login,
+              type: installation.account_type,
+              avatar_url: installation.account_avatar_url,
             },
             repository_count: reposData.total_count,
             repositories: reposData.repositories.map((repo: any) => ({
@@ -112,9 +132,9 @@ Deno.serve(async (req) => {
           return {
             id: installation.id,
             account: {
-              login: installation.account.login,
-              type: installation.account.type,
-              avatar_url: installation.account.avatar_url,
+              login: installation.account_login,
+              type: installation.account_type,
+              avatar_url: installation.account_avatar_url,
             },
             repository_count: 0,
             repositories: [],
