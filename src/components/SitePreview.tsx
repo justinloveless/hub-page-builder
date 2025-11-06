@@ -22,7 +22,8 @@ export const SitePreview = ({ siteId, pendingChanges }: SitePreviewProps) => {
   const filesRef = useRef<Record<string, { content: string; encoding: string }>>({});
   const objectUrlsRef = useRef<string[]>([]);
   const scrollPositionRef = useRef<{ x: number; y: number } | null>(null);
-  
+  const debounceTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
   const { data: siteFiles, isLoading: loading, error } = useSiteFiles(siteId);
 
   // Add message listener for debug logs from iframe
@@ -55,24 +56,39 @@ export const SitePreview = ({ siteId, pendingChanges }: SitePreviewProps) => {
 
   useEffect(() => {
     if (Object.keys(filesRef.current).length > 0) {
-      // Capture scroll position before regenerating preview
-      const iframeEl = iframeRef.current;
-      if (iframeEl && previewUrl) {
-        try {
-          const iframeDoc = iframeEl.contentDocument || iframeEl.contentWindow?.document;
-          if (iframeDoc) {
-            scrollPositionRef.current = {
-              x: iframeDoc.documentElement.scrollLeft || iframeDoc.body.scrollLeft || iframeEl.contentWindow?.scrollX || 0,
-              y: iframeDoc.documentElement.scrollTop || iframeDoc.body.scrollTop || iframeEl.contentWindow?.scrollY || 0,
-            };
-          }
-        } catch (e) {
-          // If we can't access iframe content (shouldn't happen with blob URLs), ignore
-          console.debug('Could not capture scroll position:', e);
-        }
+      // Clear any existing timeout
+      if (debounceTimeoutRef.current) {
+        clearTimeout(debounceTimeoutRef.current);
       }
-      generatePreview();
+
+      // Set up debounced preview update (2 seconds)
+      debounceTimeoutRef.current = setTimeout(() => {
+        // Capture scroll position before regenerating preview
+        const iframeEl = iframeRef.current;
+        if (iframeEl && previewUrl) {
+          try {
+            const iframeDoc = iframeEl.contentDocument || iframeEl.contentWindow?.document;
+            if (iframeDoc) {
+              scrollPositionRef.current = {
+                x: iframeDoc.documentElement.scrollLeft || iframeDoc.body.scrollLeft || iframeEl.contentWindow?.scrollX || 0,
+                y: iframeDoc.documentElement.scrollTop || iframeDoc.body.scrollTop || iframeEl.contentWindow?.scrollY || 0,
+              };
+            }
+          } catch (e) {
+            // If we can't access iframe content (shouldn't happen with blob URLs), ignore
+            console.debug('Could not capture scroll position:', e);
+          }
+        }
+        generatePreview();
+      }, 2000);
     }
+
+    // Cleanup timeout on unmount or when dependencies change
+    return () => {
+      if (debounceTimeoutRef.current) {
+        clearTimeout(debounceTimeoutRef.current);
+      }
+    };
   }, [pendingChanges]);
 
   const generatePreview = () => {
