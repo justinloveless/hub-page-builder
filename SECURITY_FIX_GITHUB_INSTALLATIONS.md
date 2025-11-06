@@ -164,10 +164,23 @@ Other edge functions that use `site.github_installation_id` are secure because:
 3. **No data loss** - Existing sites will continue to work (installation_id is still in sites table)
 4. **Edge functions** - Deploy all updated edge functions after migration
 
+## ✅ DEPLOYED - November 6, 2025
+
+**Migration:** `20251106010513_create_github_installations_table.sql` - ✅ Applied
+
+**Edge Functions Deployed:**
+- ✅ `github-installation-details` - Records installations when users connect
+- ✅ `list-github-installations` - Filters by user_id
+- ✅ `create-site` - Validates installation ownership
+
+**Project:** `inrivbbifhraowqlqzsp`
+
+**Status:** Security vulnerability patched. Users must reconnect GitHub to populate the new tracking table.
+
 ## Files Modified
 
 - `supabase/functions/github-installation-details/index.ts`
 - `supabase/functions/list-github-installations/index.ts`
 - `supabase/functions/create-site/index.ts`
-- Migration: `create_github_installations_table`
+- Migration: `20251106010513_create_github_installations_table.sql`
 
