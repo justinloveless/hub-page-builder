@@ -1038,39 +1038,39 @@ const Manage = () => {
       ) : (
         // Mobile view - full-width preview
         <div className="flex-1 flex flex-col overflow-hidden min-h-0">
-          <main className="flex-1 flex flex-col p-4 gap-4 overflow-hidden min-h-0">
+          <main className="flex-1 flex flex-col p-2 overflow-hidden min-h-0">
             <Card className="flex-1 overflow-hidden flex flex-col">
-              <CardHeader className="pb-3 flex-shrink-0">
-                <div className="flex flex-col gap-2">
-                  <CardTitle className="text-base">Live Preview</CardTitle>
-                  <CardDescription className="text-xs">
-                    {pendingChanges.length > 0
-                      ? `${pendingChanges.length} pending ${pendingChanges.length === 1 ? 'change' : 'changes'} ready to commit`
-                      : 'Changes appear here in real-time before committing'}
-                  </CardDescription>
-                  {pendingChanges.length > 0 && (
-                    <div className="flex items-center gap-2 flex-wrap">
+              {pendingChanges.length > 0 ? (
+                <CardHeader className="py-2 px-3 flex-shrink-0 border-b">
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="flex-1 min-w-0">
+                      <p className="text-xs font-medium">
+                        {pendingChanges.length} change{pendingChanges.length !== 1 && 's'}
+                      </p>
+                    </div>
+                    <div className="flex items-center gap-1.5 flex-shrink-0">
                       <Button
-                        variant="outline"
+                        variant="ghost"
                         size="sm"
+                        className="h-7 px-2"
                         onClick={() => setShowDiffDrawer(true)}
                       >
-                        <FileText className="h-4 w-4 mr-2" />
-                        View Details
+                        <FileText className="h-3.5 w-3.5" />
                       </Button>
                       <Button
-                        variant="outline"
+                        variant="ghost"
                         size="sm"
+                        className="h-7 px-2"
                         onClick={() => {
                           setPendingChanges([]);
                           toast.success('All changes cleared');
                         }}
                       >
-                        <Trash2 className="h-4 w-4 mr-2" />
-                        Clear All
+                        <Trash2 className="h-3.5 w-3.5" />
                       </Button>
                       <Button
                         size="sm"
+                        className="h-7 px-2"
                         onClick={async () => {
                           const message = prompt("Enter commit message:");
                           if (!message?.trim()) return;
@@ -1099,13 +1099,13 @@ const Manage = () => {
                           }
                         }}
                       >
-                        <GitCommit className="h-4 w-4 mr-2" />
-                        Commit All
+                        <GitCommit className="h-3.5 w-3.5 mr-1.5" />
+                        Commit
                       </Button>
                     </div>
-                  )}
-                </div>
-              </CardHeader>
+                  </div>
+                </CardHeader>
+              ) : null}
               <CardContent className="p-0 flex-1 overflow-hidden">
                 <SitePreview
                   siteId={siteId!}
