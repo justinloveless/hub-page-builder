@@ -1286,7 +1286,7 @@ const AssetManagerSidebar = ({ siteId, pendingChanges, setPendingChanges }: Asse
                                       {groups.length > 0 && (
                                         <div className="space-y-2">
                                           <Label className="text-xs">Combo Assets</Label>
-                                          <div className="space-y-2 max-h-96 overflow-y-auto">
+                                          <div className="space-y-2">
                                             {groups.map(([baseName, group]) => (
                                               <div key={baseName} className="p-3 border rounded-lg bg-accent/5 space-y-2">
                                                 <div className="flex items-center justify-between">
@@ -1427,7 +1427,7 @@ const AssetManagerSidebar = ({ siteId, pendingChanges, setPendingChanges }: Asse
                                       {standalone.length > 0 && (
                                         <div className="space-y-2">
                                           <Label className="text-xs">Other Files</Label>
-                                          <div className="space-y-1 max-h-48 overflow-y-auto">
+                                          <div className="space-y-1">
                                             {standalone.map((file) => (
                                               <div key={file.path} className="flex items-center gap-2 p-2 border rounded-lg hover:bg-muted/50">
                                                 {isImageFile(file.name) ? (
@@ -1486,7 +1486,7 @@ const AssetManagerSidebar = ({ siteId, pendingChanges, setPendingChanges }: Asse
                               getMergedDirectoryFiles(asset.path).length > 0 && (
                                 <div className="space-y-2">
                                   <Label className="text-xs">Existing Files</Label>
-                                  <div className="space-y-1 max-h-48 overflow-y-auto">
+                                  <div className="space-y-1">
                                     {getMergedDirectoryFiles(asset.path).map((file) => (
                                       <div key={file.path} className="flex items-center gap-2 p-2 border rounded-lg hover:bg-muted/50 w-full max-w-full">
                                         {isImageFile(file.name) ? (
