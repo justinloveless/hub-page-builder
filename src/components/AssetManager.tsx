@@ -61,7 +61,6 @@ const AssetManager = ({ siteId, pendingChanges, setPendingChanges }: AssetManage
       setFound(data.found);
       if (data.found) {
         setConfig(data.config);
-        toast.success("Site assets loaded successfully");
       } else {
         toast.info(data.message || "site-assets.json not found");
       }
