@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -6,10 +6,12 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { Folder, FileText, Image, AlertCircle, RefreshCw, GitPullRequest, ExternalLink, Upload } from "lucide-react";
+import { Folder, FileText, Image, AlertCircle, RefreshCw, GitPullRequest, Upload } from "lucide-react";
 import AssetUploadDialog from "./AssetUploadDialog";
 import CreateShareDialog from "./CreateShareDialog";
 import type { PendingAssetChange } from "@/pages/Manage";
+import { useSiteAssets } from "@/hooks/useSiteAssets";
+import { useQueryClient } from "@tanstack/react-query";
 
 interface AssetConfig {
   path: string;
@@ -32,45 +34,17 @@ interface AssetManagerProps {
 }
 
 const AssetManager = ({ siteId, pendingChanges, setPendingChanges }: AssetManagerProps) => {
-  const [loading, setLoading] = useState(false);
+  const queryClient = useQueryClient();
+  const { data: assetsData, isLoading: loading, refetch } = useSiteAssets(siteId);
   const [creatingPr, setCreatingPr] = useState(false);
-  const [config, setConfig] = useState<SiteAssetsConfig | null>(null);
-  const [found, setFound] = useState<boolean | null>(null);
   const [uploadDialogOpen, setUploadDialogOpen] = useState(false);
   const [selectedAsset, setSelectedAsset] = useState<AssetConfig | null>(null);
 
-  useEffect(() => {
-    fetchAssets();
-  }, [siteId]);
+  const found = assetsData?.found ?? null;
+  const config = assetsData?.config ?? null;
 
-  const fetchAssets = async () => {
-    setLoading(true);
-    try {
-      const { data: sessionData } = await supabase.auth.getSession();
-      if (!sessionData.session) {
-        toast.error("Not authenticated");
-        return;
-      }
-
-      const { data, error } = await supabase.functions.invoke('fetch-site-assets', {
-        body: { site_id: siteId },
-      });
-
-      if (error) throw error;
-
-      setFound(data.found);
-      if (data.found) {
-        setConfig(data.config);
-      } else {
-        toast.info(data.message || "site-assets.json not found");
-      }
-    } catch (error: any) {
-      console.error("Failed to fetch assets:", error);
-      setFound(false);
-      toast.error(error.message || "Failed to fetch site assets");
-    } finally {
-      setLoading(false);
-    }
+  const handleRefresh = async () => {
+    await refetch();
   };
 
   const createTemplatePr = async () => {
@@ -136,7 +110,7 @@ const AssetManager = ({ siteId, pendingChanges, setPendingChanges }: AssetManage
               <Button
                 variant="outline"
                 size="sm"
-                onClick={fetchAssets}
+                onClick={handleRefresh}
                 disabled={loading}
               >
                 {loading ? (
@@ -144,7 +118,7 @@ const AssetManager = ({ siteId, pendingChanges, setPendingChanges }: AssetManage
                 ) : (
                   <RefreshCw className="h-4 w-4" />
                 )}
-                <span className="ml-2">Load</span>
+                <span className="ml-2">Refresh</span>
               </Button>
               <Button
                 size="sm"
@@ -313,7 +287,7 @@ const AssetManager = ({ siteId, pendingChanges, setPendingChanges }: AssetManage
           pendingChanges={pendingChanges}
           setPendingChanges={setPendingChanges}
           onSuccess={() => {
-            fetchAssets();
+            queryClient.invalidateQueries({ queryKey: ['site-assets', siteId] });
             toast.success("Asset updated successfully!");
           }}
         />

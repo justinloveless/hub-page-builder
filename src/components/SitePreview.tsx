@@ -1,8 +1,8 @@
 import { useEffect, useState, useRef } from "react";
-import { supabase } from "@/integrations/supabase/client";
 import { Card } from "@/components/ui/card";
 import { Loader2 } from "lucide-react";
 import { toast } from "sonner";
+import { useSiteFiles } from "@/hooks/useSiteFiles";
 
 interface PendingAssetChange {
   repoPath: string;
@@ -17,12 +17,13 @@ interface SitePreviewProps {
 }
 
 export const SitePreview = ({ siteId, pendingChanges }: SitePreviewProps) => {
-  const [loading, setLoading] = useState(true);
   const [previewUrl, setPreviewUrl] = useState<string>("");
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const filesRef = useRef<Record<string, { content: string; encoding: string }>>({});
   const objectUrlsRef = useRef<string[]>([]);
   const scrollPositionRef = useRef<{ x: number; y: number } | null>(null);
+  
+  const { data: siteFiles, isLoading: loading, error } = useSiteFiles(siteId);
 
   // Add message listener for debug logs from iframe
   useEffect(() => {
@@ -36,9 +37,21 @@ export const SitePreview = ({ siteId, pendingChanges }: SitePreviewProps) => {
     return () => window.removeEventListener('message', handleMessage);
   }, []);
 
+  // Load files from cache when data is ready
   useEffect(() => {
-    loadSiteFiles();
-  }, [siteId]);
+    if (siteFiles) {
+      filesRef.current = siteFiles;
+      generatePreview();
+    }
+  }, [siteFiles]);
+
+  // Show error if fetch failed
+  useEffect(() => {
+    if (error) {
+      console.error('Error loading site files:', error);
+      toast.error('Failed to load site preview');
+    }
+  }, [error]);
 
   useEffect(() => {
     if (Object.keys(filesRef.current).length > 0) {
@@ -61,30 +74,6 @@ export const SitePreview = ({ siteId, pendingChanges }: SitePreviewProps) => {
       generatePreview();
     }
   }, [pendingChanges]);
-
-  const loadSiteFiles = async () => {
-    try {
-      setLoading(true);
-      const { data: { session } } = await supabase.auth.getSession();
-
-      const { data, error } = await supabase.functions.invoke('download-site-files', {
-        body: { site_id: siteId },
-        headers: {
-          Authorization: `Bearer ${session?.access_token}`,
-        },
-      });
-
-      if (error) throw error;
-
-      filesRef.current = data.files;
-      generatePreview();
-    } catch (error) {
-      console.error('Error loading site files:', error);
-      toast.error('Failed to load site preview');
-    } finally {
-      setLoading(false);
-    }
-  };
 
   const generatePreview = () => {
     // Create a virtual file system with pending changes applied
