@@ -8,7 +8,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { Folder, FileText, Image, AlertCircle, RefreshCw, GitPullRequest, ChevronDown, ChevronRight, Plus, Trash2, File, Users } from "lucide-react";
+import { Folder, FileText, Image, AlertCircle, RefreshCw, GitPullRequest, ChevronDown, ChevronRight, Plus, Trash2, File, Users, Edit, GripVertical } from "lucide-react";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import CreateShareDialog from "./CreateShareDialog";
 import type { PendingAssetChange } from "@/pages/Manage";
@@ -74,6 +74,9 @@ const AssetManagerSidebar = ({ siteId, pendingChanges, setPendingChanges }: Asse
   const [loadingComboFile, setLoadingComboFile] = useState<Record<string, boolean>>({});
   const [creatingCombo, setCreatingCombo] = useState<Record<string, boolean>>({});
   const [newComboData, setNewComboData] = useState<Record<string, { baseName: string; parts: Record<string, { content: string; file?: File; jsonData?: Record<string, any> }> }>>({});
+  const [draggedItem, setDraggedItem] = useState<number | null>(null);
+  const [dragOverItem, setDragOverItem] = useState<number | null>(null);
+  const [editingComboImage, setEditingComboImage] = useState<{ assetPath: string; filePath: string } | null>(null);
 
   const found = assetsData?.found ?? null;
   const config = assetsData?.config ?? null;
@@ -200,6 +203,69 @@ const AssetManagerSidebar = ({ siteId, pendingChanges, setPendingChanges }: Asse
       toast.error(error.message || "Failed to delete file");
     } finally {
       setDeletingFile(null);
+    }
+  };
+
+  const handleDeleteComboAsset = async (asset: AssetConfig, baseName: string, files: AssetFile[]) => {
+    if (!confirm(`Are you sure you want to delete all parts of "${baseName}"? This action cannot be undone.`)) {
+      return;
+    }
+
+    try {
+      for (const file of files) {
+        const { error } = await supabase.functions.invoke('delete-site-asset', {
+          body: {
+            site_id: siteId,
+            file_path: file.path,
+            sha: file.sha,
+            message: `Delete ${file.path}`,
+          },
+        });
+        if (error) throw error;
+      }
+
+      toast.success(`Deleted combo asset "${baseName}"`);
+      await loadDirectoryFiles(asset);
+    } catch (error: any) {
+      console.error('Error deleting combo asset:', error);
+      toast.error(error.message || "Failed to delete combo asset");
+    }
+  };
+
+  const handleReorderDirectoryItems = async (asset: AssetConfig, files: AssetFile[], newOrder: number[]) => {
+    try {
+      const reorderedFiles = newOrder.map(index => files[index]);
+      
+      const manifestContent = {
+        files: reorderedFiles.map(file => file.name)
+      };
+
+      const manifestBlob = new Blob([JSON.stringify(manifestContent, null, 2)], { type: 'application/json' });
+      const manifestPath = `${asset.path}/manifest.json`;
+      
+      const base64Content = await new Promise<string>((resolve) => {
+        const reader = new FileReader();
+        reader.onloadend = () => {
+          const base64 = reader.result as string;
+          resolve(base64.split(',')[1]);
+        };
+        reader.readAsDataURL(manifestBlob);
+      });
+
+      await saveToBatch({ 
+        ...asset, 
+        path: manifestPath 
+      }, atob(base64Content));
+
+      toast.success("Directory order updated - changes saved to batch");
+      setDraggedItem(null);
+      setDragOverItem(null);
+      
+      // Refresh the directory files
+      await loadDirectoryFiles(asset);
+    } catch (error: any) {
+      console.error("Failed to update directory order:", error);
+      toast.error(error.message || "Failed to update directory order");
     }
   };
 
@@ -1294,133 +1360,144 @@ const AssetManagerSidebar = ({ siteId, pendingChanges, setPendingChanges }: Asse
                                   const { groups, standalone } = groupComboAssets(getMergedDirectoryFiles(asset.path), asset.contains.parts);
                                   return (
                                     <>
-                                      {groups.length > 0 && (
-                                        <div className="space-y-2">
-                                          <Label className="text-xs">Combo Assets</Label>
-                                          <div className="space-y-2">
-                                            {groups.map(([baseName, group]) => (
+                                       {groups.length > 0 && (
+                                        <div className="space-y-3">
+                                          {groups.map(([baseName, group]) => {
+                                            // Sort files by type: images first, then text, then json
+                                            const sortedFiles = [...group.files].sort((a, b) => {
+                                              const aType = getFileAssetType(a.name, asset.contains.parts!);
+                                              const bType = getFileAssetType(b.name, asset.contains.parts!);
+                                              const aIsImage = aType === 'image' || isImageFile(a.name);
+                                              const bIsImage = bType === 'image' || isImageFile(b.name);
+                                              const order = { image: 0, text: 1, markdown: 1, json: 2 };
+                                              if (aIsImage && !bIsImage) return -1;
+                                              if (!aIsImage && bIsImage) return 1;
+                                              const aOrder = order[aType as keyof typeof order] ?? 999;
+                                              const bOrder = order[bType as keyof typeof order] ?? 999;
+                                              return aOrder - bOrder;
+                                            });
+
+                                            return (
                                               <div key={baseName} className="p-3 border rounded-lg bg-accent/5 space-y-2">
                                                 <div className="flex items-center justify-between">
                                                   <h5 className="text-xs font-semibold truncate">{baseName}</h5>
-                                                  <Badge variant="secondary" className="text-xs">{group.files.length} parts</Badge>
+                                                  <Button
+                                                    variant="ghost"
+                                                    size="sm"
+                                                    onClick={() => handleDeleteComboAsset(asset, baseName, group.files)}
+                                                    className="h-6 text-destructive hover:text-destructive hover:bg-destructive/10"
+                                                  >
+                                                    <Trash2 className="h-3 w-3" />
+                                                  </Button>
                                                 </div>
                                                 <div className="space-y-2">
-                                                  {group.files.map((file) => {
+                                                  {sortedFiles.map((file) => {
                                                     const fileType = getFileAssetType(file.name, asset.contains.parts!);
                                                     const isJson = fileType === 'json';
                                                     const isText = fileType === 'text' || fileType === 'markdown';
                                                     const isImage = fileType === 'image' || isImageFile(file.name);
 
+                                                    // Auto-load content for all parts
+                                                    if ((isJson || isText) && !comboFileContents[file.path] && !loadingComboFile[file.path]) {
+                                                      loadComboFileContent(file.path);
+                                                    }
+
                                                     return (
                                                       <div key={file.path} className="border rounded bg-background">
-                                                        {/* File Header */}
-                                                        <div className="flex items-center gap-2 p-2 border-b">
-                                                          {isImage ? (
-                                                            <img
-                                                              src={file.download_url}
-                                                              alt={file.name}
-                                                              className="w-8 h-8 object-cover rounded border flex-shrink-0"
-                                                            />
-                                                          ) : (
-                                                            <div className="w-8 h-8 flex items-center justify-center bg-muted rounded border flex-shrink-0">
-                                                              <File className="h-4 w-4 text-muted-foreground" />
-                                                            </div>
-                                                          )}
-                                                          <div className="flex-1 min-w-0">
-                                                            <p className="text-xs font-medium truncate">{file.name}</p>
-                                                            <p className="text-xs text-muted-foreground">
-                                                              {(file.size / 1024).toFixed(1)} KB · {fileType}
-                                                            </p>
-                                                          </div>
-                                                          <Button
-                                                            variant="ghost"
-                                                            size="sm"
-                                                            onClick={() => handleDeleteFile(asset, file.path, file.sha)}
-                                                            disabled={deletingFile === file.path}
-                                                            className="h-6 w-6 p-0 flex-shrink-0"
-                                                            title="Delete file"
-                                                          >
-                                                            {deletingFile === file.path ? (
-                                                              <RefreshCw className="h-3 w-3 animate-spin" />
-                                                            ) : (
-                                                              <Trash2 className="h-3 w-3" />
-                                                            )}
-                                                          </Button>
-                                                        </div>
-
-                                                        {/* File Content */}
+                                                        {/* Image Display with Edit Button */}
                                                         {isImage && (
-                                                          <div className="p-2">
+                                                          <div className="relative p-2">
                                                             <img
                                                               src={file.download_url}
                                                               alt={file.name}
                                                               className="w-full h-auto rounded border"
                                                             />
+                                                            <Button
+                                                              variant="secondary"
+                                                              size="sm"
+                                                              onClick={() => {
+                                                                const input = document.createElement('input');
+                                                                input.type = 'file';
+                                                                input.accept = 'image/*';
+                                                                input.onchange = async (e) => {
+                                                                  const newFile = (e.target as HTMLInputElement).files?.[0];
+                                                                  if (newFile) {
+                                                                    const uploadAsset = { ...asset, path: file.path };
+                                                                    await handleFileUpload(uploadAsset, newFile);
+                                                                  }
+                                                                };
+                                                                input.click();
+                                                              }}
+                                                              className="absolute top-3 right-3"
+                                                            >
+                                                              <Edit className="h-3 w-3 mr-1" />
+                                                              Replace
+                                                            </Button>
                                                           </div>
                                                         )}
 
-                                                        {(isJson || isText) && (
+                                                        {/* Text/Markdown Content */}
+                                                        {isText && (
                                                           <div className="p-2 space-y-2">
-                                                            {!comboFileContents[file.path] && !loadingComboFile[file.path] && (
-                                                              <Button
-                                                                variant="outline"
-                                                                size="sm"
-                                                                onClick={() => loadComboFileContent(file.path)}
-                                                                className="w-full h-8 text-xs"
-                                                              >
-                                                                Load Content
-                                                              </Button>
-                                                            )}
-
                                                             {loadingComboFile[file.path] && (
                                                               <Skeleton className="h-20 w-full" />
                                                             )}
 
                                                             {comboFileContents[file.path] && (
                                                               <>
-                                                                {isJson ? (
-                                                                  <div className="space-y-2">
-                                                                    {(() => {
-                                                                      try {
-                                                                        const jsonData = JSON.parse(comboFileContents[file.path]);
-                                                                        return (
-                                                                          <div className="space-y-2">
-                                                                            {Object.entries(jsonData).map(([key, value]) => (
-                                                                              <div key={key} className="space-y-1">
-                                                                                <Label className="text-xs">{key}</Label>
-                                                                                <Input
-                                                                                  value={String(value)}
-                                                                                  onChange={(e) => {
-                                                                                    const updated = { ...jsonData, [key]: e.target.value };
-                                                                                    handleComboFileContentChange(file.path, JSON.stringify(updated, null, 2));
-                                                                                  }}
-                                                                                  className="h-8 text-xs"
-                                                                                />
-                                                                              </div>
-                                                                            ))}
+                                                                <Textarea
+                                                                  value={comboFileContents[file.path]}
+                                                                  onChange={(e) => setComboFileContents(prev => ({ ...prev, [file.path]: e.target.value }))}
+                                                                  onBlur={(e) => handleComboFileContentChange(file.path, e.target.value)}
+                                                                  className="min-h-[80px] font-mono text-xs"
+                                                                />
+                                                                <p className="text-xs text-muted-foreground">Changes are automatically saved to batch</p>
+                                                              </>
+                                                            )}
+                                                          </div>
+                                                        )}
+
+                                                        {/* JSON Content */}
+                                                        {isJson && (
+                                                          <div className="p-2 space-y-2">
+                                                            {loadingComboFile[file.path] && (
+                                                              <Skeleton className="h-20 w-full" />
+                                                            )}
+
+                                                            {comboFileContents[file.path] && (
+                                                              <>
+                                                                {(() => {
+                                                                  try {
+                                                                    const jsonData = JSON.parse(comboFileContents[file.path]);
+                                                                    return (
+                                                                      <div className="space-y-2">
+                                                                        {Object.entries(jsonData).map(([key, value]) => (
+                                                                          <div key={key} className="space-y-1">
+                                                                            <Label className="text-xs">{key}</Label>
+                                                                            <Input
+                                                                              value={String(value)}
+                                                                              onChange={(e) => {
+                                                                                const updated = { ...jsonData, [key]: e.target.value };
+                                                                                handleComboFileContentChange(file.path, JSON.stringify(updated, null, 2));
+                                                                              }}
+                                                                              className="h-8 text-xs"
+                                                                            />
                                                                           </div>
-                                                                        );
-                                                                      } catch (e) {
-                                                                        return (
-                                                                          <Textarea
-                                                                            value={comboFileContents[file.path]}
-                                                                            onChange={(e) => setComboFileContents(prev => ({ ...prev, [file.path]: e.target.value }))}
-                                                                            onBlur={(e) => handleComboFileContentChange(file.path, e.target.value)}
-                                                                            className="min-h-[80px] font-mono text-xs"
-                                                                            placeholder="Invalid JSON"
-                                                                          />
-                                                                        );
-                                                                      }
-                                                                    })()}
-                                                                  </div>
-                                                                ) : (
-                                                                  <Textarea
-                                                                    value={comboFileContents[file.path]}
-                                                                    onChange={(e) => setComboFileContents(prev => ({ ...prev, [file.path]: e.target.value }))}
-                                                                    onBlur={(e) => handleComboFileContentChange(file.path, e.target.value)}
-                                                                    className="min-h-[80px] font-mono text-xs"
-                                                                  />
-                                                                )}
+                                                                        ))}
+                                                                      </div>
+                                                                    );
+                                                                  } catch (e) {
+                                                                    return (
+                                                                      <Textarea
+                                                                        value={comboFileContents[file.path]}
+                                                                        onChange={(e) => setComboFileContents(prev => ({ ...prev, [file.path]: e.target.value }))}
+                                                                        onBlur={(e) => handleComboFileContentChange(file.path, e.target.value)}
+                                                                        className="min-h-[80px] font-mono text-xs"
+                                                                        placeholder="Invalid JSON"
+                                                                      />
+                                                                    );
+                                                                  }
+                                                                })()}
                                                                 <p className="text-xs text-muted-foreground">Changes are automatically saved to batch</p>
                                                               </>
                                                             )}
@@ -1431,8 +1508,8 @@ const AssetManagerSidebar = ({ siteId, pendingChanges, setPendingChanges }: Asse
                                                   })}
                                                 </div>
                                               </div>
-                                            ))}
-                                          </div>
+                                            );
+                                          })}
                                         </div>
                                       )}
                                       {standalone.length > 0 && (
@@ -1494,12 +1571,29 @@ const AssetManagerSidebar = ({ siteId, pendingChanges, setPendingChanges }: Asse
                               </>
                             ) : (
                               /* Standard Directory */
-                              getMergedDirectoryFiles(asset.path).length > 0 && (
+                               getMergedDirectoryFiles(asset.path).length > 0 && (
                                 <div className="space-y-2">
                                   <Label className="text-xs">Existing Files</Label>
                                   <div className="space-y-1">
-                                    {getMergedDirectoryFiles(asset.path).map((file) => (
-                                      <div key={file.path} className="flex items-center gap-2 p-2 border rounded-lg hover:bg-muted/50 w-full max-w-full">
+                                    {getMergedDirectoryFiles(asset.path).map((file, fileIndex) => (
+                                      <div 
+                                        key={file.path} 
+                                        draggable
+                                        onDragStart={() => setDraggedItem(fileIndex)}
+                                        onDragOver={(e) => { e.preventDefault(); setDragOverItem(fileIndex); }}
+                                        onDrop={(e) => {
+                                          e.preventDefault();
+                                          if (draggedItem !== null) {
+                                            const files = getMergedDirectoryFiles(asset.path);
+                                            const newOrder = [...Array(files.length).keys()];
+                                            const [removed] = newOrder.splice(draggedItem, 1);
+                                            newOrder.splice(fileIndex, 0, removed);
+                                            handleReorderDirectoryItems(asset, files, newOrder);
+                                          }
+                                        }}
+                                        className={`flex items-center gap-2 p-2 border rounded-lg hover:bg-muted/50 w-full max-w-full cursor-move ${dragOverItem === fileIndex ? 'border-primary' : ''}`}
+                                      >
+                                        <GripVertical className="h-3 w-3 text-muted-foreground flex-shrink-0" />
                                         {isImageFile(file.name) ? (
                                           <img
                                             src={file.download_url}

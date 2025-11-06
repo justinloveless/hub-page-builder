@@ -27,18 +27,46 @@ export const usePrefetchAssets = (siteId: string, assets: AssetConfig[] | undefi
   useEffect(() => {
     if (!assets || !siteId) return;
 
-    // Prefetch content for all text/json/markdown/image assets
+    // Prefetch content for all assets
     assets.forEach(asset => {
+      // For combo assets in directories, prefetch all parts
+      if (asset.type === 'directory' || asset.type === 'folder') {
+        if (asset.contains?.type === 'combo' && asset.contains.parts) {
+          // Prefetch directory files first
+          queryClient.prefetchQuery({
+            queryKey: ['directory-files', siteId, asset.path],
+            queryFn: async () => {
+              const { data, error } = await supabase.functions.invoke('list-directory-assets', {
+                body: { site_id: siteId, asset_path: asset.path },
+              });
+              if (error) throw error;
+              return data.files || [];
+            },
+            staleTime: 5 * 60 * 1000,
+          });
+        } else {
+          // Standard directory prefetch
+          queryClient.prefetchQuery({
+            queryKey: ['directory-files', siteId, asset.path],
+            queryFn: async () => {
+              const { data, error } = await supabase.functions.invoke('list-directory-assets', {
+                body: { site_id: siteId, asset_path: asset.path },
+              });
+              if (error) throw error;
+              return data.files || [];
+            },
+            staleTime: 5 * 60 * 1000,
+          });
+        }
+      }
+      
+      // For text/json/markdown/image assets, prefetch content
       const shouldPrefetchContent = 
         asset.type === 'text' || 
         asset.type === 'json' || 
         asset.type === 'markdown' || 
         asset.type === 'image' || 
         asset.type === 'img';
-
-      const shouldPrefetchDirectory = 
-        asset.type === 'directory' || 
-        asset.type === 'folder';
 
       if (shouldPrefetchContent) {
         queryClient.prefetchQuery({
@@ -49,20 +77,6 @@ export const usePrefetchAssets = (siteId: string, assets: AssetConfig[] | undefi
             });
             if (error) throw error;
             return data;
-          },
-          staleTime: 5 * 60 * 1000,
-        });
-      }
-
-      if (shouldPrefetchDirectory) {
-        queryClient.prefetchQuery({
-          queryKey: ['directory-files', siteId, asset.path],
-          queryFn: async () => {
-            const { data, error } = await supabase.functions.invoke('list-directory-assets', {
-              body: { site_id: siteId, asset_path: asset.path },
-            });
-            if (error) throw error;
-            return data.files || [];
           },
           staleTime: 5 * 60 * 1000,
         });
