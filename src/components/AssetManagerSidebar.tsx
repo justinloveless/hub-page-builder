@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -8,7 +8,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { Folder, FileText, Image, AlertCircle, RefreshCw, GitPullRequest, ChevronDown, ChevronRight, Plus, Trash2, File, Users, Edit, GripVertical } from "lucide-react";
+import { Folder, FileText, Image, AlertCircle, RefreshCw, GitPullRequest, ChevronDown, ChevronRight, Plus, Trash2, File, Users, Edit, GripVertical, ArrowUp, ArrowDown } from "lucide-react";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import CreateShareDialog from "./CreateShareDialog";
 import type { PendingAssetChange } from "@/pages/Manage";
@@ -77,6 +77,11 @@ const AssetManagerSidebar = ({ siteId, pendingChanges, setPendingChanges }: Asse
   const [draggedItem, setDraggedItem] = useState<number | null>(null);
   const [dragOverItem, setDragOverItem] = useState<number | null>(null);
   const [editingComboImage, setEditingComboImage] = useState<{ assetPath: string; filePath: string } | null>(null);
+  const [renamingFile, setRenamingFile] = useState<string | null>(null);
+  const [newFileName, setNewFileName] = useState<string>("");
+  const [draggedComboItem, setDraggedComboItem] = useState<number | null>(null);
+  const [dragOverComboItem, setDragOverComboItem] = useState<number | null>(null);
+  const scrollIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
   const found = assetsData?.found ?? null;
   const config = assetsData?.config ?? null;
@@ -171,7 +176,59 @@ const AssetManagerSidebar = ({ siteId, pendingChanges, setPendingChanges }: Asse
       });
 
       if (error) throw error;
-      setDirectoryFiles(prev => ({ ...prev, [asset.path]: data.files || [] }));
+
+      let files = data.files || [];
+
+      // Try to load manifest.json to get the order
+      const basePath = asset.path.endsWith('/') ? asset.path : asset.path + '/';
+      const manifestPath = basePath + 'manifest.json';
+
+      try {
+        let manifestContent: string | null = null;
+
+        // First check if manifest is in pending changes
+        const pendingManifest = pendingChanges.find(c => c.repoPath === manifestPath);
+        if (pendingManifest) {
+          // Decode base64 content
+          manifestContent = atob(pendingManifest.content);
+        } else {
+          // Fetch from API
+          const { data: manifestData } = await supabase.functions.invoke('fetch-asset-content', {
+            body: { site_id: siteId, asset_path: manifestPath },
+          });
+
+          if (manifestData?.found) {
+            manifestContent = manifestData.content;
+          }
+        }
+
+        if (manifestContent) {
+          const manifest = JSON.parse(manifestContent);
+          if (manifest.files && Array.isArray(manifest.files)) {
+            // Sort files based on manifest order
+            const orderedFiles: AssetFile[] = [];
+            const fileMap = new Map<string, AssetFile>(files.map(f => [f.name, f]));
+
+            manifest.files.forEach((fileName: string) => {
+              const file = fileMap.get(fileName);
+              if (file) {
+                orderedFiles.push(file);
+                fileMap.delete(fileName);
+              }
+            });
+
+            // Add any files not in manifest at the end
+            fileMap.forEach((file) => orderedFiles.push(file));
+
+            files = orderedFiles;
+          }
+        }
+      } catch (manifestError) {
+        // Manifest doesn't exist or failed to parse, use default order
+        console.debug('No manifest.json found or failed to parse:', manifestError);
+      }
+
+      setDirectoryFiles(prev => ({ ...prev, [asset.path]: files }));
     } catch (error: any) {
       console.error('Error loading directory files:', error);
       toast.error('Failed to load files');
@@ -206,6 +263,107 @@ const AssetManagerSidebar = ({ siteId, pendingChanges, setPendingChanges }: Asse
     }
   };
 
+  const handleRenameFile = async (asset: AssetConfig, file: AssetFile) => {
+    if (!newFileName.trim()) {
+      toast.error("Filename cannot be empty");
+      return;
+    }
+
+    // Validate filename
+    if (newFileName === file.name) {
+      setRenamingFile(null);
+      setNewFileName("");
+      return;
+    }
+
+    try {
+      // Get the directory path
+      const dirPath = asset.path.endsWith('/') ? asset.path : asset.path + '/';
+      const newFilePath = dirPath + newFileName;
+
+      // Check if already in pending changes
+      const existingPending = pendingChanges.find(c => c.repoPath === file.path);
+
+      let fileContent: string;
+
+      if (existingPending) {
+        // Use content from pending changes (already base64)
+        fileContent = existingPending.content;
+      } else {
+        // Fetch the file content
+        const isImage = isImageFile(file.name);
+
+        if (isImage) {
+          // For images, fetch directly from download_url and convert to base64
+          const response = await fetch(file.download_url);
+          const blob = await response.blob();
+          const base64 = await new Promise<string>((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onloadend = () => {
+              const result = reader.result as string;
+              resolve(result.split(',')[1]);
+            };
+            reader.onerror = reject;
+            reader.readAsDataURL(blob);
+          });
+          fileContent = base64;
+        } else {
+          // For text files, use the API
+          const { data, error } = await supabase.functions.invoke('fetch-asset-content', {
+            body: { site_id: siteId, asset_path: file.path },
+          });
+
+          if (error) throw error;
+
+          if (!data.found) {
+            toast.error("File not found");
+            return;
+          }
+
+          // Content comes as plain text, encode to base64
+          fileContent = btoa(unescape(encodeURIComponent(data.content)));
+        }
+      }
+
+      // Create pending change for the new file
+      const newChange: PendingAssetChange = {
+        repoPath: newFilePath,
+        content: fileContent,
+        fileName: newFileName
+      };
+
+      // Remove old file from pending changes if it exists, and add the new one
+      let updatedChanges = pendingChanges.filter(c => c.repoPath !== file.path);
+      updatedChanges = [...updatedChanges, newChange];
+
+      // If the file is committed (has real sha), we need to delete it
+      if (file.sha !== 'pending') {
+        // Delete the old file
+        const { error: deleteError } = await supabase.functions.invoke('delete-site-asset', {
+          body: {
+            site_id: siteId,
+            file_path: file.path,
+            sha: file.sha,
+            message: `Rename ${file.name} to ${newFileName}`,
+          },
+        });
+
+        if (deleteError) throw deleteError;
+      }
+
+      setPendingChanges(updatedChanges);
+      setRenamingFile(null);
+      setNewFileName("");
+      toast.success(`Renamed to ${newFileName}`);
+
+      // Refresh directory to show updated files
+      await loadDirectoryFiles(asset);
+    } catch (error: any) {
+      console.error('Error renaming file:', error);
+      toast.error(error.message || "Failed to rename file");
+    }
+  };
+
   const handleDeleteComboAsset = async (asset: AssetConfig, baseName: string, files: AssetFile[]) => {
     if (!confirm(`Are you sure you want to delete all parts of "${baseName}"? This action cannot be undone.`)) {
       return;
@@ -229,6 +387,100 @@ const AssetManagerSidebar = ({ siteId, pendingChanges, setPendingChanges }: Asse
     } catch (error: any) {
       console.error('Error deleting combo asset:', error);
       toast.error(error.message || "Failed to delete combo asset");
+    }
+  };
+
+  const handleRenameComboAsset = async (asset: AssetConfig, baseName: string, files: AssetFile[], comboParts: Array<{ assetType: string; allowedExtensions?: string[] }>) => {
+    if (!newFileName.trim()) {
+      toast.error("Name cannot be empty");
+      return;
+    }
+
+    if (newFileName === baseName) {
+      setRenamingFile(null);
+      setNewFileName("");
+      return;
+    }
+
+    try {
+      const dirPath = asset.path.endsWith('/') ? asset.path : asset.path + '/';
+
+      // For each file in the combo, create a pending change with the new base name
+      for (const file of files) {
+        const ext = getFileExtension(file.name);
+        const newFilePath = dirPath + newFileName + ext;
+
+        // Check if already in pending changes
+        const existingPending = pendingChanges.find(c => c.repoPath === file.path);
+
+        let fileContent: string;
+
+        if (existingPending) {
+          fileContent = existingPending.content;
+        } else {
+          const isImage = isImageFile(file.name);
+
+          if (isImage) {
+            const response = await fetch(file.download_url);
+            const blob = await response.blob();
+            const base64 = await new Promise<string>((resolve, reject) => {
+              const reader = new FileReader();
+              reader.onloadend = () => {
+                const result = reader.result as string;
+                resolve(result.split(',')[1]);
+              };
+              reader.onerror = reject;
+              reader.readAsDataURL(blob);
+            });
+            fileContent = base64;
+          } else {
+            const { data, error } = await supabase.functions.invoke('fetch-asset-content', {
+              body: { site_id: siteId, asset_path: file.path },
+            });
+
+            if (error) throw error;
+
+            if (!data.found) {
+              toast.error("File not found");
+              continue;
+            }
+
+            fileContent = btoa(unescape(encodeURIComponent(data.content)));
+          }
+        }
+
+        const newChange: PendingAssetChange = {
+          repoPath: newFilePath,
+          content: fileContent,
+          fileName: newFileName + ext
+        };
+
+        let updatedChanges = pendingChanges.filter(c => c.repoPath !== file.path);
+        updatedChanges = [...updatedChanges, newChange];
+        setPendingChanges(updatedChanges);
+
+        // Delete old file if committed
+        if (file.sha !== 'pending') {
+          const { error: deleteError } = await supabase.functions.invoke('delete-site-asset', {
+            body: {
+              site_id: siteId,
+              file_path: file.path,
+              sha: file.sha,
+              message: `Rename ${baseName} to ${newFileName}`,
+            },
+          });
+
+          if (deleteError) throw deleteError;
+        }
+      }
+
+      setRenamingFile(null);
+      setNewFileName("");
+      toast.success(`Renamed "${baseName}" to "${newFileName}"`);
+      await loadDirectoryFiles(asset);
+    } catch (error: any) {
+      console.error('Error renaming combo asset:', error);
+      toast.error(error.message || "Failed to rename combo asset");
     }
   };
 
@@ -266,6 +518,120 @@ const AssetManagerSidebar = ({ siteId, pendingChanges, setPendingChanges }: Asse
       console.error("Failed to update directory order:", error);
       toast.error(error.message || "Failed to update directory order");
     }
+  };
+
+  const handleAutoScroll = (e: React.DragEvent) => {
+    const scrollZone = 80; // pixels from edge to trigger scroll
+    const scrollSpeed = 10;
+
+    // Find the scrollable container (the asset list sidebar)
+    const container = (e.currentTarget as HTMLElement).closest('[role="main"]')?.previousElementSibling;
+    if (!container) return;
+
+    const rect = container.getBoundingClientRect();
+    const distanceFromTop = e.clientY - rect.top;
+    const distanceFromBottom = rect.bottom - e.clientY;
+
+    // Clear existing interval
+    if (scrollIntervalRef.current) {
+      clearInterval(scrollIntervalRef.current);
+      scrollIntervalRef.current = null;
+    }
+
+    // Scroll up if near top
+    if (distanceFromTop < scrollZone && distanceFromTop > 0) {
+      scrollIntervalRef.current = setInterval(() => {
+        container.scrollTop -= scrollSpeed;
+      }, 16);
+    }
+    // Scroll down if near bottom
+    else if (distanceFromBottom < scrollZone && distanceFromBottom > 0) {
+      scrollIntervalRef.current = setInterval(() => {
+        container.scrollTop += scrollSpeed;
+      }, 16);
+    }
+  };
+
+  const handleStopAutoScroll = () => {
+    if (scrollIntervalRef.current) {
+      clearInterval(scrollIntervalRef.current);
+      scrollIntervalRef.current = null;
+    }
+  };
+
+  const handleReorderComboAssets = async (
+    asset: AssetConfig,
+    groups: [string, { files: AssetFile[]; types: string[] }][],
+    fromIndex: number,
+    toIndex: number
+  ) => {
+    try {
+      // Reorder the groups
+      const reorderedGroups = [...groups];
+      const [movedGroup] = reorderedGroups.splice(fromIndex, 1);
+      reorderedGroups.splice(toIndex, 0, movedGroup);
+
+      // Create a flat list of all filenames in the new order
+      const allFileNames: string[] = [];
+      reorderedGroups.forEach(([baseName, group]) => {
+        group.files.forEach(file => {
+          allFileNames.push(file.name);
+        });
+      });
+
+      const manifestContent = {
+        files: allFileNames
+      };
+
+      const basePath = asset.path.endsWith('/') ? asset.path : asset.path + '/';
+      const manifestPath = basePath + 'manifest.json';
+
+      const base64Content = btoa(unescape(encodeURIComponent(JSON.stringify(manifestContent, null, 2))));
+
+      await saveToBatch({
+        ...asset,
+        path: manifestPath
+      }, JSON.stringify(manifestContent, null, 2));
+
+      setDraggedComboItem(null);
+      setDragOverComboItem(null);
+
+      toast.success("Combo asset order updated");
+
+      // Refresh the directory files
+      await loadDirectoryFiles(asset);
+    } catch (error: any) {
+      console.error("Failed to update combo asset order:", error);
+      toast.error(error.message || "Failed to update combo asset order");
+    }
+  };
+
+  const handleMoveComboAsset = async (
+    asset: AssetConfig,
+    groups: [string, { files: AssetFile[]; types: string[] }][],
+    fromIndex: number,
+    direction: 'up' | 'down'
+  ) => {
+    const toIndex = direction === 'up' ? fromIndex - 1 : fromIndex + 1;
+    if (toIndex < 0 || toIndex >= groups.length) return;
+
+    await handleReorderComboAssets(asset, groups, fromIndex, toIndex);
+  };
+
+  const handleMoveDirectoryItem = async (
+    asset: AssetConfig,
+    files: AssetFile[],
+    fromIndex: number,
+    direction: 'up' | 'down'
+  ) => {
+    const toIndex = direction === 'up' ? fromIndex - 1 : fromIndex + 1;
+    if (toIndex < 0 || toIndex >= files.length) return;
+
+    const newOrder = [...Array(files.length).keys()];
+    const [removed] = newOrder.splice(fromIndex, 1);
+    newOrder.splice(toIndex, 0, removed);
+
+    await handleReorderDirectoryItems(asset, files, newOrder);
   };
 
   const loadAssetContent = async (asset: AssetConfig) => {
@@ -739,7 +1105,41 @@ const AssetManagerSidebar = ({ siteId, pendingChanges, setPendingChanges }: Asse
     committedFiles.forEach(file => fileMap.set(file.path, file));
     pendingFiles.forEach(file => fileMap.set(file.path, file));
 
-    return Array.from(fileMap.values());
+    let files = Array.from(fileMap.values());
+
+    // Apply manifest ordering if it exists in pending changes
+    const manifestPath = basePath + 'manifest.json';
+    const pendingManifest = pendingChanges.find(c => c.repoPath === manifestPath);
+
+    if (pendingManifest) {
+      try {
+        const manifestContent = atob(pendingManifest.content);
+        const manifest = JSON.parse(manifestContent);
+
+        if (manifest.files && Array.isArray(manifest.files)) {
+          // Reorder files based on manifest
+          const orderedFiles: AssetFile[] = [];
+          const fileByName = new Map<string, AssetFile>(files.map(f => [f.name, f]));
+
+          manifest.files.forEach((fileName: string) => {
+            const file = fileByName.get(fileName);
+            if (file) {
+              orderedFiles.push(file);
+              fileByName.delete(fileName);
+            }
+          });
+
+          // Add any files not in manifest at the end
+          fileByName.forEach(file => orderedFiles.push(file));
+
+          files = orderedFiles;
+        }
+      } catch (error) {
+        console.debug('Failed to parse pending manifest:', error);
+      }
+    }
+
+    return files;
   };
 
   const groupComboAssets = (files: AssetFile[], comboParts: Array<{ assetType: string; allowedExtensions?: string[] }>) => {
@@ -1359,7 +1759,7 @@ const AssetManagerSidebar = ({ siteId, pendingChanges, setPendingChanges }: Asse
                                     <>
                                       {groups.length > 0 && (
                                         <div className="space-y-3">
-                                          {groups.map(([baseName, group]) => {
+                                          {groups.map(([baseName, group], groupIndex) => {
                                             // Sort files by type: images first, then text, then json
                                             const sortedFiles = [...group.files].sort((a, b) => {
                                               const aType = getFileAssetType(a.name, asset.contains.parts!);
@@ -1375,17 +1775,120 @@ const AssetManagerSidebar = ({ siteId, pendingChanges, setPendingChanges }: Asse
                                             });
 
                                             return (
-                                              <div key={baseName} className="p-3 border rounded-lg bg-accent/5 space-y-2">
-                                                <div className="flex items-center justify-between">
-                                                  <h5 className="text-xs font-semibold truncate">{baseName}</h5>
-                                                  <Button
-                                                    variant="ghost"
-                                                    size="sm"
-                                                    onClick={() => handleDeleteComboAsset(asset, baseName, group.files)}
-                                                    className="h-6 text-destructive hover:text-destructive hover:bg-destructive/10"
-                                                  >
-                                                    <Trash2 className="h-3 w-3" />
-                                                  </Button>
+                                              <div
+                                                key={baseName}
+                                                draggable
+                                                onDragStart={() => setDraggedComboItem(groupIndex)}
+                                                onDragOver={(e) => {
+                                                  e.preventDefault();
+                                                  handleAutoScroll(e);
+                                                  setDragOverComboItem(groupIndex);
+                                                }}
+                                                onDrop={(e) => {
+                                                  e.preventDefault();
+                                                  handleStopAutoScroll();
+                                                  if (draggedComboItem !== null && draggedComboItem !== groupIndex) {
+                                                    handleReorderComboAssets(asset, groups, draggedComboItem, groupIndex);
+                                                  }
+                                                }}
+                                                onDragEnd={() => {
+                                                  handleStopAutoScroll();
+                                                  setDraggedComboItem(null);
+                                                  setDragOverComboItem(null);
+                                                }}
+                                                onDragLeave={() => {
+                                                  handleStopAutoScroll();
+                                                }}
+                                                className={`p-3 border rounded-lg bg-accent/5 space-y-2 ${dragOverComboItem === groupIndex ? 'border-primary' : ''}`}
+                                              >
+                                                <div className="flex items-center gap-2">
+                                                  <div className="flex flex-col gap-0.5 flex-shrink-0">
+                                                    <Button
+                                                      variant="ghost"
+                                                      size="sm"
+                                                      onClick={() => handleMoveComboAsset(asset, groups, groupIndex, 'up')}
+                                                      disabled={groupIndex === 0}
+                                                      className="h-4 w-4 p-0 hover:bg-muted"
+                                                      title="Move up"
+                                                    >
+                                                      <ArrowUp className="h-3 w-3" />
+                                                    </Button>
+                                                    <Button
+                                                      variant="ghost"
+                                                      size="sm"
+                                                      onClick={() => handleMoveComboAsset(asset, groups, groupIndex, 'down')}
+                                                      disabled={groupIndex === groups.length - 1}
+                                                      className="h-4 w-4 p-0 hover:bg-muted"
+                                                      title="Move down"
+                                                    >
+                                                      <ArrowDown className="h-3 w-3" />
+                                                    </Button>
+                                                  </div>
+                                                  <GripVertical className="h-4 w-4 text-muted-foreground flex-shrink-0 cursor-move" />
+                                                  <div className="flex items-center justify-between flex-1">
+                                                    {renamingFile === baseName ? (
+                                                      <div className="flex items-center gap-1 flex-1">
+                                                        <Input
+                                                          value={newFileName}
+                                                          onChange={(e) => setNewFileName(e.target.value)}
+                                                          onKeyDown={(e) => {
+                                                            if (e.key === 'Enter') {
+                                                              handleRenameComboAsset(asset, baseName, group.files, asset.contains.parts!);
+                                                            } else if (e.key === 'Escape') {
+                                                              setRenamingFile(null);
+                                                              setNewFileName("");
+                                                            }
+                                                          }}
+                                                          className="h-7 text-xs"
+                                                          autoFocus
+                                                        />
+                                                        <Button
+                                                          variant="ghost"
+                                                          size="sm"
+                                                          onClick={() => handleRenameComboAsset(asset, baseName, group.files, asset.contains.parts!)}
+                                                          className="h-7 px-2 text-xs"
+                                                        >
+                                                          Save
+                                                        </Button>
+                                                        <Button
+                                                          variant="ghost"
+                                                          size="sm"
+                                                          onClick={() => {
+                                                            setRenamingFile(null);
+                                                            setNewFileName("");
+                                                          }}
+                                                          className="h-7 px-2 text-xs"
+                                                        >
+                                                          Cancel
+                                                        </Button>
+                                                      </div>
+                                                    ) : (
+                                                      <>
+                                                        <h5 className="text-xs font-semibold truncate">{baseName}</h5>
+                                                        <div className="flex items-center gap-1 flex-shrink-0">
+                                                          <Button
+                                                            variant="ghost"
+                                                            size="sm"
+                                                            onClick={() => {
+                                                              setRenamingFile(baseName);
+                                                              setNewFileName(baseName);
+                                                            }}
+                                                            className="h-6"
+                                                          >
+                                                            <Edit className="h-3 w-3" />
+                                                          </Button>
+                                                          <Button
+                                                            variant="ghost"
+                                                            size="sm"
+                                                            onClick={() => handleDeleteComboAsset(asset, baseName, group.files)}
+                                                            className="h-6 text-destructive hover:text-destructive hover:bg-destructive/10"
+                                                          >
+                                                            <Trash2 className="h-3 w-3" />
+                                                          </Button>
+                                                        </div>
+                                                      </>
+                                                    )}
+                                                  </div>
                                                 </div>
                                                 <div className="space-y-2">
                                                   {sortedFiles.map((file) => {
@@ -1527,36 +2030,90 @@ const AssetManagerSidebar = ({ siteId, pendingChanges, setPendingChanges }: Asse
                                                   </div>
                                                 )}
                                                 <div className="flex-1 min-w-0">
-                                                  <p className="text-xs font-medium truncate">{file.name}</p>
-                                                  <p className="text-xs text-muted-foreground">
-                                                    {(file.size / 1024).toFixed(1)} KB
-                                                  </p>
+                                                  {renamingFile === file.path ? (
+                                                    <div className="flex items-center gap-1">
+                                                      <Input
+                                                        value={newFileName}
+                                                        onChange={(e) => setNewFileName(e.target.value)}
+                                                        onKeyDown={(e) => {
+                                                          if (e.key === 'Enter') {
+                                                            handleRenameFile(asset, file);
+                                                          } else if (e.key === 'Escape') {
+                                                            setRenamingFile(null);
+                                                            setNewFileName("");
+                                                          }
+                                                        }}
+                                                        className="h-7 text-xs"
+                                                        autoFocus
+                                                      />
+                                                      <Button
+                                                        variant="ghost"
+                                                        size="sm"
+                                                        onClick={() => handleRenameFile(asset, file)}
+                                                        className="h-7 px-2 text-xs"
+                                                      >
+                                                        Save
+                                                      </Button>
+                                                      <Button
+                                                        variant="ghost"
+                                                        size="sm"
+                                                        onClick={() => {
+                                                          setRenamingFile(null);
+                                                          setNewFileName("");
+                                                        }}
+                                                        className="h-7 px-2 text-xs"
+                                                      >
+                                                        Cancel
+                                                      </Button>
+                                                    </div>
+                                                  ) : (
+                                                    <>
+                                                      <p className="text-xs font-medium truncate">{file.name}</p>
+                                                      <p className="text-xs text-muted-foreground">
+                                                        {(file.size / 1024).toFixed(1)} KB
+                                                      </p>
+                                                    </>
+                                                  )}
                                                 </div>
-                                                <div className="flex items-center gap-1 flex-shrink-0">
-                                                  <Button
-                                                    variant="ghost"
-                                                    size="sm"
-                                                    onClick={() => window.open(file.download_url, '_blank')}
-                                                    className="h-7 w-7 p-0"
-                                                    title="Open file"
-                                                  >
-                                                    <FileText className="h-3 w-3" />
-                                                  </Button>
-                                                  <Button
-                                                    variant="ghost"
-                                                    size="sm"
-                                                    onClick={() => handleDeleteFile(asset, file.path, file.sha)}
-                                                    disabled={deletingFile === file.path}
-                                                    className="h-7 w-7 p-0"
-                                                    title="Delete file"
-                                                  >
-                                                    {deletingFile === file.path ? (
-                                                      <RefreshCw className="h-3 w-3 animate-spin" />
-                                                    ) : (
-                                                      <Trash2 className="h-3 w-3" />
-                                                    )}
-                                                  </Button>
-                                                </div>
+                                                {renamingFile !== file.path && (
+                                                  <div className="flex items-center gap-1 flex-shrink-0">
+                                                    <Button
+                                                      variant="ghost"
+                                                      size="sm"
+                                                      onClick={() => window.open(file.download_url, '_blank')}
+                                                      className="h-7 w-7 p-0"
+                                                      title="Open file"
+                                                    >
+                                                      <FileText className="h-3 w-3" />
+                                                    </Button>
+                                                    <Button
+                                                      variant="ghost"
+                                                      size="sm"
+                                                      onClick={() => {
+                                                        setRenamingFile(file.path);
+                                                        setNewFileName(file.name);
+                                                      }}
+                                                      className="h-7 w-7 p-0"
+                                                      title="Rename file"
+                                                    >
+                                                      <Edit className="h-3 w-3" />
+                                                    </Button>
+                                                    <Button
+                                                      variant="ghost"
+                                                      size="sm"
+                                                      onClick={() => handleDeleteFile(asset, file.path, file.sha)}
+                                                      disabled={deletingFile === file.path}
+                                                      className="h-7 w-7 p-0"
+                                                      title="Delete file"
+                                                    >
+                                                      {deletingFile === file.path ? (
+                                                        <RefreshCw className="h-3 w-3 animate-spin" />
+                                                      ) : (
+                                                        <Trash2 className="h-3 w-3" />
+                                                      )}
+                                                    </Button>
+                                                  </div>
+                                                )}
                                               </div>
                                             ))}
                                           </div>
@@ -1577,9 +2134,14 @@ const AssetManagerSidebar = ({ siteId, pendingChanges, setPendingChanges }: Asse
                                         key={file.path}
                                         draggable
                                         onDragStart={() => setDraggedItem(fileIndex)}
-                                        onDragOver={(e) => { e.preventDefault(); setDragOverItem(fileIndex); }}
+                                        onDragOver={(e) => {
+                                          e.preventDefault();
+                                          handleAutoScroll(e);
+                                          setDragOverItem(fileIndex);
+                                        }}
                                         onDrop={(e) => {
                                           e.preventDefault();
+                                          handleStopAutoScroll();
                                           if (draggedItem !== null) {
                                             const files = getMergedDirectoryFiles(asset.path);
                                             const newOrder = [...Array(files.length).keys()];
@@ -1588,9 +2150,37 @@ const AssetManagerSidebar = ({ siteId, pendingChanges, setPendingChanges }: Asse
                                             handleReorderDirectoryItems(asset, files, newOrder);
                                           }
                                         }}
-                                        className={`flex items-center gap-2 p-2 border rounded-lg hover:bg-muted/50 w-full max-w-full cursor-move ${dragOverItem === fileIndex ? 'border-primary' : ''}`}
+                                        onDragEnd={() => {
+                                          handleStopAutoScroll();
+                                        }}
+                                        onDragLeave={() => {
+                                          handleStopAutoScroll();
+                                        }}
+                                        className={`flex items-center gap-2 p-2 border rounded-lg hover:bg-muted/50 w-full max-w-full ${dragOverItem === fileIndex ? 'border-primary' : ''}`}
                                       >
-                                        <GripVertical className="h-3 w-3 text-muted-foreground flex-shrink-0" />
+                                        <div className="flex flex-col gap-0.5 flex-shrink-0">
+                                          <Button
+                                            variant="ghost"
+                                            size="sm"
+                                            onClick={() => handleMoveDirectoryItem(asset, getMergedDirectoryFiles(asset.path), fileIndex, 'up')}
+                                            disabled={fileIndex === 0}
+                                            className="h-4 w-4 p-0 hover:bg-muted"
+                                            title="Move up"
+                                          >
+                                            <ArrowUp className="h-3 w-3" />
+                                          </Button>
+                                          <Button
+                                            variant="ghost"
+                                            size="sm"
+                                            onClick={() => handleMoveDirectoryItem(asset, getMergedDirectoryFiles(asset.path), fileIndex, 'down')}
+                                            disabled={fileIndex === getMergedDirectoryFiles(asset.path).length - 1}
+                                            className="h-4 w-4 p-0 hover:bg-muted"
+                                            title="Move down"
+                                          >
+                                            <ArrowDown className="h-3 w-3" />
+                                          </Button>
+                                        </div>
+                                        <GripVertical className="h-3 w-3 text-muted-foreground flex-shrink-0 cursor-move" />
                                         {isImageFile(file.name) ? (
                                           <img
                                             src={file.download_url}
@@ -1603,36 +2193,90 @@ const AssetManagerSidebar = ({ siteId, pendingChanges, setPendingChanges }: Asse
                                           </div>
                                         )}
                                         <div className="flex-1 min-w-0 overflow-hidden">
-                                          <p className="text-xs font-medium truncate">{file.name}</p>
-                                          <p className="text-xs text-muted-foreground">
-                                            {(file.size / 1024).toFixed(1)} KB
-                                          </p>
+                                          {renamingFile === file.path ? (
+                                            <div className="flex items-center gap-1">
+                                              <Input
+                                                value={newFileName}
+                                                onChange={(e) => setNewFileName(e.target.value)}
+                                                onKeyDown={(e) => {
+                                                  if (e.key === 'Enter') {
+                                                    handleRenameFile(asset, file);
+                                                  } else if (e.key === 'Escape') {
+                                                    setRenamingFile(null);
+                                                    setNewFileName("");
+                                                  }
+                                                }}
+                                                className="h-7 text-xs"
+                                                autoFocus
+                                              />
+                                              <Button
+                                                variant="ghost"
+                                                size="sm"
+                                                onClick={() => handleRenameFile(asset, file)}
+                                                className="h-7 px-2 text-xs"
+                                              >
+                                                Save
+                                              </Button>
+                                              <Button
+                                                variant="ghost"
+                                                size="sm"
+                                                onClick={() => {
+                                                  setRenamingFile(null);
+                                                  setNewFileName("");
+                                                }}
+                                                className="h-7 px-2 text-xs"
+                                              >
+                                                Cancel
+                                              </Button>
+                                            </div>
+                                          ) : (
+                                            <>
+                                              <p className="text-xs font-medium truncate">{file.name}</p>
+                                              <p className="text-xs text-muted-foreground">
+                                                {(file.size / 1024).toFixed(1)} KB
+                                              </p>
+                                            </>
+                                          )}
                                         </div>
-                                        <div className="flex items-center gap-1 flex-shrink-0">
-                                          <Button
-                                            variant="ghost"
-                                            size="sm"
-                                            onClick={() => window.open(file.download_url, '_blank')}
-                                            className="h-7 w-7 p-0"
-                                            title="Open file"
-                                          >
-                                            <FileText className="h-3 w-3" />
-                                          </Button>
-                                          <Button
-                                            variant="ghost"
-                                            size="sm"
-                                            onClick={() => handleDeleteFile(asset, file.path, file.sha)}
-                                            disabled={deletingFile === file.path}
-                                            className="h-7 w-7 p-0"
-                                            title="Delete file"
-                                          >
-                                            {deletingFile === file.path ? (
-                                              <RefreshCw className="h-3 w-3 animate-spin" />
-                                            ) : (
-                                              <Trash2 className="h-3 w-3" />
-                                            )}
-                                          </Button>
-                                        </div>
+                                        {renamingFile !== file.path && (
+                                          <div className="flex items-center gap-1 flex-shrink-0">
+                                            <Button
+                                              variant="ghost"
+                                              size="sm"
+                                              onClick={() => window.open(file.download_url, '_blank')}
+                                              className="h-7 w-7 p-0"
+                                              title="Open file"
+                                            >
+                                              <FileText className="h-3 w-3" />
+                                            </Button>
+                                            <Button
+                                              variant="ghost"
+                                              size="sm"
+                                              onClick={() => {
+                                                setRenamingFile(file.path);
+                                                setNewFileName(file.name);
+                                              }}
+                                              className="h-7 w-7 p-0"
+                                              title="Rename file"
+                                            >
+                                              <Edit className="h-3 w-3" />
+                                            </Button>
+                                            <Button
+                                              variant="ghost"
+                                              size="sm"
+                                              onClick={() => handleDeleteFile(asset, file.path, file.sha)}
+                                              disabled={deletingFile === file.path}
+                                              className="h-7 w-7 p-0"
+                                              title="Delete file"
+                                            >
+                                              {deletingFile === file.path ? (
+                                                <RefreshCw className="h-3 w-3 animate-spin" />
+                                              ) : (
+                                                <Trash2 className="h-3 w-3" />
+                                              )}
+                                            </Button>
+                                          </div>
+                                        )}
                                       </div>
                                     ))}
                                   </div>
