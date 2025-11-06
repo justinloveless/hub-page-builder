@@ -21,13 +21,13 @@ All colors MUST be HSL.
     --primary-foreground: 0 0% 100%;
     --primary-hover: 200 85% 50%;
 
-    --secondary: 320 80% 65%;
+    --secondary: 320 65% 50%;
     --secondary-foreground: 0 0% 100%;
 
     --muted: 230 20% 90%;
     --muted-foreground: 230 15% 50%;
 
-    --accent: 320 80% 65%;
+    --accent: 320 65% 50%;
     --accent-foreground: 0 0% 100%;
 
     --destructive: 0 84% 60%;
@@ -39,7 +39,7 @@ All colors MUST be HSL.
 
     --radius: 0.5rem;
 
-    --gradient-primary: linear-gradient(135deg, hsl(200 85% 55%), hsl(320 80% 65%));
+    --gradient-primary: linear-gradient(135deg, hsl(200 85% 55%), hsl(320, 65%, 50%));
     --gradient-card: linear-gradient(180deg, hsl(0 0% 100%), hsl(230 35% 98%));
     --shadow-card: 0 4px 20px -4px hsl(200 85% 55% / 0.15);
     --shadow-card-hover: 0 10px 25px -5px hsl(200 85% 55% / 0.25);
@@ -76,13 +76,13 @@ All colors MUST be HSL.
     --primary-foreground: 0 0% 100%;
     --primary-hover: 200 85% 55%;
 
-    --secondary: 320 80% 70%;
+    --secondary: 320 65% 50%;
     --secondary-foreground: 0 0% 100%;
 
     --muted: 235 30% 20%;
     --muted-foreground: 230 20% 65%;
 
-    --accent: 320 80% 70%;
+    --accent: 320 65% 50%;
     --accent-foreground: 0 0% 100%;
 
     --destructive: 0 62% 50%;
