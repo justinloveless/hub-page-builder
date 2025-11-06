@@ -10,7 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
 import { toast } from "sonner";
-import { ArrowLeft, ExternalLink, GitBranch, Users, FileText, Activity, Copy, Trash2, Check, User as UserIcon, Settings, UserCog, Crown, LogOut, Filter, CalendarIcon, X, Package, GitCommit, Upload, Shield, Menu } from "lucide-react";
+import { ArrowLeft, ExternalLink, GitBranch, Users, FileText, Activity, Copy, Trash2, Check, User as UserIcon, Settings, UserCog, Crown, LogOut, Filter, CalendarIcon, X, Package, GitCommit, Upload, Shield, Menu, Edit } from "lucide-react";
 import { Separator } from "@/components/ui/separator";
 import { format } from "date-fns";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
@@ -735,6 +735,16 @@ const Manage = () => {
               <p className={`text-muted-foreground ${isMobile ? 'text-sm' : 'text-xs'}`}>+{members.length - 3} more</p>
             )}
           </div>
+          
+          {/* Leave Site Button */}
+          <Button
+            variant="outline"
+            className="w-full"
+            onClick={handleLeaveSite}
+          >
+            <LogOut className={`mr-2 ${isMobile ? 'h-4 w-4' : 'h-3 w-3'}`} />
+            Leave Site
+          </Button>
         </div>
 
         <Separator />
@@ -876,32 +886,6 @@ const Manage = () => {
               <p className="text-xs sm:text-sm text-muted-foreground truncate">{site.repo_full_name}</p>
             </div>
             <div className="flex items-center gap-2 flex-shrink-0">
-              {isMobile && (
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  onClick={() => setShowMobileSidebar(true)}
-                  title="Menu"
-                >
-                  <Menu className="h-5 w-5" />
-                </Button>
-              )}
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={() => navigate("/profile")}
-                title="Profile"
-              >
-                <UserIcon className="h-5 w-5" />
-              </Button>
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={handleLeaveSite}
-                title="Leave Site"
-              >
-                <LogOut className="h-5 w-5" />
-              </Button>
               <Button
                 variant="outline"
                 size="sm"
@@ -925,10 +909,22 @@ const Manage = () => {
         </div>
       </header>
 
+      {/* Mobile FAB for Asset Manager */}
+      {isMobile && (
+        <Button
+          className="fixed bottom-6 right-6 h-14 w-14 rounded-full shadow-lg z-40"
+          size="icon"
+          onClick={() => setShowMobileSidebar(true)}
+          title="Manage Assets"
+        >
+          <Edit className="h-6 w-6" />
+        </Button>
+      )}
+
       {/* Mobile Drawer */}
       {isMobile && (
         <Drawer open={showMobileSidebar} onOpenChange={setShowMobileSidebar}>
-          <DrawerContent className="max-h-[85vh]">
+          <DrawerContent className="max-h-[85vh] z-50">
             <DrawerHeader>
               <DrawerTitle>Site Management</DrawerTitle>
             </DrawerHeader>
