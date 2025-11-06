@@ -14,6 +14,9 @@ import CreateShareDialog from "./CreateShareDialog";
 import type { PendingAssetChange } from "@/pages/Manage";
 import { useSiteAssets } from "@/hooks/useSiteAssets";
 import { useQueryClient } from "@tanstack/react-query";
+import { useAssetContent } from "@/hooks/useAssetContent";
+import { useDirectoryFiles } from "@/hooks/useDirectoryFiles";
+import { usePrefetchAssets } from "@/hooks/usePrefetchAssets";
 
 interface AssetConfig {
   path: string;
@@ -75,6 +78,9 @@ const AssetManagerSidebar = ({ siteId, pendingChanges, setPendingChanges }: Asse
   const found = assetsData?.found ?? null;
   const config = assetsData?.config ?? null;
 
+  // Prefetch all asset content in the background
+  usePrefetchAssets(siteId, config?.assets);
+
   const handleRefresh = async () => {
     await refetch();
   };
@@ -85,17 +91,49 @@ const AssetManagerSidebar = ({ siteId, pendingChanges, setPendingChanges }: Asse
       newExpanded.delete(asset.path);
     } else {
       newExpanded.add(asset.path);
-      // Load content when expanding
-      if ((asset.type === 'text' || asset.type === 'json' || asset.type === 'markdown') && !assetContents[asset.path]) {
+      
+      // Check cache first, then load if not cached
+      const cachedContent = queryClient.getQueryData(['asset-content', siteId, asset.path]);
+      const cachedFiles = queryClient.getQueryData(['directory-files', siteId, asset.path]);
+      
+      // Load content when expanding if not already in cache
+      if ((asset.type === 'text' || asset.type === 'json' || asset.type === 'markdown') && !assetContents[asset.path] && !cachedContent) {
         await loadAssetContent(asset);
+      } else if (cachedContent && !assetContents[asset.path]) {
+        // Use cached content
+        const data = cachedContent as any;
+        if (data.found) {
+          setAssetContents(prev => ({ ...prev, [asset.path]: data.content }));
+          if (asset.type === 'json' && asset.schema) {
+            try {
+              const parsed = JSON.parse(data.content);
+              setJsonFormData(prev => ({ ...prev, [asset.path]: parsed }));
+            } catch (e) {
+              console.error("Failed to parse JSON:", e);
+            }
+          }
+        }
       }
-      // Load directory files when expanding
-      if ((asset.type === 'directory' || asset.type === 'folder') && !directoryFiles[asset.path]) {
+      
+      // Load directory files when expanding if not already in cache
+      if ((asset.type === 'directory' || asset.type === 'folder') && !directoryFiles[asset.path] && !cachedFiles) {
         await loadDirectoryFiles(asset);
+      } else if (cachedFiles && !directoryFiles[asset.path]) {
+        // Use cached files
+        setDirectoryFiles(prev => ({ ...prev, [asset.path]: cachedFiles as any }));
       }
-      // Load image when expanding
+      
+      // Load image when expanding if not already loaded
       if ((asset.type === 'image' || asset.type === 'img') && !imageUrls[asset.path]) {
-        await loadImageAsset(asset);
+        const cachedImage = queryClient.getQueryData(['asset-content', siteId, asset.path]);
+        if (cachedImage) {
+          const data = cachedImage as any;
+          if (data.found && data.download_url) {
+            setImageUrls(prev => ({ ...prev, [asset.path]: data.download_url }));
+          }
+        } else {
+          await loadImageAsset(asset);
+        }
       }
     }
     setExpandedAssets(newExpanded);
