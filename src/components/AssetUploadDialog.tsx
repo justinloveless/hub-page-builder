@@ -227,7 +227,6 @@ const AssetUploadDialog = ({ open, onOpenChange, asset, siteId, pendingChanges, 
           
           const updatedChanges = pendingChanges.filter(c => c.repoPath !== fullPath);
           setPendingChanges([...updatedChanges, newChange]);
-          toast.success("Added to batch");
           setFile(null);
           setPreview(null);
           setShowConfirmation(false);
@@ -310,7 +309,6 @@ const AssetUploadDialog = ({ open, onOpenChange, asset, siteId, pendingChanges, 
         
         const updatedChanges = pendingChanges.filter(c => c.repoPath !== asset.path);
         setPendingChanges([...updatedChanges, newChange]);
-        toast.success("Added to batch");
       } else {
         const { error } = await supabase.functions.invoke('upload-site-asset', {
           body: {
