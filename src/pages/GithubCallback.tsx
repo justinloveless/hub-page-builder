@@ -13,7 +13,7 @@ const GithubCallback = () => {
       try {
         console.log('GitHub callback started');
         console.log('Search params:', Object.fromEntries(searchParams.entries()));
-        
+
         const installationId = searchParams.get('installation_id');
         const setupAction = searchParams.get('setup_action');
         const state = searchParams.get('state');
@@ -21,20 +21,20 @@ const GithubCallback = () => {
         console.log('Parsed params:', { installationId, setupAction, state });
 
         // Verify state
-        const savedState = sessionStorage.getItem('github_oauth_state');
+        const savedState = localStorage.getItem('github_oauth_state');
         console.log('State validation:', { received: state, saved: savedState, matches: state === savedState });
-        
+
         if (state !== savedState) {
           throw new Error('Invalid state parameter - please try connecting again');
         }
-        sessionStorage.removeItem('github_oauth_state');
+        localStorage.removeItem('github_oauth_state');
 
         if (!installationId) {
           throw new Error('No installation ID received from GitHub');
         }
 
         console.log('Calling github-installation-details edge function...');
-        
+
         // Call edge function to get installation details
         const { data, error } = await supabase.functions.invoke('github-installation-details', {
           body: { installation_id: installationId },
@@ -59,7 +59,7 @@ const GithubCallback = () => {
               setup_action: setupAction,
             }
           }, window.location.origin);
-          
+
           console.log('Message sent, closing popup...');
           setTimeout(() => window.close(), 500);
         } else {
@@ -70,7 +70,7 @@ const GithubCallback = () => {
         }
       } catch (error: any) {
         console.error('GitHub callback error:', error);
-        
+
         if (window.opener) {
           window.opener.postMessage({
             type: 'GITHUB_OAUTH_ERROR',

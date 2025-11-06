@@ -99,9 +99,9 @@ const AddSiteDialog = ({ onSiteAdded }: AddSiteDialogProps) => {
 
       if (event.data?.type === 'GITHUB_OAUTH_SUCCESS') {
         const { installation_id, repositories } = event.data.data;
-        
+
         console.log('GitHub connection successful:', { installation_id, repoCount: repositories?.length });
-        
+
         // If we have repositories, use the first one to pre-fill
         if (repositories && repositories.length > 0) {
           const repo = repositories[0];
@@ -117,7 +117,7 @@ const AddSiteDialog = ({ onSiteAdded }: AddSiteDialogProps) => {
             githubInstallationId: installation_id.toString(),
           }));
         }
-        
+
         toast.success("Connected to GitHub successfully!");
         setConnectingGithub(false);
         setPopupWindow(null);
@@ -168,7 +168,7 @@ const AddSiteDialog = ({ onSiteAdded }: AddSiteDialogProps) => {
 
   const handleFetchInstallations = async () => {
     setConnectingGithub(true);
-    
+
     try {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) throw new Error("Not authenticated");
@@ -194,7 +194,7 @@ const AddSiteDialog = ({ onSiteAdded }: AddSiteDialogProps) => {
 
   const handleSelectRepository = async (repo: Repository, installationId: number) => {
     setLoading(true);
-    
+
     try {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) throw new Error("Not authenticated");
@@ -214,7 +214,7 @@ const AddSiteDialog = ({ onSiteAdded }: AddSiteDialogProps) => {
 
       toast.success(`Site "${repo.name}" added successfully!`);
       setOpen(false);
-      
+
       // Reset form and installations
       setFormData({
         name: "",
@@ -223,7 +223,7 @@ const AddSiteDialog = ({ onSiteAdded }: AddSiteDialogProps) => {
         githubInstallationId: "",
       });
       setInstallations([]);
-      
+
       onSiteAdded();
     } catch (error: any) {
       console.error("Error adding site:", error);
@@ -235,7 +235,7 @@ const AddSiteDialog = ({ onSiteAdded }: AddSiteDialogProps) => {
 
   const handleConnectGithub = async () => {
     setConnectingGithub(true);
-    
+
     try {
       // Fetch GitHub app config
       const { data: config, error } = await supabase
@@ -257,15 +257,15 @@ const AddSiteDialog = ({ onSiteAdded }: AddSiteDialogProps) => {
       const redirectUri = `${window.location.origin}/github/callback`;
       const state = crypto.randomUUID();
       sessionStorage.setItem('github_oauth_state', state);
-      
-      const oauthUrl = `https://github.com/apps/${config.slug}/installations/new?state=${state}`;
-      
+
+      const oauthUrl = `https://github.com/apps/${config.slug}/installations/new?state=${state}&redirect_uri=${encodeURIComponent(redirectUri)}`;
+
       // Open in popup
       const width = 600;
       const height = 700;
       const left = window.screenX + (window.outerWidth - width) / 2;
       const top = window.screenY + (window.outerHeight - height) / 2;
-      
+
       const popup = window.open(
         oauthUrl,
         'GitHub OAuth',
@@ -277,10 +277,10 @@ const AddSiteDialog = ({ onSiteAdded }: AddSiteDialogProps) => {
       }
 
       setPopupWindow(popup);
-      
+
       // Focus the popup
       popup.focus();
-      
+
       console.log('GitHub OAuth popup opened');
     } catch (error: any) {
       console.error("Error connecting to GitHub:", error);
@@ -388,7 +388,7 @@ const AddSiteDialog = ({ onSiteAdded }: AddSiteDialogProps) => {
                       </>
                     )}
                   </Button>
-                  
+
                   <Button
                     type="button"
                     variant="secondary"
@@ -408,7 +408,7 @@ const AddSiteDialog = ({ onSiteAdded }: AddSiteDialogProps) => {
                       </>
                     )}
                   </Button>
-                  
+
                   {connectingGithub && (
                     <p className="text-xs text-center text-muted-foreground mt-2">
                       Complete the GitHub installation in the popup window
@@ -442,7 +442,7 @@ const AddSiteDialog = ({ onSiteAdded }: AddSiteDialogProps) => {
                         <div className="space-y-2">
                           {installation.repositories.map((repo) => {
                             const isAdded = isRepositoryAdded(repo.full_name);
-                            
+
                             return (
                               <Card key={repo.full_name} className="hover:bg-accent/50 transition-colors">
                                 <CardHeader className="pb-3">
