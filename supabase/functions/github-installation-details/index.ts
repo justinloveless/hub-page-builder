@@ -98,25 +98,40 @@ Deno.serve(async (req) => {
     const octokit = await app.getInstallationOctokit(installation_id)
     console.log('Got GitHub installation client')
 
-    // Get installation repositories
-    const { data: reposData } = await octokit.request('GET /installation/repositories')
-    console.log(`Found ${reposData.repositories.length} repositories`)
+    // Get installation repositories (with pagination for "All repositories")
+    const { data: reposData } = await octokit.request('GET /installation/repositories', {
+      per_page: 100  // Get up to 100 repos per page
+    })
+    console.log(`Found ${reposData.repositories.length} out of ${reposData.total_count} repositories`)
 
     // Get installation details
     const { data: installationData } = await app.octokit.request('GET /app/installations/{installation_id}', {
       installation_id: installation_id
     })
 
-    // Get the old installation_id for this user (if it exists)
-    const { data: oldInstallation } = await supabaseClient
+    // Check if user already has an installation
+    const { data: existingInstallation } = await supabaseClient
       .from('github_installations')
       .select('installation_id')
       .eq('user_id', user.id)
       .maybeSingle()
 
-    const oldInstallationId = oldInstallation?.installation_id
+    // If user has a different installation, delete it first (FK will set sites.github_installation_id to NULL)
+    if (existingInstallation && existingInstallation.installation_id !== installation_id) {
+      console.log(`User switching from installation ${existingInstallation.installation_id} to ${installation_id}`)
 
-    // Record this installation for the user (upserts by installation_id as PK)
+      const { error: deleteError } = await supabaseClient
+        .from('github_installations')
+        .delete()
+        .eq('user_id', user.id)
+
+      if (deleteError) {
+        console.error('Error deleting old installation:', deleteError)
+        throw new Error(`Failed to remove old installation: ${deleteError.message}`)
+      }
+    }
+
+    // Insert or update the installation (upsert by installation_id since it's the PK)
     const { error: upsertError } = await supabaseClient
       .from('github_installations')
       .upsert({
@@ -127,41 +142,34 @@ Deno.serve(async (req) => {
         account_avatar_url: installationData.account.avatar_url,
         updated_at: new Date().toISOString(),
       }, {
-        onConflict: 'installation_id'
+        onConflict: 'installation_id'  // PK conflict resolution
       })
 
     if (upsertError) {
       console.error('Error recording installation:', upsertError)
-      // Don't fail the request, just log the error
+      throw new Error(`Failed to save GitHub installation: ${upsertError.message}`)
     }
 
-    // If the installation_id changed (user had old installation, now has new one)
-    // Delete the old installation record (FK will set sites to NULL via ON DELETE SET NULL)
-    // Then update sites to use the new installation_id
-    if (oldInstallationId && oldInstallationId !== installation_id) {
-      console.log(`User switched from installation ${oldInstallationId} to ${installation_id}`)
+    console.log(`Successfully recorded installation ${installation_id} for user ${user.id}`)
 
-      // Delete old installation (this will set github_installation_id to NULL in sites via FK)
-      const { error: deleteError } = await supabaseClient
-        .from('github_installations')
-        .delete()
-        .eq('installation_id', oldInstallationId)
+    // Reconnect any sites that were disconnected (github_installation_id is NULL) to this installation
+    const { error: updateSitesError } = await supabaseClient
+      .from('sites')
+      .update({ github_installation_id: installation_id })
+      .eq('created_by', user.id)
+      .is('github_installation_id', null)
 
-      if (deleteError) {
-        console.error('Error deleting old installation:', deleteError)
-      }
-
-      // Update user's sites to use new installation_id
-      const { error: updateSitesError } = await supabaseClient
+    if (updateSitesError) {
+      console.error('Error reconnecting sites to installation:', updateSitesError)
+    } else {
+      const { count } = await supabaseClient
         .from('sites')
-        .update({ github_installation_id: installation_id })
+        .select('id', { count: 'exact', head: true })
         .eq('created_by', user.id)
-        .is('github_installation_id', null)
+        .eq('github_installation_id', installation_id)
 
-      if (updateSitesError) {
-        console.error('Error updating sites with new installation_id:', updateSitesError)
-      } else {
-        console.log('Successfully updated sites with new installation_id')
+      if (count && count > 0) {
+        console.log(`Reconnected ${count} site(s) to installation ${installation_id}`)
       }
     }
 
