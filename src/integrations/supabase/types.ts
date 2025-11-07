@@ -390,6 +390,42 @@ export type Database = {
         }
         Relationships: []
       }
+      feature_flags: {
+        Row: {
+          id: string
+          flag_key: string
+          name: string
+          description: string | null
+          enabled: boolean
+          rollout_percentage: number
+          user_targeting: Json
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          flag_key: string
+          name: string
+          description?: string | null
+          enabled?: boolean
+          rollout_percentage?: number
+          user_targeting?: Json
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          flag_key?: string
+          name?: string
+          description?: string | null
+          enabled?: boolean
+          rollout_percentage?: number
+          user_targeting?: Json
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       templates: {
         Row: {
           created_at: string
