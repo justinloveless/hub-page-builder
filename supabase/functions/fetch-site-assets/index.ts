@@ -114,11 +114,23 @@ Deno.serve(async (req) => {
       isPKCS8: normalizedKey.includes('BEGIN PRIVATE KEY'),
       length: normalizedKey.length,
     })
-    
+
     const app = new App({
       appId: config.app_id,
       privateKey: normalizedKey,
     })
+
+    // Verify the installation exists and is accessible
+    try {
+      await app.octokit.request('GET /app/installations/{installation_id}', {
+        installation_id: site.github_installation_id
+      })
+    } catch (installError: any) {
+      if (installError.status === 404) {
+        throw new Error('GitHub App installation no longer exists. The app may have been uninstalled. Please reconnect your GitHub account and update the site settings.')
+      }
+      throw installError
+    }
 
     // Get installation-authenticated Octokit
     const octokit = await app.getInstallationOctokit(site.github_installation_id)

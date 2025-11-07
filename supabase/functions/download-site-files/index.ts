@@ -90,6 +90,18 @@ Deno.serve(async (req) => {
       privateKey: privateKey,
     })
 
+    // Verify the installation exists and is accessible
+    try {
+      await app.octokit.request('GET /app/installations/{installation_id}', {
+        installation_id: site.github_installation_id
+      })
+    } catch (installError: any) {
+      if (installError.status === 404) {
+        throw new Error('GitHub App installation no longer exists. The app may have been uninstalled. Please reconnect your GitHub account and update the site settings.')
+      }
+      throw installError
+    }
+
     const octokit = await app.getInstallationOctokit(site.github_installation_id)
 
     // Parse repo owner and name from full name
@@ -117,7 +129,7 @@ Deno.serve(async (req) => {
 
     // Download all files
     const files: Record<string, { content: string; encoding: string }> = {}
-    
+
     for (const item of tree.tree) {
       if (item.type === 'blob' && item.path) {
         try {
@@ -126,7 +138,7 @@ Deno.serve(async (req) => {
             repo: repo_name,
             file_sha: item.sha!,
           })
-          
+
           files[item.path] = {
             content: blob.content,
             encoding: blob.encoding,

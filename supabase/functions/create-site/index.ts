@@ -50,9 +50,14 @@ Deno.serve(async (req) => {
       .select('installation_id')
       .eq('installation_id', parseInt(github_installation_id))
       .eq('user_id', user.id)
-      .single()
+      .maybeSingle()
 
-    if (installationError || !installation) {
+    if (installationError) {
+      console.error('Error checking installation:', installationError)
+      throw new Error('Error verifying GitHub installation')
+    }
+
+    if (!installation) {
       throw new Error('GitHub installation not found or not owned by user. Please connect your GitHub account first.')
     }
 

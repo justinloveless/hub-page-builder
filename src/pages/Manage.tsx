@@ -10,10 +10,11 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
 import { toast } from "sonner";
-import { ArrowLeft, ExternalLink, GitBranch, Users, FileText, Activity, Copy, Trash2, Check, User as UserIcon, Settings, UserCog, Crown, LogOut, Filter, CalendarIcon, X, Package, GitCommit, Upload, Shield, Menu, Edit } from "lucide-react";
+import { ArrowLeft, ExternalLink, GitBranch, Users, FileText, Activity, Copy, Trash2, Check, User as UserIcon, Settings, UserCog, Crown, LogOut, Filter, CalendarIcon, X, Package, GitCommit, Upload, Shield, Menu, Edit, AlertCircle, Github } from "lucide-react";
 import { Separator } from "@/components/ui/separator";
 import { format } from "date-fns";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -66,6 +67,7 @@ const Manage = () => {
   const [pendingChanges, setPendingChanges] = useState<PendingAssetChange[]>([]);
   const [showDiffDrawer, setShowDiffDrawer] = useState(false);
   const [showMobileSidebar, setShowMobileSidebar] = useState(false);
+  const [reconnecting, setReconnecting] = useState(false);
   const ACTIVITIES_PER_PAGE = 10;
 
   // Activity filters
@@ -622,6 +624,38 @@ const Manage = () => {
     }
   };
 
+  const reconnectGithub = async () => {
+    if (!siteId) return;
+
+    setReconnecting(true);
+    try {
+      const { data, error } = await supabase.functions.invoke(
+        'reconnect-site-github',
+        { body: { site_id: siteId } }
+      );
+
+      if (error) throw error;
+
+      toast.success('GitHub connection restored!');
+      // Reload site data
+      await loadSite();
+    } catch (error: any) {
+      console.error('Failed to reconnect GitHub:', error);
+      if (error.message?.includes('No GitHub installation found')) {
+        toast.error('Please connect your GitHub account first', {
+          action: {
+            label: 'Go to Settings',
+            onClick: () => navigate('/settings')
+          }
+        });
+      } else {
+        toast.error(error.message || 'Failed to reconnect GitHub');
+      }
+    } finally {
+      setReconnecting(false);
+    }
+  };
+
   if (loading) {
     return (
       <div className="h-screen w-full flex flex-col bg-background overflow-hidden">
@@ -684,6 +718,32 @@ const Manage = () => {
           </div>
         </div>
 
+        {/* GitHub Connection Warning */}
+        {!site.github_installation_id && (
+          <>
+            <Separator />
+            <Alert variant="destructive">
+              <AlertCircle className="h-4 w-4" />
+              <AlertTitle>GitHub Connection Required</AlertTitle>
+              <AlertDescription className="space-y-2">
+                <p className="text-xs">
+                  This site needs to be reconnected to GitHub to enable asset management and deployments.
+                </p>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={reconnectGithub}
+                  disabled={reconnecting}
+                  className="w-full"
+                >
+                  <Github className="mr-2 h-3 w-3" />
+                  {reconnecting ? 'Reconnecting...' : 'Reconnect GitHub'}
+                </Button>
+              </AlertDescription>
+            </Alert>
+          </>
+        )}
+
         <Separator />
 
         {/* Asset Manager */}
@@ -735,7 +795,7 @@ const Manage = () => {
               <p className={`text-muted-foreground ${isMobile ? 'text-sm' : 'text-xs'}`}>+{members.length - 3} more</p>
             )}
           </div>
-          
+
           {/* Leave Site Button */}
           <Button
             variant="outline"
