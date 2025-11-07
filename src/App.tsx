@@ -10,6 +10,7 @@ import Dashboard from "./pages/Dashboard";
 import Profile from "./pages/Profile";
 import Settings from "./pages/Settings";
 import Manage from "./pages/Manage";
+import SiteEditor from "./pages/SiteEditor";
 import GithubCallback from "./pages/GithubCallback";
 import AcceptInvite from "./pages/AcceptInvite";
 import GuestUpload from "./pages/GuestUpload";
@@ -33,6 +34,8 @@ const App = () => (
             <Route path="/profile" element={<Profile />} />
             <Route path="/settings" element={<Settings />} />
             <Route path="/manage/:siteId" element={<Manage />} />
+            <Route path="/edit/:siteId" element={<SiteEditor />} />
+            <Route path="/edit/:siteId/:filePath" element={<SiteEditor />} />
             <Route path="/invite/:token" element={<AcceptInvite />} />
             <Route path="/upload/:token" element={<GuestUpload />} />
             <Route path="/github/callback" element={<GithubCallback />} />

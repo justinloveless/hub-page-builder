@@ -10,7 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
 import { toast } from "sonner";
-import { ArrowLeft, ExternalLink, GitBranch, Users, FileText, Activity, Copy, Trash2, Check, User as UserIcon, Settings, UserCog, Crown, LogOut, Filter, CalendarIcon, X, Package, GitCommit, Upload, Shield, Menu, Edit, AlertCircle, Github, Code } from "lucide-react";
+import { ArrowLeft, ExternalLink, GitBranch, Users, FileText, Activity, Copy, Trash2, Check, User as UserIcon, Settings, UserCog, Crown, LogOut, Filter, CalendarIcon, X, Package, GitCommit, Upload, Shield, Menu, Edit, AlertCircle, Github, Code, Paintbrush } from "lucide-react";
 import { Separator } from "@/components/ui/separator";
 import { format } from "date-fns";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
@@ -950,6 +950,25 @@ const Manage = () => {
               <p className="text-xs sm:text-sm text-muted-foreground truncate">{site.repo_full_name}</p>
             </div>
             <div className="flex items-center gap-2 flex-shrink-0">
+              <Button
+                variant="default"
+                size="sm"
+                onClick={() => navigate(`/edit/${siteId}`)}
+                className="hidden sm:flex"
+                title="Visual Editor"
+              >
+                <Paintbrush className="mr-2 h-4 w-4" />
+                Visual Editor
+              </Button>
+              <Button
+                variant="default"
+                size="icon"
+                onClick={() => navigate(`/edit/${siteId}`)}
+                className="sm:hidden"
+                title="Visual Editor"
+              >
+                <Paintbrush className="h-4 w-4" />
+              </Button>
               <Button
                 variant="outline"
                 size="sm"
