@@ -13,6 +13,7 @@ import Manage from "./pages/Manage";
 import GithubCallback from "./pages/GithubCallback";
 import AcceptInvite from "./pages/AcceptInvite";
 import GuestUpload from "./pages/GuestUpload";
+import ResetPassword from "./pages/ResetPassword";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -27,6 +28,7 @@ const App = () => (
           <Routes>
             <Route path="/" element={<Index />} />
             <Route path="/auth" element={<Auth />} />
+            <Route path="/reset-password" element={<ResetPassword />} />
             <Route path="/dashboard" element={<Dashboard />} />
             <Route path="/profile" element={<Profile />} />
             <Route path="/settings" element={<Settings />} />
