@@ -3,9 +3,11 @@ import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Separator } from "@/components/ui/separator";
 import { toast } from "sonner";
-import { ArrowLeft, Shield } from "lucide-react";
+import { ArrowLeft, Shield, PackagePlus } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
+import TemplateManagement from "@/components/TemplateManagement";
 
 const Settings = () => {
   const navigate = useNavigate();
@@ -60,7 +62,7 @@ const Settings = () => {
           client_id: data.client_id,
         });
       }
-      
+
       setLoading(false);
     };
 
@@ -190,6 +192,25 @@ const Settings = () => {
               <li>Note the App ID from the GitHub App settings</li>
               <li>Add the App ID to github_app_config table, store the private key in GITHUB_APP_PKEY secret</li>
             </ol>
+          </CardContent>
+        </Card>
+
+        <Separator className="my-8" />
+
+        <Card>
+          <CardHeader>
+            <div className="flex items-start justify-between">
+              <div>
+                <CardTitle>Template Management</CardTitle>
+                <CardDescription>
+                  Manage site templates available to all users
+                </CardDescription>
+              </div>
+              <PackagePlus className="h-5 w-5 text-muted-foreground" />
+            </div>
+          </CardHeader>
+          <CardContent>
+            <TemplateManagement />
           </CardContent>
         </Card>
       </main>

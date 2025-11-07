@@ -16,7 +16,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
-import { Loader2, Plus, Github, BookOpen, Settings, CheckCircle2 } from "lucide-react";
+import { Loader2, Plus, Github, BookOpen, Settings, CheckCircle2, PackagePlus, Search } from "lucide-react";
+import type { Tables } from "@/integrations/supabase/types";
 
 interface AddSiteDialogProps {
   onSiteAdded: () => void;
@@ -48,6 +49,16 @@ interface Site {
   github_installation_id: number;
 }
 
+type Template = Tables<"templates">;
+
+interface TemplateWithProfile extends Template {
+  profiles?: {
+    id: string;
+    full_name: string | null;
+    avatar_url: string | null;
+  } | null;
+}
+
 const AddSiteDialog = ({ onSiteAdded }: AddSiteDialogProps) => {
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -63,12 +74,41 @@ const AddSiteDialog = ({ onSiteAdded }: AddSiteDialogProps) => {
     githubInstallationId: "",
   });
 
-  // Load existing sites when dialog opens
+  // Template state
+  const [templates, setTemplates] = useState<TemplateWithProfile[]>([]);
+  const [loadingTemplates, setLoadingTemplates] = useState(false);
+  const [selectedTemplate, setSelectedTemplate] = useState<Template | null>(null);
+  const [templateFormData, setTemplateFormData] = useState({
+    siteName: "",
+    repoName: "",
+  });
+  const [searchQuery, setSearchQuery] = useState("");
+  const [selectedTagFilter, setSelectedTagFilter] = useState<string | null>(null);
+
+  // Load existing sites and templates when dialog opens
   useEffect(() => {
     if (open) {
       loadExistingSites();
+      if (activeTab === "template") {
+        loadTemplates();
+      }
     }
-  }, [open]);
+  }, [open, activeTab]);
+
+  const loadTemplates = async () => {
+    setLoadingTemplates(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('list-templates');
+
+      if (error) throw error;
+      setTemplates(data?.templates || []);
+    } catch (error: any) {
+      console.error('Error loading templates:', error);
+      toast.error("Failed to load templates");
+    } finally {
+      setLoadingTemplates(false);
+    }
+  };
 
   const loadExistingSites = async () => {
     try {
@@ -326,6 +366,69 @@ const AddSiteDialog = ({ onSiteAdded }: AddSiteDialogProps) => {
     }
   };
 
+  const handleCreateFromTemplate = async () => {
+    if (!selectedTemplate) return;
+
+    setLoading(true);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) throw new Error("Not authenticated");
+
+      // Validate inputs
+      if (!templateFormData.siteName.trim() || !templateFormData.repoName.trim()) {
+        throw new Error("Please fill in all required fields");
+      }
+
+      // Validate repo name
+      if (!templateFormData.repoName.match(/^[a-zA-Z0-9_.-]+$/)) {
+        throw new Error("Invalid repository name. Use only letters, numbers, hyphens, underscores, and dots.");
+      }
+
+      // Call the edge function to create site from template
+      const { data, error } = await supabase.functions.invoke('create-site-from-template', {
+        body: {
+          template_id: selectedTemplate.id,
+          new_repo_name: templateFormData.repoName,
+          site_name: templateFormData.siteName,
+        },
+      });
+
+      if (error) throw error;
+      if (!data?.site) throw new Error("Failed to create site from template");
+
+      toast.success(`Site "${templateFormData.siteName}" created successfully!`);
+      setOpen(false);
+
+      // Reset form
+      setSelectedTemplate(null);
+      setTemplateFormData({
+        siteName: "",
+        repoName: "",
+      });
+
+      onSiteAdded();
+    } catch (error: any) {
+      console.error("Error creating site from template:", error);
+      toast.error(error.message || "Failed to create site from template");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Filter templates by search and tags
+  const filteredTemplates = templates.filter(template => {
+    const matchesSearch = !searchQuery ||
+      template.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      template.description.toLowerCase().includes(searchQuery.toLowerCase());
+
+    const matchesTag = !selectedTagFilter || template.tags.includes(selectedTagFilter);
+
+    return matchesSearch && matchesTag;
+  });
+
+  // Get unique tags from all templates
+  const allTags = Array.from(new Set(templates.flatMap(t => t.tags))).sort();
+
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
@@ -346,7 +449,11 @@ const AddSiteDialog = ({ onSiteAdded }: AddSiteDialogProps) => {
         </DialogHeader>
 
         <Tabs value={activeTab} onValueChange={setActiveTab} className="flex-1 flex flex-col overflow-hidden">
-          <TabsList className="grid w-full flex-shrink-0 grid-cols-2">
+          <TabsList className="grid w-full flex-shrink-0 grid-cols-3">
+            <TabsTrigger value="template">
+              <PackagePlus className="mr-2 h-4 w-4" />
+              From Template
+            </TabsTrigger>
             <TabsTrigger value="github">
               <Github className="mr-2 h-4 w-4" />
               From GitHub
@@ -358,6 +465,187 @@ const AddSiteDialog = ({ onSiteAdded }: AddSiteDialogProps) => {
           </TabsList>
 
           <div className="flex-1 overflow-y-auto pr-2">
+            <TabsContent value="template" className="mt-0 h-full">
+              <div className="space-y-4 pb-4 px-1">
+                {/* Search and filters */}
+                <div className="space-y-3">
+                  <div className="relative">
+                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                    <Input
+                      placeholder="Search templates..."
+                      value={searchQuery}
+                      onChange={(e) => setSearchQuery(e.target.value)}
+                      className="pl-10"
+                    />
+                  </div>
+
+                  {allTags.length > 0 && (
+                    <div className="flex flex-wrap gap-2">
+                      <Badge
+                        variant={selectedTagFilter === null ? "default" : "outline"}
+                        className="cursor-pointer"
+                        onClick={() => setSelectedTagFilter(null)}
+                      >
+                        All
+                      </Badge>
+                      {allTags.map((tag) => (
+                        <Badge
+                          key={tag}
+                          variant={selectedTagFilter === tag ? "default" : "outline"}
+                          className="cursor-pointer"
+                          onClick={() => setSelectedTagFilter(tag)}
+                        >
+                          {tag}
+                        </Badge>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                {loadingTemplates ? (
+                  <div className="text-center py-8">
+                    <Loader2 className="h-8 w-8 animate-spin mx-auto mb-3 text-muted-foreground" />
+                    <p className="text-sm text-muted-foreground">Loading templates...</p>
+                  </div>
+                ) : filteredTemplates.length === 0 ? (
+                  <div className="text-center py-8 text-muted-foreground text-sm">
+                    <PackagePlus className="h-12 w-12 mx-auto mb-3 opacity-50" />
+                    <p>No templates found.</p>
+                    <p className="text-xs mt-2">Try adjusting your search or filters.</p>
+                  </div>
+                ) : selectedTemplate ? (
+                  <div className="space-y-4">
+                    <Card>
+                      <CardHeader className="pb-3">
+                        <div className="flex items-start justify-between">
+                          <div className="space-y-1">
+                            <CardTitle className="text-base">{selectedTemplate.name}</CardTitle>
+                            <CardDescription className="text-xs">{selectedTemplate.description}</CardDescription>
+                          </div>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => setSelectedTemplate(null)}
+                          >
+                            Back
+                          </Button>
+                        </div>
+                      </CardHeader>
+                      {selectedTemplate.preview_image_url && (
+                        <CardContent className="pb-3">
+                          <img
+                            src={selectedTemplate.preview_image_url}
+                            alt={selectedTemplate.name}
+                            className="w-full rounded-md border"
+                          />
+                        </CardContent>
+                      )}
+                      <CardFooter className="flex-col gap-2 items-start">
+                        <div className="flex flex-wrap gap-1">
+                          {selectedTemplate.tags.map((tag) => (
+                            <Badge key={tag} variant="secondary" className="text-xs">
+                              {tag}
+                            </Badge>
+                          ))}
+                        </div>
+                        <p className="text-xs text-muted-foreground">
+                          Template: <span className="font-mono">{selectedTemplate.repo_full_name}</span>
+                        </p>
+                      </CardFooter>
+                    </Card>
+
+                    <div className="space-y-3">
+                      <div className="space-y-2">
+                        <Label htmlFor="siteName">Site Name *</Label>
+                        <Input
+                          id="siteName"
+                          placeholder="My Awesome Site"
+                          value={templateFormData.siteName}
+                          onChange={(e) => setTemplateFormData({ ...templateFormData, siteName: e.target.value })}
+                          required
+                        />
+                      </div>
+
+                      <div className="space-y-2">
+                        <Label htmlFor="repoName">New Repository Name *</Label>
+                        <Input
+                          id="repoName"
+                          placeholder="my-awesome-site"
+                          value={templateFormData.repoName}
+                          onChange={(e) => setTemplateFormData({ ...templateFormData, repoName: e.target.value })}
+                          required
+                        />
+                        <p className="text-xs text-muted-foreground">
+                          A new repository will be created in your GitHub account
+                        </p>
+                      </div>
+
+                      <Button
+                        className="w-full"
+                        onClick={handleCreateFromTemplate}
+                        disabled={loading || !templateFormData.siteName || !templateFormData.repoName}
+                      >
+                        {loading ? (
+                          <>
+                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                            Creating Site...
+                          </>
+                        ) : (
+                          <>
+                            <Plus className="mr-2 h-4 w-4" />
+                            Create Site from Template
+                          </>
+                        )}
+                      </Button>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-1 gap-3">
+                    {filteredTemplates.map((template) => (
+                      <Card
+                        key={template.id}
+                        className="hover:bg-accent/50 transition-colors cursor-pointer"
+                        onClick={() => setSelectedTemplate(template)}
+                      >
+                        {template.preview_image_url && (
+                          <div className="aspect-video w-full overflow-hidden rounded-t-lg">
+                            <img
+                              src={template.preview_image_url}
+                              alt={template.name}
+                              className="w-full h-full object-cover"
+                            />
+                          </div>
+                        )}
+                        <CardHeader className="pb-3">
+                          <CardTitle className="text-sm">{template.name}</CardTitle>
+                          <CardDescription className="text-xs line-clamp-2">
+                            {template.description}
+                          </CardDescription>
+                        </CardHeader>
+                        <CardFooter className="flex-col gap-2 items-start pt-0">
+                          <div className="flex flex-wrap gap-1">
+                            {template.tags.slice(0, 3).map((tag) => (
+                              <Badge key={tag} variant="secondary" className="text-xs">
+                                {tag}
+                              </Badge>
+                            ))}
+                            {template.tags.length > 3 && (
+                              <Badge variant="secondary" className="text-xs">
+                                +{template.tags.length - 3}
+                              </Badge>
+                            )}
+                          </div>
+                          <p className="text-xs text-muted-foreground">
+                            {template.profiles?.full_name || 'Anonymous'}
+                          </p>
+                        </CardFooter>
+                      </Card>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </TabsContent>
+
             <TabsContent value="github" className="mt-0 h-full">
               <div className="space-y-4 pb-4 px-1">
                 <div className="space-y-2">

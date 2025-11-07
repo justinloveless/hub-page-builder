@@ -2,7 +2,7 @@ import { useNavigate } from "react-router-dom";
 import { Card, CardContent, CardFooter, CardHeader } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { ExternalLink, Settings, Users } from "lucide-react";
+import { ExternalLink, Settings, Users, Code } from "lucide-react";
 import type { Tables } from "@/integrations/supabase/types";
 
 type Site = Tables<"sites">;
@@ -18,6 +18,11 @@ const SiteCard = ({ site }: SiteCardProps) => {
   const getGithubPagesUrl = () => {
     const [username, repoName] = site.repo_full_name.split('/');
     return `https://${username}.github.io/${repoName}/`;
+  };
+
+  // Generate VSCode online URL
+  const getVSCodeUrl = () => {
+    return `https://vscode.dev/github/${site.repo_full_name}`;
   };
 
   return (
@@ -51,19 +56,28 @@ const SiteCard = ({ site }: SiteCardProps) => {
       </CardContent>
 
       <CardFooter className="flex gap-2 pt-3 border-t border-border">
-        <Button 
-          variant="outline" 
-          className="flex-1" 
+        <Button
+          variant="outline"
+          className="flex-1"
           size="sm"
           onClick={() => navigate(`/manage/${site.id}`)}
         >
           <Settings className="mr-2 h-4 w-4" />
           Manage
         </Button>
-        <Button 
-          variant="outline" 
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => window.open(getVSCodeUrl(), '_blank')}
+          title="Open in VSCode Online"
+        >
+          <Code className="h-4 w-4" />
+        </Button>
+        <Button
+          variant="outline"
           size="sm"
           onClick={() => window.open(getGithubPagesUrl(), '_blank')}
+          title="View Site"
         >
           <ExternalLink className="h-4 w-4" />
         </Button>

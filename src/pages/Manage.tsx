@@ -10,7 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
 import { toast } from "sonner";
-import { ArrowLeft, ExternalLink, GitBranch, Users, FileText, Activity, Copy, Trash2, Check, User as UserIcon, Settings, UserCog, Crown, LogOut, Filter, CalendarIcon, X, Package, GitCommit, Upload, Shield, Menu, Edit, AlertCircle, Github } from "lucide-react";
+import { ArrowLeft, ExternalLink, GitBranch, Users, FileText, Activity, Copy, Trash2, Check, User as UserIcon, Settings, UserCog, Crown, LogOut, Filter, CalendarIcon, X, Package, GitCommit, Upload, Shield, Menu, Edit, AlertCircle, Github, Code } from "lucide-react";
 import { Separator } from "@/components/ui/separator";
 import { format } from "date-fns";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
@@ -100,6 +100,10 @@ const Manage = () => {
 
   const getRepositoryUrl = (repoFullName: string) => {
     return `https://github.com/${repoFullName}`;
+  };
+
+  const getVSCodeUrl = (repoFullName: string) => {
+    return `https://vscode.dev/github/${repoFullName}`;
   };
 
   useEffect(() => {
@@ -946,6 +950,25 @@ const Manage = () => {
               <p className="text-xs sm:text-sm text-muted-foreground truncate">{site.repo_full_name}</p>
             </div>
             <div className="flex items-center gap-2 flex-shrink-0">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => window.open(getVSCodeUrl(site.repo_full_name), '_blank')}
+                className="hidden sm:flex"
+                title="Open in VSCode Online"
+              >
+                <Code className="mr-2 h-4 w-4" />
+                VSCode
+              </Button>
+              <Button
+                variant="outline"
+                size="icon"
+                onClick={() => window.open(getVSCodeUrl(site.repo_full_name), '_blank')}
+                className="sm:hidden"
+                title="Open in VSCode Online"
+              >
+                <Code className="h-4 w-4" />
+              </Button>
               <Button
                 variant="outline"
                 size="sm"

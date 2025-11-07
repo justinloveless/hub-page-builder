@@ -8,6 +8,7 @@ import { Loader2, Plus, LogOut, Settings, User as UserIcon } from "lucide-react"
 import SiteCard from "@/components/SiteCard";
 import AddSiteDialog from "@/components/AddSiteDialog";
 import JoinWithCodeDialog from "@/components/JoinWithCodeDialog";
+import SubmitTemplateDialog from "@/components/SubmitTemplateDialog";
 import type { Tables } from "@/integrations/supabase/types";
 import logo from "@/assets/staticsnack-logo.png";
 
@@ -49,7 +50,7 @@ const Dashboard = () => {
         _user_id: userId,
         _role: 'admin'
       });
-      
+
       if (!error && data) {
         setIsAdmin(true);
       }
@@ -135,6 +136,7 @@ const Dashboard = () => {
             </p>
           </div>
           <div className="flex gap-2 sm:flex-shrink-0">
+            <SubmitTemplateDialog />
             <JoinWithCodeDialog />
             <AddSiteDialog onSiteAdded={loadSites} />
           </div>
@@ -151,6 +153,7 @@ const Dashboard = () => {
               and start managing content with ease. Or join an existing site with an invite code.
             </p>
             <div className="flex gap-2 justify-center">
+              <SubmitTemplateDialog />
               <JoinWithCodeDialog />
               <AddSiteDialog onSiteAdded={loadSites} />
             </div>
