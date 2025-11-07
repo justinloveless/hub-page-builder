@@ -77,7 +77,7 @@ const SiteEditor = () => {
       const { data, error } = await supabase.functions.invoke('fetch-asset-content', {
         body: {
           site_id: siteId,
-          file_path: targetPath
+          asset_path: targetPath
         }
       });
 
