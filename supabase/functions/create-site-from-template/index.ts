@@ -100,6 +100,59 @@ async function createRepoFromTemplate(
     }
 }
 
+async function enableGitHubPages(
+    octokit: any,
+    owner: string,
+    repo: string,
+    branch: string = 'main'
+): Promise<void> {
+    console.log(`Enabling GitHub Pages for ${owner}/${repo} from ${branch} branch`)
+
+    try {
+        // Create or update GitHub Pages configuration
+        await octokit.request('POST /repos/{owner}/{repo}/pages', {
+            owner,
+            repo,
+            source: {
+                branch,
+                path: '/'
+            },
+            headers: {
+                'X-GitHub-Api-Version': '2022-11-28',
+            }
+        })
+
+        console.log('GitHub Pages enabled successfully')
+    } catch (error: any) {
+        console.error('GitHub Pages error:', error)
+
+        // If Pages already exists, try to update it
+        if (error.status === 409) {
+            console.log('GitHub Pages already exists, updating configuration...')
+            try {
+                await octokit.request('PUT /repos/{owner}/{repo}/pages', {
+                    owner,
+                    repo,
+                    source: {
+                        branch,
+                        path: '/'
+                    },
+                    headers: {
+                        'X-GitHub-Api-Version': '2022-11-28',
+                    }
+                })
+                console.log('GitHub Pages updated successfully')
+            } catch (updateError: any) {
+                console.error('Failed to update GitHub Pages:', updateError)
+                throw new Error(`Failed to configure GitHub Pages: ${updateError.message}`)
+            }
+        } else {
+            console.warn('Failed to enable GitHub Pages:', error.message)
+            // Don't throw - Pages setup is not critical, the repo was created successfully
+        }
+    }
+}
+
 // Removed getGitHubUsername function - we get the username from the installation record
 
 Deno.serve(async (req) => {
@@ -224,6 +277,12 @@ Deno.serve(async (req) => {
 
         // Wait a moment for GitHub to finalize the repo
         await new Promise(resolve => setTimeout(resolve, 2000))
+
+        // Enable GitHub Pages
+        await enableGitHubPages(octokit, githubUsername, new_repo_name, newRepo.default_branch || 'main')
+
+        // Wait another moment for GitHub Pages to initialize
+        await new Promise(resolve => setTimeout(resolve, 1000))
 
         // Now create the site using the new repository
         const { data: site, error: siteError } = await supabaseClient
