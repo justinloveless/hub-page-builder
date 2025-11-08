@@ -23,9 +23,10 @@ interface AssetManagerSidebarContextValue {
   draggedComboItem: number | null;
   dragOverComboItem: number | null;
   creatingPr: boolean;
-  
+
   // Setters
   setAssetContents: React.Dispatch<React.SetStateAction<Record<string, string>>>;
+  setJsonFormData: React.Dispatch<React.SetStateAction<Record<string, Record<string, any>>>>;
   setNewKeys: React.Dispatch<React.SetStateAction<Record<string, string>>>;
   setComboFileContents: React.Dispatch<React.SetStateAction<Record<string, string>>>;
   setNewComboData: React.Dispatch<React.SetStateAction<Record<string, { baseName: string; parts: Record<string, { content: string; file?: File; jsonData?: Record<string, any> }> }>>>;
@@ -35,7 +36,7 @@ interface AssetManagerSidebarContextValue {
   setDragOverItem: React.Dispatch<React.SetStateAction<number | null>>;
   setDraggedComboItem: React.Dispatch<React.SetStateAction<number | null>>;
   setDragOverComboItem: React.Dispatch<React.SetStateAction<number | null>>;
-  
+
   // Handlers
   handleRefresh: () => void;
   toggleExpanded: (asset: AssetConfig) => void;

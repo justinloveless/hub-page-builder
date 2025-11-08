@@ -71,11 +71,25 @@ export const SchemaFieldRenderer = ({
         const items = Array.isArray(arrayValue) ? arrayValue : [];
 
         const addArrayItem = async () => {
-          const newItem: any = {};
+          let newItem: any;
           if (fieldSchema.items.type === 'object' && fieldSchema.items.properties) {
+            // Array of objects
+            newItem = {};
             Object.entries(fieldSchema.items.properties).forEach(([propKey, propSchema]: [string, any]) => {
               newItem[propKey] = propSchema.default ?? '';
             });
+          } else if (fieldSchema.items.type === 'string') {
+            // Array of strings
+            newItem = '';
+          } else if (fieldSchema.items.type === 'number' || fieldSchema.items.type === 'integer') {
+            // Array of numbers
+            newItem = 0;
+          } else if (fieldSchema.items.type === 'boolean') {
+            // Array of booleans
+            newItem = false;
+          } else {
+            // Default to string if no type specified
+            newItem = '';
           }
 
           const newItems = [...items, newItem];
@@ -118,76 +132,119 @@ export const SchemaFieldRenderer = ({
             </div>
 
             <div className="space-y-2">
-              {items.map((item, index) => (
-                <div key={index} className="p-2 border rounded-lg bg-background space-y-2">
-                  <div className="flex items-center justify-between">
-                    <Label className="text-xs font-semibold">Item {index + 1}</Label>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => removeArrayItem(index)}
-                      className="h-6 w-6 p-0"
-                    >
-                      <Trash2 className="h-3 w-3" />
-                    </Button>
-                  </div>
-                  {fieldSchema.items.type === 'object' && fieldSchema.items.properties && (
-                    <div className="space-y-2 pl-2">
-                      {Object.entries(fieldSchema.items.properties).map(([propKey, propSchema]: [string, any]) => {
-                        const propValue = item[propKey] ?? propSchema.default ?? '';
-                        const propFullKey = `${fullKey}[${index}].${propKey}`;
+              {items.map((item, index) => {
+                const updateArrayItem = async (newValue: any) => {
+                  const newItems = [...items];
+                  newItems[index] = newValue;
+                  const updatedData = parentKey
+                    ? { ...(jsonFormData[asset.path] || {}), [parentKey]: { ...(jsonFormData[asset.path]?.[parentKey] || {}), [fieldKey]: newItems } }
+                    : { ...(jsonFormData[asset.path] || {}), [fieldKey]: newItems };
 
-                        const updateArrayItemProp = async (newPropValue: any) => {
-                          const newItems = [...items];
-                          newItems[index] = { ...newItems[index], [propKey]: newPropValue };
-                          const updatedData = parentKey
-                            ? { ...(jsonFormData[asset.path] || {}), [parentKey]: { ...(jsonFormData[asset.path]?.[parentKey] || {}), [fieldKey]: newItems } }
-                            : { ...(jsonFormData[asset.path] || {}), [fieldKey]: newItems };
+                  await onJsonFormChange(asset, updatedData);
+                };
 
-                          await onJsonFormChange(asset, updatedData);
-                        };
-
-                        return (
-                          <div key={propFullKey} className="space-y-1">
-                            <Label htmlFor={propFullKey} className="text-xs">
-                              {propSchema.title || propKey}
-                            </Label>
-                            {propSchema.description && (
-                              <p className="text-xs text-muted-foreground">{propSchema.description}</p>
-                            )}
-                            {propSchema.type === 'string' && propSchema.multiline ? (
-                              <Textarea
-                                id={propFullKey}
-                                value={propValue}
-                                onChange={(e) => updateArrayItemProp(e.target.value)}
-                                placeholder={propSchema.placeholder}
-                                className="min-h-[60px] text-xs"
-                              />
-                            ) : propSchema.type === 'number' || propSchema.type === 'integer' ? (
-                              <Input
-                                id={propFullKey}
-                                type="number"
-                                value={propValue}
-                                onChange={(e) => updateArrayItemProp(propSchema.type === 'integer' ? parseInt(e.target.value) || 0 : parseFloat(e.target.value) || 0)}
-                                placeholder={propSchema.placeholder}
-                                className="h-8 text-xs"
-                              />
-                            ) : (
-                              <Input
-                                id={propFullKey}
-                                value={propValue}
-                                onChange={(e) => updateArrayItemProp(e.target.value)}
-                                placeholder={propSchema.placeholder}
-                                className="h-8 text-xs"
-                              />
-                            )}
-                          </div>
-                        );
-                      })}
+                return (
+                  <div key={index} className="p-2 border rounded-lg bg-background space-y-2">
+                    <div className="flex items-center justify-between">
+                      <Label className="text-xs font-semibold">Item {index + 1}</Label>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => removeArrayItem(index)}
+                        className="h-6 w-6 p-0"
+                      >
+                        <Trash2 className="h-3 w-3" />
+                      </Button>
                     </div>
-                  )}
-                </div>
-              ))}
+                    {fieldSchema.items.type === 'object' && fieldSchema.items.properties ? (
+                      // Array of objects
+                      <div className="space-y-2 pl-2">
+                        {Object.entries(fieldSchema.items.properties).map(([propKey, propSchema]: [string, any]) => {
+                          const propValue = item[propKey] ?? propSchema.default ?? '';
+                          const propFullKey = `${fullKey}[${index}].${propKey}`;
+
+                          const updateArrayItemProp = async (newPropValue: any) => {
+                            const newItems = [...items];
+                            newItems[index] = { ...newItems[index], [propKey]: newPropValue };
+                            const updatedData = parentKey
+                              ? { ...(jsonFormData[asset.path] || {}), [parentKey]: { ...(jsonFormData[asset.path]?.[parentKey] || {}), [fieldKey]: newItems } }
+                              : { ...(jsonFormData[asset.path] || {}), [fieldKey]: newItems };
+
+                            await onJsonFormChange(asset, updatedData);
+                          };
+
+                          return (
+                            <div key={propFullKey} className="space-y-1">
+                              <Label htmlFor={propFullKey} className="text-xs">
+                                {propSchema.title || propKey}
+                              </Label>
+                              {propSchema.description && (
+                                <p className="text-xs text-muted-foreground">{propSchema.description}</p>
+                              )}
+                              {propSchema.type === 'string' && propSchema.multiline ? (
+                                <Textarea
+                                  id={propFullKey}
+                                  value={propValue}
+                                  onChange={(e) => updateArrayItemProp(e.target.value)}
+                                  placeholder={propSchema.placeholder}
+                                  className="min-h-[60px] text-xs"
+                                />
+                              ) : propSchema.type === 'number' || propSchema.type === 'integer' ? (
+                                <Input
+                                  id={propFullKey}
+                                  type="number"
+                                  value={propValue}
+                                  onChange={(e) => updateArrayItemProp(propSchema.type === 'integer' ? parseInt(e.target.value) || 0 : parseFloat(e.target.value) || 0)}
+                                  placeholder={propSchema.placeholder}
+                                  className="h-8 text-xs"
+                                />
+                              ) : (
+                                <Input
+                                  id={propFullKey}
+                                  value={propValue}
+                                  onChange={(e) => updateArrayItemProp(e.target.value)}
+                                  placeholder={propSchema.placeholder}
+                                  className="h-8 text-xs"
+                                />
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    ) : (
+                      // Array of simple types (string, number, boolean, or default to string)
+                      <div className="pl-2">
+                        {fieldSchema.items.type === 'number' || fieldSchema.items.type === 'integer' ? (
+                          <Input
+                            value={item ?? 0}
+                            onChange={(e) => updateArrayItem(fieldSchema.items.type === 'integer' ? parseInt(e.target.value) || 0 : parseFloat(e.target.value) || 0)}
+                            placeholder="Enter value"
+                            className="h-8 text-xs"
+                          />
+                        ) : fieldSchema.items.type === 'boolean' ? (
+                          <div className="flex items-center gap-2">
+                            <input
+                              type="checkbox"
+                              checked={item ?? false}
+                              onChange={(e) => updateArrayItem(e.target.checked)}
+                              className="h-4 w-4"
+                            />
+                            <Label className="text-xs">{item ? 'True' : 'False'}</Label>
+                          </div>
+                        ) : (
+                          // Default to string
+                          <Input
+                            value={item ?? ''}
+                            onChange={(e) => updateArrayItem(e.target.value)}
+                            placeholder="Enter value"
+                            className="h-8 text-xs"
+                          />
+                        )}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
               {items.length === 0 && (
                 <p className="text-xs text-muted-foreground text-center py-2">No items yet. Click "Add" to create one.</p>
               )}

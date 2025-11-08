@@ -237,6 +237,7 @@ export const useAssetManagerSidebar = ({
     const dataToUse = jsonData ?? jsonFormData[asset.path];
     const newContent = JSON.stringify(dataToUse, null, 2);
     setAssetContents(prev => ({ ...prev, [asset.path]: newContent }));
+    setJsonFormData(prev => ({ ...prev, [asset.path]: dataToUse }));
     await saveToBatch(asset, newContent);
   };
 

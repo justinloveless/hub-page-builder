@@ -17,6 +17,7 @@ import { AssetTextEditor } from "./AssetManagerSidebar/AssetTextEditor";
 import { AssetImageEditor } from "./AssetManagerSidebar/AssetImageEditor";
 import { AssetJsonEditor } from "./AssetManagerSidebar/AssetJsonEditor";
 import { DirectoryFileList } from "./AssetManagerSidebar/DirectoryFileList";
+import { DirectoryJsonList } from "./AssetManagerSidebar/DirectoryJsonList";
 import { ComboAssetList } from "./AssetManagerSidebar/ComboAssetList";
 import { ComboAssetCreator } from "./AssetManagerSidebar/ComboAssetCreator";
 import { getAssetIcon, formatFileSize, groupComboAssets } from "./AssetManagerSidebar/utils";
@@ -61,6 +62,7 @@ const AssetManagerSidebar = ({ siteId, pendingChanges, setPendingChanges }: Asse
     creatingPr,
     // Setters
     setAssetContents,
+    setJsonFormData,
     setNewKeys,
     setComboFileContents,
     setNewComboData,
@@ -137,6 +139,7 @@ const AssetManagerSidebar = ({ siteId, pendingChanges, setPendingChanges }: Asse
     creatingPr,
     // Setters
     setAssetContents,
+    setJsonFormData,
     setNewKeys,
     setComboFileContents,
     setNewComboData,
@@ -301,6 +304,15 @@ const AssetManagerSidebar = ({ siteId, pendingChanges, setPendingChanges }: Asse
                                     />
                                   );
                                 })()
+                              ) : asset.contains?.type === 'json' && asset.contains.schema ? (
+                                /* Directory with JSON files and schema */
+                                getMergedDirectoryFiles(asset.path).length > 0 && (
+                                  <DirectoryJsonList
+                                    asset={asset}
+                                    files={getMergedDirectoryFiles(asset.path)}
+                                    schema={asset.contains.schema}
+                                  />
+                                )
                               ) : (
                                 /* Standard Directory */
                                 getMergedDirectoryFiles(asset.path).length > 0 && (
