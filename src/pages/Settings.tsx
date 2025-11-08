@@ -5,9 +5,10 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { toast } from "sonner";
-import { ArrowLeft, Shield, PackagePlus } from "lucide-react";
+import { ArrowLeft, Shield, PackagePlus, Flag } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import TemplateManagement from "@/components/TemplateManagement";
+import { FeatureFlagManagement } from "@/components/FeatureFlagManagement";
 
 const Settings = () => {
   const navigate = useNavigate();
@@ -211,6 +212,25 @@ const Settings = () => {
           </CardHeader>
           <CardContent>
             <TemplateManagement />
+          </CardContent>
+        </Card>
+
+        <Separator className="my-8" />
+
+        <Card>
+          <CardHeader>
+            <div className="flex items-start justify-between">
+              <div>
+                <CardTitle>Feature Flags</CardTitle>
+                <CardDescription>
+                  Control feature availability across your application
+                </CardDescription>
+              </div>
+              <Flag className="h-5 w-5 text-muted-foreground" />
+            </div>
+          </CardHeader>
+          <CardContent>
+            <FeatureFlagManagement />
           </CardContent>
         </Card>
       </main>
