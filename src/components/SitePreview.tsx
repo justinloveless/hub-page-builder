@@ -118,9 +118,63 @@ export const SitePreview = ({ siteId, pendingChanges }: SitePreviewProps) => {
       ? decodeURIComponent(escape(atob(indexFile.content)))
       : indexFile.content;
 
+    const resolveVirtualPath = (rawPath: string): string | null => {
+      if (!rawPath) return null;
+      const stripQueryHash = (value: string) => value.split('#')[0].split('?')[0];
+      const dropLeading = (value: string) => value.replace(/^(\.\/)+/, '').replace(/^\/+/, '');
+
+      const withoutExtras = dropLeading(stripQueryHash(rawPath));
+      if (!withoutExtras) return null;
+
+      const segments = withoutExtras.split('/').filter(Boolean);
+      const candidates = new Set<string>();
+
+      candidates.add(withoutExtras);
+      candidates.add('./' + withoutExtras);
+      candidates.add('/' + withoutExtras);
+
+      if (segments.length > 1) {
+        const withoutFirst = segments.slice(1).join('/');
+        if (withoutFirst) {
+          candidates.add(withoutFirst);
+          candidates.add('./' + withoutFirst);
+          candidates.add('/' + withoutFirst);
+        }
+      }
+
+      for (const candidate of candidates) {
+        const normalized = candidate.replace(/^(\.\/)+/, '').replace(/^\/+/, '');
+        if (normalized && virtualFiles[normalized]) {
+          return normalized;
+        }
+      }
+
+      const fileName = segments[segments.length - 1];
+      if (fileName) {
+        const matches = Object.keys(virtualFiles).filter(path =>
+          path === fileName || path.endsWith('/' + fileName)
+        );
+        if (matches.length > 0) {
+          matches.sort((a, b) => {
+            const aIsSrc = a.startsWith('src/');
+            const bIsSrc = b.startsWith('src/');
+            if (aIsSrc !== bIsSrc) {
+              return aIsSrc ? 1 : -1;
+            }
+            return a.length - b.length;
+          });
+          return matches[0];
+        }
+      }
+
+      return null;
+    };
+
     // Helper to decode file content
     const getFileContent = (path: string): string => {
-      const file = virtualFiles[path];
+      const resolvedPath = resolveVirtualPath(path);
+      if (!resolvedPath) return '';
+      const file = virtualFiles[resolvedPath];
       if (!file) return '';
       return file.encoding === 'base64'
         ? decodeURIComponent(escape(atob(file.content)))
@@ -247,25 +301,47 @@ export const SitePreview = ({ siteId, pendingChanges }: SitePreviewProps) => {
               return path;
             }
             const withoutQ = stripQueryHash(path);
-            const dropPrefixes = function(p) { return p.replace(/^\\.\\//g, '').replace(/^\\//g, ''); };
+            const dropPrefixes = function(p) { return p.replace(/^(\\.\\/)+/g, '').replace(/^\\/+/, ''); };
             const base = dropPrefixes(withoutQ);
-            const variants = [base, './' + base, '/' + base];
+            if (!base) {
+              console.warn('[Site Preview] Could not resolve empty path:', path);
+              return null;
+            }
+            var variants = [base, './' + base, '/' + base];
+            var parts = base.split('/');
+            if (parts.length > 1) {
+              var withoutFirst = parts.slice(1).join('/');
+              if (withoutFirst) {
+                variants.push(withoutFirst, './' + withoutFirst, '/' + withoutFirst);
+              }
+            }
             for (var i = 0; i < variants.length; i++) {
-              var v = variants[i];
-              if (fileContentMap[v]) {
+              var v = dropPrefixes(variants[i]);
+              if (v && fileContentMap[v]) {
                 console.log('[Site Preview] Resolved path:', path, '->', v);
                 return v;
               }
             }
-            // Try filename-only match in any directory
+            // Try filename-only match in any directory with heuristics
             var fileName = base.split('/').pop();
             if (fileName) {
-              // Search all file paths for a matching filename
+              var matches = [];
               for (var filePath in fileContentMap) {
                 if (filePath.endsWith('/' + fileName) || filePath === fileName) {
-                  console.log('[Site Preview] Resolved by filename match:', path, '->', filePath);
-                  return filePath;
+                  matches.push(filePath);
                 }
+              }
+              if (matches.length > 0) {
+                matches.sort(function(a, b) {
+                  var aIsSrc = a.indexOf('src/') === 0;
+                  var bIsSrc = b.indexOf('src/') === 0;
+                  if (aIsSrc !== bIsSrc) {
+                    return aIsSrc ? 1 : -1;
+                  }
+                  return a.length - b.length;
+                });
+                console.log('[Site Preview] Resolved by filename match:', path, '->', matches[0]);
+                return matches[0];
               }
             }
             console.warn('[Site Preview] Could not resolve path:', path);
@@ -699,9 +775,9 @@ if (typeof window.__moduleImportMap === 'undefined') {
         const jsPath = src.replace(/^\.\//, '').replace(/^\//, '');
         console.log('[SitePreview] Inlining module script:', jsPath);
 
-        // Get the JS content
-        const jsContent = getFileContent(jsPath);
-        if (!jsContent) {
+        const resolvedPath = resolveVirtualPath(jsPath);
+        const jsContent = resolvedPath ? getFileContent(resolvedPath) : '';
+        if (!resolvedPath || !jsContent) {
           console.warn('[SitePreview] Could not find module:', jsPath);
           return match;
         }
