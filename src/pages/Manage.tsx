@@ -27,6 +27,7 @@ import ActivityCard from "@/components/ActivityCard";
 import { SitePreview } from "@/components/SitePreview";
 import { ResizablePanelGroup, ResizablePanel, ResizableHandle } from "@/components/ui/resizable";
 import { useIsMobile } from "@/hooks/use-mobile";
+import { useFeatureFlags } from "@/contexts/FeatureFlagContext";
 import type { Tables } from "@/integrations/supabase/types";
 
 export interface PendingAssetChange {
@@ -54,6 +55,8 @@ const Manage = () => {
   const navigate = useNavigate();
   const { siteId } = useParams<{ siteId: string }>();
   const isMobile = useIsMobile();
+  const { isEnabled } = useFeatureFlags();
+  const grapesjsEnabled = isEnabled("use_grapesjs");
   const [loading, setLoading] = useState(true);
   const [copiedInviteId, setCopiedInviteId] = useState<string | null>(null);
   const [site, setSite] = useState<Site | null>(null);
@@ -950,25 +953,29 @@ const Manage = () => {
               <p className="text-xs sm:text-sm text-muted-foreground truncate">{site.repo_full_name}</p>
             </div>
             <div className="flex items-center gap-2 flex-shrink-0">
-              <Button
-                variant="default"
-                size="sm"
-                onClick={() => navigate(`/edit/${siteId}`)}
-                className="hidden sm:flex"
-                title="Visual Editor"
-              >
-                <Paintbrush className="mr-2 h-4 w-4" />
-                Visual Editor
-              </Button>
-              <Button
-                variant="default"
-                size="icon"
-                onClick={() => navigate(`/edit/${siteId}`)}
-                className="sm:hidden"
-                title="Visual Editor"
-              >
-                <Paintbrush className="h-4 w-4" />
-              </Button>
+              {grapesjsEnabled && (
+                <>
+                  <Button
+                    variant="default"
+                    size="sm"
+                    onClick={() => navigate(`/edit/${siteId}`)}
+                    className="hidden sm:flex"
+                    title="Visual Editor"
+                  >
+                    <Paintbrush className="mr-2 h-4 w-4" />
+                    Visual Editor
+                  </Button>
+                  <Button
+                    variant="default"
+                    size="icon"
+                    onClick={() => navigate(`/edit/${siteId}`)}
+                    className="sm:hidden"
+                    title="Visual Editor"
+                  >
+                    <Paintbrush className="h-4 w-4" />
+                  </Button>
+                </>
+              )}
               <Button
                 variant="outline"
                 size="sm"

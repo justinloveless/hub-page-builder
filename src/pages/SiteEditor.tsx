@@ -7,6 +7,7 @@ import { ArrowLeft, Save, FileDown, AlertCircle } from "lucide-react";
 import { GrapesEditor } from "@/components/GrapesEditor";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Skeleton } from "@/components/ui/skeleton";
+import { useFeatureFlags } from "@/contexts/FeatureFlagContext";
 import type { Tables } from "@/integrations/supabase/types";
 
 type Site = Tables<"sites">;
@@ -14,6 +15,7 @@ type Site = Tables<"sites">;
 const SiteEditor = () => {
   const navigate = useNavigate();
   const { siteId, filePath } = useParams<{ siteId: string; filePath?: string }>();
+  const { isEnabled, isLoading: flagsLoading } = useFeatureFlags();
   const [loading, setLoading] = useState(true);
   const [site, setSite] = useState<Site | null>(null);
   const [initialHtml, setInitialHtml] = useState("");
@@ -23,6 +25,12 @@ const SiteEditor = () => {
   const [saving, setSaving] = useState(false);
   const [hasChanges, setHasChanges] = useState(false);
   const [editingPath, setEditingPath] = useState<string>("index.html");
+  const [externalStyles, setExternalStyles] = useState<string[]>([]);
+  const [externalScripts, setExternalScripts] = useState<string[]>([]);
+  const [siteData, setSiteData] = useState<any>(null);
+  const [githubPagesBaseUrl, setGithubPagesBaseUrl] = useState<string>('');
+
+  const grapesjsEnabled = isEnabled("use_grapesjs");
 
   useEffect(() => {
     const checkAuthAndLoad = async () => {
@@ -33,8 +41,10 @@ const SiteEditor = () => {
       }
 
       if (siteId) {
-        await loadSite();
-        await loadFileContent();
+        const siteData = await loadSite();
+        if (siteData) {
+          await loadFileContent(siteData);
+        }
       }
       setLoading(false);
     };
@@ -43,7 +53,7 @@ const SiteEditor = () => {
   }, [siteId, filePath, navigate]);
 
   const loadSite = async () => {
-    if (!siteId) return;
+    if (!siteId) return null;
 
     try {
       const { data, error } = await supabase
@@ -56,17 +66,19 @@ const SiteEditor = () => {
       if (!data) {
         toast.error("Site not found");
         navigate("/dashboard");
-        return;
+        return null;
       }
       setSite(data);
+      return data;
     } catch (error: any) {
       toast.error("Failed to load site");
       console.error(error);
       navigate("/dashboard");
+      return null;
     }
   };
 
-  const loadFileContent = async () => {
+  const loadFileContent = async (siteData: Site) => {
     if (!siteId) return;
 
     try {
@@ -86,20 +98,110 @@ const SiteEditor = () => {
       if (data?.content) {
         // Parse HTML and extract CSS if present
         const content = data.content;
-        const styleMatch = content.match(/<style[^>]*>([\s\S]*?)<\/style>/i);
-        const css = styleMatch ? styleMatch[1] : '';
-        
-        // Remove style tags from HTML
-        const htmlWithoutStyle = content.replace(/<style[^>]*>[\s\S]*?<\/style>/gi, '');
-        
+
+        // Extract all inline CSS from style tags
+        const styleMatches = content.matchAll(/<style[^>]*>([\s\S]*?)<\/style>/gi);
+        let inlineCSS = '';
+        for (const match of styleMatches) {
+          inlineCSS += match[1] + '\n';
+        }
+
+        // Extract external CSS file references from link tags
+        const linkMatches = content.matchAll(/<link[^>]*rel=["']stylesheet["'][^>]*href=["']([^"']+)["'][^>]*>/gi);
+        const cssFiles: string[] = [];
+        const externalCssUrls: string[] = [];
+        for (const match of linkMatches) {
+          const href = match[1];
+          // Separate site CSS files from external CDN URLs
+          if (href.startsWith('http://') || href.startsWith('https://') || href.startsWith('//')) {
+            externalCssUrls.push(href);
+          } else {
+            cssFiles.push(href);
+          }
+        }
+
+        // Extract all external scripts from script tags
+        const externalScriptUrls: string[] = [];
+        const scriptMatches = content.matchAll(/<script[^>]*src=["']([^"']+)["'][^>]*>/gi);
+
+        // Get the site's GitHub Pages URL to resolve relative paths
+        const githubPagesUrl = siteData.repo_full_name
+          ? `https://${siteData.repo_full_name.split('/')[0]}.github.io/${siteData.repo_full_name.split('/')[1]}/`
+          : '';
+
+        // Store for use by GrapesEditor
+        setGithubPagesBaseUrl(githubPagesUrl);
+
+        for (const match of scriptMatches) {
+          let src = match[1];
+          // Convert relative paths to absolute URLs using GitHub Pages URL
+          if (githubPagesUrl && !src.startsWith('http://') && !src.startsWith('https://') && !src.startsWith('//')) {
+            // Handle both absolute paths (/path) and relative paths (path)
+            if (src.startsWith('/')) {
+              src = `${githubPagesUrl.replace(/\/$/, '')}${src}`;
+            } else {
+              src = `${githubPagesUrl}${src}`;
+            }
+          }
+          externalScriptUrls.push(src);
+        }
+
+        // Fetch site-assets.json if it exists (for templates with dynamic content)
+        let siteAssetsData = null;
+        try {
+          const { data: siteAssetsContent } = await supabase.functions.invoke('fetch-asset-content', {
+            body: {
+              site_id: siteId,
+              asset_path: 'site-assets.json'
+            }
+          });
+          if (siteAssetsContent?.content) {
+            siteAssetsData = JSON.parse(siteAssetsContent.content);
+            console.log('site-assets.json loaded:', siteAssetsData);
+          }
+        } catch (error) {
+          // site-assets.json doesn't exist, that's okay
+          console.log('No site-assets.json found, skipping');
+        }
+
+        // Store external URLs and site data for GrapesJS canvas
+        setExternalStyles(externalCssUrls);
+        setExternalScripts(externalScriptUrls);
+        setSiteData(siteAssetsData);
+
+        // Fetch external CSS files
+        let externalCSS = '';
+        for (const cssFile of cssFiles) {
+          try {
+            const { data: cssData, error: cssError } = await supabase.functions.invoke('fetch-asset-content', {
+              body: {
+                site_id: siteId,
+                asset_path: cssFile
+              }
+            });
+            if (!cssError && cssData?.content) {
+              externalCSS += cssData.content + '\n';
+            }
+          } catch (cssError) {
+            console.warn(`Failed to load external CSS: ${cssFile}`, cssError);
+          }
+        }
+
+        // Combine all CSS
+        const combinedCSS = externalCSS + inlineCSS;
+
+        // Remove style tags and link tags from HTML
+        let cleanHtml = content.replace(/<style[^>]*>[\s\S]*?<\/style>/gi, '');
+        cleanHtml = cleanHtml.replace(/<link[^>]*rel=["']stylesheet["'][^>]*>/gi, '');
+
         // Extract body content if it's a full HTML document
-        const bodyMatch = htmlWithoutStyle.match(/<body[^>]*>([\s\S]*?)<\/body>/i);
-        const html = bodyMatch ? bodyMatch[1] : htmlWithoutStyle;
+        const bodyMatch = cleanHtml.match(/<body[^>]*>([\s\S]*?)<\/body>/i);
+        const html = bodyMatch ? bodyMatch[1] : cleanHtml;
 
         setInitialHtml(html.trim());
-        setInitialCss(css.trim());
+        setInitialCss(combinedCSS.trim());
         setCurrentHtml(html.trim());
-        setCurrentCss(css.trim());
+        setCurrentCss(combinedCSS.trim());
       } else {
         // Start with empty document
         setInitialHtml('<div class="container"><h1>Welcome to Your Site</h1><p>Start editing!</p></div>');
@@ -196,7 +298,7 @@ ${currentHtml}
     toast.success("HTML file downloaded!");
   };
 
-  if (loading) {
+  if (loading || flagsLoading) {
     return (
       <div className="h-screen w-full flex flex-col bg-background">
         <header className="border-b border-border bg-card/50 backdrop-blur-sm">
@@ -224,6 +326,42 @@ ${currentHtml}
             Back to Dashboard
           </Button>
         </div>
+      </div>
+    );
+  }
+
+  if (!grapesjsEnabled) {
+    return (
+      <div className="h-screen w-full flex flex-col bg-background">
+        <header className="border-b border-border bg-card/50 backdrop-blur-sm">
+          <div className="px-4 py-3">
+            <div className="flex items-center gap-3">
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => navigate(`/manage/${siteId}`)}
+                className="flex-shrink-0"
+              >
+                <ArrowLeft className="h-5 w-5" />
+              </Button>
+              <div className="flex-1 min-w-0">
+                <h1 className="text-lg font-bold truncate">Visual Editor</h1>
+                <p className="text-xs text-muted-foreground truncate">
+                  {site.name} - {editingPath}
+                </p>
+              </div>
+            </div>
+          </div>
+        </header>
+        <main className="flex-1 flex items-center justify-center p-4">
+          <Alert className="max-w-md">
+            <AlertCircle className="h-4 w-4" />
+            <AlertTitle>Feature Not Available</AlertTitle>
+            <AlertDescription>
+              The GrapesJS visual editor is currently disabled. Please contact an administrator to enable the "use_grapesjs" feature flag.
+            </AlertDescription>
+          </Alert>
+        </main>
       </div>
     );
   }
@@ -297,6 +435,11 @@ ${currentHtml}
         <GrapesEditor
           initialHtml={initialHtml}
           initialCss={initialCss}
+          externalStyles={externalStyles}
+          externalScripts={externalScripts}
+          siteData={siteData}
+          githubPagesBaseUrl={githubPagesBaseUrl}
+          siteId={siteId || ''}
           onSave={handleSave}
           onUpdate={handleUpdate}
         />
