@@ -22,7 +22,8 @@ import { AssetManagerSidebarNoConfig } from "./AssetManagerSidebar/AssetManagerS
 import { AssetTextEditor } from "./AssetManagerSidebar/AssetTextEditor";
 import { AssetImageEditor } from "./AssetManagerSidebar/AssetImageEditor";
 import { AssetJsonEditor } from "./AssetManagerSidebar/AssetJsonEditor";
-import { getAssetIcon, formatFileSize, isImageFile, getFileBaseName, getFileExtension } from "./AssetManagerSidebar/utils";
+import { DirectoryFileList } from "./AssetManagerSidebar/DirectoryFileList";
+import { getAssetIcon, formatFileSize, isImageFile, getFileBaseName, getFileExtension, groupComboAssets, getFileAssetType } from "./AssetManagerSidebar/utils";
 
 import type { AssetConfig, AssetFile } from "./AssetManagerSidebar/types";
 
@@ -1607,161 +1608,46 @@ const AssetManagerSidebar = ({ siteId, pendingChanges, setPendingChanges }: Asse
                             ) : (
                               /* Standard Directory */
                               getMergedDirectoryFiles(asset.path).length > 0 && (
-                                <div className="space-y-2">
-                                  <Label className="text-xs">Existing Files</Label>
-                                  <div className="space-y-1">
-                                    {getMergedDirectoryFiles(asset.path).map((file, fileIndex) => (
-                                      <div
-                                        key={file.path}
-                                        draggable
-                                        onDragStart={() => setDraggedItem(fileIndex)}
-                                        onDragOver={(e) => {
-                                          e.preventDefault();
-                                          handleAutoScroll(e);
-                                          setDragOverItem(fileIndex);
-                                        }}
-                                        onDrop={(e) => {
-                                          e.preventDefault();
-                                          handleStopAutoScroll();
-                                          if (draggedItem !== null) {
-                                            const files = getMergedDirectoryFiles(asset.path);
-                                            const newOrder = [...Array(files.length).keys()];
-                                            const [removed] = newOrder.splice(draggedItem, 1);
-                                            newOrder.splice(fileIndex, 0, removed);
-                                            handleReorderDirectoryItems(asset, files, newOrder);
-                                          }
-                                        }}
-                                        onDragEnd={() => {
-                                          handleStopAutoScroll();
-                                        }}
-                                        onDragLeave={() => {
-                                          handleStopAutoScroll();
-                                        }}
-                                        className={`flex items-center gap-2 p-2 border rounded-lg hover:bg-muted/50 w-full max-w-full ${dragOverItem === fileIndex ? 'border-primary' : ''}`}
-                                      >
-                                        <div className="flex flex-col gap-0.5 flex-shrink-0">
-                                          <Button
-                                            variant="ghost"
-                                            size="sm"
-                                            onClick={() => handleMoveDirectoryItem(asset, getMergedDirectoryFiles(asset.path), fileIndex, 'up')}
-                                            disabled={fileIndex === 0}
-                                            className="h-4 w-4 p-0 hover:bg-muted"
-                                            title="Move up"
-                                          >
-                                            <ArrowUp className="h-3 w-3" />
-                                          </Button>
-                                          <Button
-                                            variant="ghost"
-                                            size="sm"
-                                            onClick={() => handleMoveDirectoryItem(asset, getMergedDirectoryFiles(asset.path), fileIndex, 'down')}
-                                            disabled={fileIndex === getMergedDirectoryFiles(asset.path).length - 1}
-                                            className="h-4 w-4 p-0 hover:bg-muted"
-                                            title="Move down"
-                                          >
-                                            <ArrowDown className="h-3 w-3" />
-                                          </Button>
-                                        </div>
-                                        <GripVertical className="h-3 w-3 text-muted-foreground flex-shrink-0 cursor-move" />
-                                        {isImageFile(file.name) ? (
-                                          <img
-                                            src={file.download_url}
-                                            alt={file.name}
-                                            className="w-12 h-12 object-cover rounded border flex-shrink-0"
-                                          />
-                                        ) : (
-                                          <div className="w-12 h-12 flex items-center justify-center bg-muted rounded border flex-shrink-0">
-                                            <File className="h-6 w-6 text-muted-foreground" />
-                                          </div>
-                                        )}
-                                        <div className="flex-1 min-w-0 overflow-hidden">
-                                          {renamingFile === file.path ? (
-                                            <div className="flex items-center gap-1">
-                                              <Input
-                                                value={newFileName}
-                                                onChange={(e) => setNewFileName(e.target.value)}
-                                                onKeyDown={(e) => {
-                                                  if (e.key === 'Enter') {
-                                                    handleRenameFile(asset, file);
-                                                  } else if (e.key === 'Escape') {
-                                                    setRenamingFile(null);
-                                                    setNewFileName("");
-                                                  }
-                                                }}
-                                                className="h-7 text-xs"
-                                                autoFocus
-                                              />
-                                              <Button
-                                                variant="ghost"
-                                                size="sm"
-                                                onClick={() => handleRenameFile(asset, file)}
-                                                className="h-7 px-2 text-xs"
-                                              >
-                                                Save
-                                              </Button>
-                                              <Button
-                                                variant="ghost"
-                                                size="sm"
-                                                onClick={() => {
-                                                  setRenamingFile(null);
-                                                  setNewFileName("");
-                                                }}
-                                                className="h-7 px-2 text-xs"
-                                              >
-                                                Cancel
-                                              </Button>
-                                            </div>
-                                          ) : (
-                                            <>
-                                              <p className="text-xs font-medium truncate">{file.name}</p>
-                                              <p className="text-xs text-muted-foreground">
-                                                {(file.size / 1024).toFixed(1)} KB
-                                              </p>
-                                            </>
-                                          )}
-                                        </div>
-                                        {renamingFile !== file.path && (
-                                          <div className="flex items-center gap-1 flex-shrink-0">
-                                            <Button
-                                              variant="ghost"
-                                              size="sm"
-                                              onClick={() => window.open(file.download_url, '_blank')}
-                                              className="h-7 w-7 p-0"
-                                              title="Open file"
-                                            >
-                                              <FileText className="h-3 w-3" />
-                                            </Button>
-                                            <Button
-                                              variant="ghost"
-                                              size="sm"
-                                              onClick={() => {
-                                                setRenamingFile(file.path);
-                                                setNewFileName(file.name);
-                                              }}
-                                              className="h-7 w-7 p-0"
-                                              title="Rename file"
-                                            >
-                                              <Edit className="h-3 w-3" />
-                                            </Button>
-                                            <Button
-                                              variant="ghost"
-                                              size="sm"
-                                              onClick={() => handleDeleteFile(asset, file.path, file.sha)}
-                                              disabled={deletingFile === file.path}
-                                              className="h-7 w-7 p-0"
-                                              title="Delete file"
-                                            >
-                                              {deletingFile === file.path ? (
-                                                <RefreshCw className="h-3 w-3 animate-spin" />
-                                              ) : (
-                                                <Trash2 className="h-3 w-3" />
-                                              )}
-                                            </Button>
-                                          </div>
-                                        )}
-                                      </div>
-                                    ))}
-                                  </div>
-                                </div>
+                                <DirectoryFileList
+                                  asset={asset}
+                                  files={getMergedDirectoryFiles(asset.path)}
+                                  draggedItem={draggedItem}
+                                  dragOverItem={dragOverItem}
+                                  renamingFile={renamingFile}
+                                  newFileName={newFileName}
+                                  deletingFile={deletingFile}
+                                  onDragStart={(index) => setDraggedItem(index)}
+                                  onDragOver={(e, index) => {
+                                    handleAutoScroll(e);
+                                    setDragOverItem(index);
+                                  }}
+                                  onDrop={(e, index) => {
+                                    handleStopAutoScroll();
+                                    if (draggedItem !== null) {
+                                      const files = getMergedDirectoryFiles(asset.path);
+                                      const newOrder = [...Array(files.length).keys()];
+                                      const [removed] = newOrder.splice(draggedItem, 1);
+                                      newOrder.splice(index, 0, removed);
+                                      handleReorderDirectoryItems(asset, files, newOrder);
+                                    }
+                                  }}
+                                  onDragEnd={() => handleStopAutoScroll()}
+                                  onDragLeave={() => handleStopAutoScroll()}
+                                  onMoveUp={(index) => handleMoveDirectoryItem(asset, getMergedDirectoryFiles(asset.path), index, 'up')}
+                                  onMoveDown={(index) => handleMoveDirectoryItem(asset, getMergedDirectoryFiles(asset.path), index, 'down')}
+                                  onRename={(file) => handleRenameFile(asset, file)}
+                                  onRenameCancel={() => {
+                                    setRenamingFile(null);
+                                    setNewFileName("");
+                                  }}
+                                  onRenameStart={(file) => {
+                                    setRenamingFile(file.path);
+                                    setNewFileName(file.name);
+                                  }}
+                                  onNewFileNameChange={(value) => setNewFileName(value)}
+                                  onDelete={(file) => handleDeleteFile(asset, file.path, file.sha)}
+                                  onOpenFile={(file) => window.open(file.download_url, '_blank')}
+                                />
                               )
                             )}
 
