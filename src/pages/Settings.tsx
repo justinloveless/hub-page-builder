@@ -4,6 +4,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { toast } from "sonner";
 import { ArrowLeft, Shield, PackagePlus, Flag } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -89,150 +90,160 @@ const Settings = () => {
 
       {/* Main Content */}
       <main className="container mx-auto px-4 py-8 max-w-3xl">
-        <Card>
-          <CardHeader>
-            <div className="flex items-start justify-between">
-              <div>
-                <CardTitle>GitHub App Configuration</CardTitle>
+        <Tabs defaultValue="github" className="w-full">
+          <TabsList className="grid w-full grid-cols-3">
+            <TabsTrigger value="github">GitHub App</TabsTrigger>
+            <TabsTrigger value="templates">Templates</TabsTrigger>
+            <TabsTrigger value="flags">Feature Flags</TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="github" className="space-y-6 mt-6">
+            <Card>
+              <CardHeader>
+                <div className="flex items-start justify-between">
+                  <div>
+                    <CardTitle>GitHub App Configuration</CardTitle>
+                    <CardDescription>
+                      System-managed GitHub App credentials (read-only)
+                    </CardDescription>
+                  </div>
+                  <Shield className="h-5 w-5 text-muted-foreground" />
+                </div>
+              </CardHeader>
+              <CardContent>
+                {loading ? (
+                  <div className="space-y-6">
+                    <div className="space-y-2">
+                      <Skeleton className="h-4 w-32" />
+                      <Skeleton className="h-10 w-full" />
+                    </div>
+                    <div className="space-y-2">
+                      <Skeleton className="h-4 w-24" />
+                      <Skeleton className="h-10 w-full" />
+                    </div>
+                    <div className="space-y-2">
+                      <Skeleton className="h-4 w-28" />
+                      <Skeleton className="h-10 w-full" />
+                    </div>
+                  </div>
+                ) : config ? (
+                  <div className="space-y-6">
+                    <div className="space-y-2">
+                      <p className="text-sm font-medium">GitHub App Slug</p>
+                      <p className="text-sm text-muted-foreground bg-muted/50 p-3 rounded-md font-mono">
+                        {config.slug}
+                      </p>
+                    </div>
+
+                    <div className="space-y-2">
+                      <p className="text-sm font-medium">App ID</p>
+                      <p className="text-sm text-muted-foreground bg-muted/50 p-3 rounded-md font-mono">
+                        {config.app_id || "Not configured"}
+                      </p>
+                    </div>
+
+                    <div className="space-y-2">
+                      <p className="text-sm font-medium">Client ID</p>
+                      <p className="text-sm text-muted-foreground bg-muted/50 p-3 rounded-md font-mono">
+                        {config.client_id}
+                      </p>
+                    </div>
+
+                    <div className="space-y-2">
+                      <p className="text-sm font-medium">Client Secret</p>
+                      <p className="text-sm text-muted-foreground bg-muted/50 p-3 rounded-md font-mono">
+                        ••••••••••••••••
+                      </p>
+                      <p className="text-xs text-muted-foreground">
+                        Client secret is stored securely and cannot be displayed
+                      </p>
+                    </div>
+
+                    <div className="space-y-2">
+                      <p className="text-sm font-medium">Private Key</p>
+                      <p className="text-sm text-muted-foreground bg-muted/50 p-3 rounded-md font-mono">
+                        ••••••••••••••••
+                      </p>
+                      <p className="text-xs text-muted-foreground">
+                        Private key is stored in Supabase secrets (GITHUB_APP_PKEY) and cannot be displayed
+                      </p>
+                    </div>
+
+                    <div className="bg-blue-500/10 border border-blue-500/20 rounded-md p-4">
+                      <p className="text-sm text-blue-300">
+                        <strong>Note:</strong> This configuration is managed by system administrators.
+                        Contact your administrator if changes are needed.
+                      </p>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="bg-yellow-500/10 border border-yellow-500/20 rounded-md p-4">
+                    <p className="text-sm text-yellow-300">
+                      No GitHub App configuration found. Please contact your system administrator to set up the GitHub App credentials.
+                    </p>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle>How to Create a GitHub App</CardTitle>
                 <CardDescription>
-                  System-managed GitHub App credentials (read-only)
+                  Follow these steps to set up GitHub integration
                 </CardDescription>
-              </div>
-              <Shield className="h-5 w-5 text-muted-foreground" />
-            </div>
-          </CardHeader>
-          <CardContent>
-            {loading ? (
-              <div className="space-y-6">
-                <div className="space-y-2">
-                  <Skeleton className="h-4 w-32" />
-                  <Skeleton className="h-10 w-full" />
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <ol className="list-decimal list-inside space-y-3 text-sm text-muted-foreground">
+                  <li>Go to GitHub Settings → Developer settings → GitHub Apps</li>
+                  <li>Click "New GitHub App"</li>
+                  <li>Set the required permissions (Contents: Read & Write, Metadata: Read)</li>
+                  <li>Generate a client secret and a private key</li>
+                  <li>Note the App ID from the GitHub App settings</li>
+                  <li>Add the App ID to github_app_config table, store the private key in GITHUB_APP_PKEY secret</li>
+                </ol>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="templates" className="mt-6">
+            <Card>
+              <CardHeader>
+                <div className="flex items-start justify-between">
+                  <div>
+                    <CardTitle>Template Management</CardTitle>
+                    <CardDescription>
+                      Manage site templates available to all users
+                    </CardDescription>
+                  </div>
+                  <PackagePlus className="h-5 w-5 text-muted-foreground" />
                 </div>
-                <div className="space-y-2">
-                  <Skeleton className="h-4 w-24" />
-                  <Skeleton className="h-10 w-full" />
+              </CardHeader>
+              <CardContent>
+                <TemplateManagement />
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="flags" className="mt-6">
+            <Card>
+              <CardHeader>
+                <div className="flex items-start justify-between">
+                  <div>
+                    <CardTitle>Feature Flags</CardTitle>
+                    <CardDescription>
+                      Control feature availability across your application
+                    </CardDescription>
+                  </div>
+                  <Flag className="h-5 w-5 text-muted-foreground" />
                 </div>
-                <div className="space-y-2">
-                  <Skeleton className="h-4 w-28" />
-                  <Skeleton className="h-10 w-full" />
-                </div>
-              </div>
-            ) : config ? (
-              <div className="space-y-6">
-                <div className="space-y-2">
-                  <p className="text-sm font-medium">GitHub App Slug</p>
-                  <p className="text-sm text-muted-foreground bg-muted/50 p-3 rounded-md font-mono">
-                    {config.slug}
-                  </p>
-                </div>
-
-                <div className="space-y-2">
-                  <p className="text-sm font-medium">App ID</p>
-                  <p className="text-sm text-muted-foreground bg-muted/50 p-3 rounded-md font-mono">
-                    {config.app_id || "Not configured"}
-                  </p>
-                </div>
-
-                <div className="space-y-2">
-                  <p className="text-sm font-medium">Client ID</p>
-                  <p className="text-sm text-muted-foreground bg-muted/50 p-3 rounded-md font-mono">
-                    {config.client_id}
-                  </p>
-                </div>
-
-                <div className="space-y-2">
-                  <p className="text-sm font-medium">Client Secret</p>
-                  <p className="text-sm text-muted-foreground bg-muted/50 p-3 rounded-md font-mono">
-                    ••••••••••••••••
-                  </p>
-                  <p className="text-xs text-muted-foreground">
-                    Client secret is stored securely and cannot be displayed
-                  </p>
-                </div>
-
-                <div className="space-y-2">
-                  <p className="text-sm font-medium">Private Key</p>
-                  <p className="text-sm text-muted-foreground bg-muted/50 p-3 rounded-md font-mono">
-                    ••••••••••••••••
-                  </p>
-                  <p className="text-xs text-muted-foreground">
-                    Private key is stored in Supabase secrets (GITHUB_APP_PKEY) and cannot be displayed
-                  </p>
-                </div>
-
-                <div className="bg-blue-500/10 border border-blue-500/20 rounded-md p-4">
-                  <p className="text-sm text-blue-300">
-                    <strong>Note:</strong> This configuration is managed by system administrators.
-                    Contact your administrator if changes are needed.
-                  </p>
-                </div>
-              </div>
-            ) : (
-              <div className="bg-yellow-500/10 border border-yellow-500/20 rounded-md p-4">
-                <p className="text-sm text-yellow-300">
-                  No GitHub App configuration found. Please contact your system administrator to set up the GitHub App credentials.
-                </p>
-              </div>
-            )}
-          </CardContent>
-        </Card>
-
-        <Card className="mt-6">
-          <CardHeader>
-            <CardTitle>How to Create a GitHub App</CardTitle>
-            <CardDescription>
-              Follow these steps to set up GitHub integration
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <ol className="list-decimal list-inside space-y-3 text-sm text-muted-foreground">
-              <li>Go to GitHub Settings → Developer settings → GitHub Apps</li>
-              <li>Click "New GitHub App"</li>
-              <li>Set the required permissions (Contents: Read & Write, Metadata: Read)</li>
-              <li>Generate a client secret and a private key</li>
-              <li>Note the App ID from the GitHub App settings</li>
-              <li>Add the App ID to github_app_config table, store the private key in GITHUB_APP_PKEY secret</li>
-            </ol>
-          </CardContent>
-        </Card>
-
-        <Separator className="my-8" />
-
-        <Card>
-          <CardHeader>
-            <div className="flex items-start justify-between">
-              <div>
-                <CardTitle>Template Management</CardTitle>
-                <CardDescription>
-                  Manage site templates available to all users
-                </CardDescription>
-              </div>
-              <PackagePlus className="h-5 w-5 text-muted-foreground" />
-            </div>
-          </CardHeader>
-          <CardContent>
-            <TemplateManagement />
-          </CardContent>
-        </Card>
-
-        <Separator className="my-8" />
-
-        <Card>
-          <CardHeader>
-            <div className="flex items-start justify-between">
-              <div>
-                <CardTitle>Feature Flags</CardTitle>
-                <CardDescription>
-                  Control feature availability across your application
-                </CardDescription>
-              </div>
-              <Flag className="h-5 w-5 text-muted-foreground" />
-            </div>
-          </CardHeader>
-          <CardContent>
-            <FeatureFlagManagement />
-          </CardContent>
-        </Card>
+              </CardHeader>
+              <CardContent>
+                <FeatureFlagManagement />
+              </CardContent>
+            </Card>
+          </TabsContent>
+        </Tabs>
       </main>
     </div>
   );
