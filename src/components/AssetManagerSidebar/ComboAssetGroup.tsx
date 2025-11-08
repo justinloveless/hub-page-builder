@@ -2,9 +2,10 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
-import { ArrowUp, ArrowDown, GripVertical, Edit } from "lucide-react";
+import { ArrowUp, ArrowDown, GripVertical, Edit, Trash2 } from "lucide-react";
 import type { AssetConfig, AssetFile } from "./types";
-import { getFileAssetType, isImageFile } from "./utils";
+import { getFileAssetType, isImageFile, groupComboAssets } from "./utils";
+import { useAssetManagerSidebarContext } from "./AssetManagerSidebarContext";
 
 interface ComboAssetGroupProps {
   asset: AssetConfig;
@@ -13,29 +14,6 @@ interface ComboAssetGroupProps {
   groupIndex: number;
   totalGroups: number;
   sortedFiles: AssetFile[];
-  comboFileContents: Record<string, string>;
-  loadingComboFile: Record<string, boolean>;
-  renamingFile: string | null;
-  newFileName: string;
-  draggedComboItem: number | null;
-  dragOverComboItem: number | null;
-  onDragStart: () => void;
-  onDragOver: (e: React.DragEvent) => void;
-  onDrop: (e: React.DragEvent) => void;
-  onDragEnd: () => void;
-  onDragLeave: () => void;
-  onMoveUp: () => void;
-  onMoveDown: () => void;
-  onRenameStart: () => void;
-  onRenameSave: () => void;
-  onRenameCancel: () => void;
-  onNewFileNameChange: (value: string) => void;
-  onDelete: () => void;
-  onFileContentChange: (filePath: string, content: string) => void;
-  onComboFileContentChange: (filePath: string, content: string) => void;
-  onSetComboFileContent: (filePath: string, content: string) => void;
-  onFileUpload: (filePath: string, file: File) => void;
-  onLoadComboFileContent: (filePath: string) => void;
 }
 
 export const ComboAssetGroup = ({
@@ -45,39 +23,56 @@ export const ComboAssetGroup = ({
   groupIndex,
   totalGroups,
   sortedFiles,
-  comboFileContents,
-  loadingComboFile,
-  renamingFile,
-  newFileName,
-  draggedComboItem,
-  dragOverComboItem,
-  onDragStart,
-  onDragOver,
-  onDrop,
-  onDragEnd,
-  onDragLeave,
-  onMoveUp,
-  onMoveDown,
-  onRenameStart,
-  onRenameSave,
-  onRenameCancel,
-  onNewFileNameChange,
-  onDelete,
-  onFileContentChange,
-  onComboFileContentChange,
-  onSetComboFileContent,
-  onFileUpload,
-  onLoadComboFileContent,
 }: ComboAssetGroupProps) => {
+  const {
+    comboFileContents,
+    loadingComboFile,
+    renamingFile,
+    newFileName,
+    draggedComboItem,
+    dragOverComboItem,
+    setRenamingFile,
+    setNewFileName,
+    setDraggedComboItem,
+    setDragOverComboItem,
+    setComboFileContents,
+    handleFileUpload,
+    handleComboFileContentChange,
+    loadComboFileContent,
+    handleDeleteComboAsset,
+    handleRenameComboAsset,
+    handleMoveComboAsset,
+    getMergedDirectoryFiles,
+    handleAutoScroll,
+    handleStopAutoScroll,
+    handleReorderComboAssets,
+  } = useAssetManagerSidebarContext();
   return (
     <div
       key={baseName}
       draggable
-      onDragStart={onDragStart}
-      onDragOver={onDragOver}
-      onDrop={onDrop}
-      onDragEnd={onDragEnd}
-      onDragLeave={onDragLeave}
+      onDragStart={() => setDraggedComboItem(groupIndex)}
+      onDragOver={(e) => {
+        e.preventDefault();
+        handleAutoScroll(e);
+        setDragOverComboItem(groupIndex);
+      }}
+      onDrop={(e) => {
+        e.preventDefault();
+        handleStopAutoScroll();
+        if (draggedComboItem !== null && draggedComboItem !== groupIndex) {
+          const { groups } = groupComboAssets(getMergedDirectoryFiles(asset.path), asset.contains!.parts!);
+          handleReorderComboAssets(asset, groups, draggedComboItem, groupIndex);
+        }
+        setDraggedComboItem(null);
+        setDragOverComboItem(null);
+      }}
+      onDragEnd={() => {
+        handleStopAutoScroll();
+        setDraggedComboItem(null);
+        setDragOverComboItem(null);
+      }}
+      onDragLeave={handleStopAutoScroll}
       className={`p-3 border rounded-lg bg-accent/5 space-y-2 ${dragOverComboItem === groupIndex ? 'border-primary' : ''}`}
     >
       <div className="flex items-center gap-2">
@@ -85,7 +80,10 @@ export const ComboAssetGroup = ({
           <Button
             variant="ghost"
             size="sm"
-            onClick={onMoveUp}
+            onClick={() => {
+              const { groups } = groupComboAssets(getMergedDirectoryFiles(asset.path), asset.contains!.parts!);
+              handleMoveComboAsset(asset, groups, groupIndex, 'up');
+            }}
             disabled={groupIndex === 0}
             className="h-4 w-4 p-0 hover:bg-muted"
             title="Move up"
@@ -95,7 +93,10 @@ export const ComboAssetGroup = ({
           <Button
             variant="ghost"
             size="sm"
-            onClick={onMoveDown}
+            onClick={() => {
+              const { groups } = groupComboAssets(getMergedDirectoryFiles(asset.path), asset.contains!.parts!);
+              handleMoveComboAsset(asset, groups, groupIndex, 'down');
+            }}
             disabled={groupIndex === totalGroups - 1}
             className="h-4 w-4 p-0 hover:bg-muted"
             title="Move down"
@@ -109,12 +110,13 @@ export const ComboAssetGroup = ({
             <div className="flex items-center gap-1 flex-1">
               <Input
                 value={newFileName}
-                onChange={(e) => onNewFileNameChange(e.target.value)}
+                onChange={(e) => setNewFileName(e.target.value)}
                 onKeyDown={(e) => {
                   if (e.key === 'Enter') {
-                    onRenameSave();
+                    handleRenameComboAsset(asset, baseName, group.files, asset.contains!.parts!);
                   } else if (e.key === 'Escape') {
-                    onRenameCancel();
+                    setRenamingFile(null);
+                    setNewFileName("");
                   }
                 }}
                 className="h-7 text-xs"
@@ -123,7 +125,7 @@ export const ComboAssetGroup = ({
               <Button
                 variant="ghost"
                 size="sm"
-                onClick={onRenameSave}
+                onClick={() => handleRenameComboAsset(asset, baseName, group.files, asset.contains!.parts!)}
                 className="h-7 px-2 text-xs"
               >
                 Save
@@ -131,7 +133,10 @@ export const ComboAssetGroup = ({
               <Button
                 variant="ghost"
                 size="sm"
-                onClick={onRenameCancel}
+                onClick={() => {
+                  setRenamingFile(null);
+                  setNewFileName("");
+                }}
                 className="h-7 px-2 text-xs"
               >
                 Cancel
@@ -144,7 +149,10 @@ export const ComboAssetGroup = ({
                 <Button
                   variant="ghost"
                   size="sm"
-                  onClick={onRenameStart}
+                  onClick={() => {
+                    setRenamingFile(baseName);
+                    setNewFileName(baseName);
+                  }}
                   className="h-6"
                 >
                   <Edit className="h-3 w-3" />
@@ -152,7 +160,7 @@ export const ComboAssetGroup = ({
                 <Button
                   variant="ghost"
                   size="sm"
-                  onClick={onDelete}
+                  onClick={() => handleDeleteComboAsset(asset, baseName, group.files)}
                   className="h-6 text-destructive hover:text-destructive hover:bg-destructive/10"
                 >
                   <Trash2 className="h-3 w-3" />
@@ -171,7 +179,7 @@ export const ComboAssetGroup = ({
 
           // Auto-load content for all parts
           if ((isJson || isText) && !comboFileContents[file.path] && !loadingComboFile[file.path]) {
-            onLoadComboFileContent(file.path);
+            loadComboFileContent(file.path);
           }
 
           return (
@@ -194,7 +202,8 @@ export const ComboAssetGroup = ({
                       input.onchange = async (e) => {
                         const newFile = (e.target as HTMLInputElement).files?.[0];
                         if (newFile) {
-                          onFileUpload(file.path, newFile);
+                          const uploadAsset = { ...asset, path: file.path };
+                          handleFileUpload(uploadAsset, newFile);
                         }
                       };
                       input.click();
@@ -218,8 +227,8 @@ export const ComboAssetGroup = ({
                     <>
                       <Textarea
                         value={comboFileContents[file.path]}
-                        onChange={(e) => onSetComboFileContent(file.path, e.target.value)}
-                        onBlur={(e) => onComboFileContentChange(file.path, e.target.value)}
+                        onChange={(e) => setComboFileContents(prev => ({ ...prev, [file.path]: e.target.value }))}
+                        onBlur={(e) => handleComboFileContentChange(file.path, e.target.value)}
                         className="min-h-[80px] font-mono text-xs"
                       />
                       <p className="text-xs text-muted-foreground">Changes are automatically saved to batch</p>
@@ -249,7 +258,7 @@ export const ComboAssetGroup = ({
                                     value={String(value)}
                                     onChange={(e) => {
                                       const updated = { ...jsonData, [key]: e.target.value };
-                                      onComboFileContentChange(file.path, JSON.stringify(updated, null, 2));
+                                      handleComboFileContentChange(file.path, JSON.stringify(updated, null, 2));
                                     }}
                                     className="h-8 text-xs"
                                   />
@@ -261,8 +270,8 @@ export const ComboAssetGroup = ({
                           return (
                             <Textarea
                               value={comboFileContents[file.path]}
-                              onChange={(e) => onSetComboFileContent(file.path, e.target.value)}
-                              onBlur={(e) => onComboFileContentChange(file.path, e.target.value)}
+                              onChange={(e) => setComboFileContents(prev => ({ ...prev, [file.path]: e.target.value }))}
+                              onBlur={(e) => handleComboFileContentChange(file.path, e.target.value)}
                               className="min-h-[80px] font-mono text-xs"
                               placeholder="Invalid JSON"
                             />

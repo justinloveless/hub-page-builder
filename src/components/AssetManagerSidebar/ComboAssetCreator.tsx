@@ -7,41 +7,32 @@ import { Plus } from "lucide-react";
 import { toast } from "sonner";
 import type { AssetConfig } from "./types";
 import { formatFileSize } from "./utils";
+import { useAssetManagerSidebarContext } from "./AssetManagerSidebarContext";
 
 interface ComboAssetCreatorProps {
   asset: AssetConfig;
-  creatingCombo: boolean;
-  newComboData: {
-    baseName: string;
-    parts: Record<string, { content: string; file?: File; jsonData?: Record<string, any> }>;
-  } | undefined;
-  onStartCreating: () => void;
-  onCancelCreating: () => void;
-  onBaseNameChange: (value: string) => void;
-  onPartFileChange: (partKey: string, file: File) => void;
-  onPartJsonDataChange: (partKey: string, jsonData: Record<string, any>) => void;
-  onPartContentChange: (partKey: string, content: string) => void;
-  onSubmit: () => void;
 }
 
 export const ComboAssetCreator = ({
   asset,
-  creatingCombo,
-  newComboData,
-  onStartCreating,
-  onCancelCreating,
-  onBaseNameChange,
-  onPartFileChange,
-  onPartJsonDataChange,
-  onPartContentChange,
-  onSubmit,
 }: ComboAssetCreatorProps) => {
-  if (!creatingCombo) {
+  const {
+    creatingCombo,
+    newComboData,
+    setNewComboData,
+    startCreatingCombo,
+    cancelCreatingCombo,
+    submitNewCombo,
+  } = useAssetManagerSidebarContext();
+  
+  const isCreatingCombo = !!creatingCombo[asset.path];
+  const comboData = newComboData[asset.path];
+  if (!isCreatingCombo) {
     return (
       <Button
         variant="outline"
         size="sm"
-        onClick={onStartCreating}
+        onClick={() => startCreatingCombo(asset)}
         className="w-full"
       >
         <Plus className="h-3 w-3 mr-2" />
@@ -57,7 +48,7 @@ export const ComboAssetCreator = ({
         <Button
           variant="ghost"
           size="sm"
-          onClick={onCancelCreating}
+          onClick={() => cancelCreatingCombo(asset.path)}
           className="h-6 px-2 text-xs"
         >
           Cancel
@@ -71,8 +62,17 @@ export const ComboAssetCreator = ({
         </Label>
         <Input
           id="combo-basename"
-          value={newComboData?.baseName || ''}
-          onChange={(e) => onBaseNameChange(e.target.value)}
+          value={comboData?.baseName || ''}
+          onChange={(e) => {
+            setNewComboData(prev => ({
+              ...prev,
+              [asset.path]: {
+                ...prev[asset.path],
+                baseName: e.target.value,
+                parts: prev[asset.path]?.parts || {}
+              }
+            }));
+          }}
           placeholder="e.g., photo1, document-a"
           className="h-8 text-xs"
         />
@@ -86,7 +86,7 @@ export const ComboAssetCreator = ({
           const isImage = partKey === 'image';
           const isJson = partKey === 'json';
           const isText = partKey === 'text' || partKey === 'markdown';
-          const hasPart = !!newComboData?.parts[partKey];
+          const hasPart = !!comboData?.parts[partKey];
 
           return (
             <div key={partIdx} className="p-2 border rounded bg-background space-y-2">
@@ -118,14 +118,24 @@ export const ComboAssetCreator = ({
                           toast.error(`File size exceeds maximum of ${formatFileSize(part.maxSize)}`);
                           return;
                         }
-                        onPartFileChange(partKey, file);
+                        setNewComboData(prev => ({
+                          ...prev,
+                          [asset.path]: {
+                            ...prev[asset.path],
+                            baseName: prev[asset.path]?.baseName || '',
+                            parts: {
+                              ...prev[asset.path]?.parts,
+                              [partKey]: { content: '', file }
+                            }
+                          }
+                        }));
                       }
                     }}
                     className="text-xs"
                   />
-                  {hasPart && newComboData?.parts[partKey]?.file && (
+                  {hasPart && comboData?.parts[partKey]?.file && (
                     <p className="text-xs text-muted-foreground">
-                      Selected: {newComboData.parts[partKey].file!.name}
+                      Selected: {comboData.parts[partKey].file!.name}
                     </p>
                   )}
                 </div>
@@ -138,15 +148,28 @@ export const ComboAssetCreator = ({
                     <div className="space-y-2">
                       <Label className="text-xs">JSON Content (Form)</Label>
                       {Object.entries(part.schema.properties).map(([fieldKey, fieldSchema]: [string, any]) => {
-                        const comboPartData = newComboData?.parts[partKey];
+                        const comboPartData = comboData?.parts[partKey];
                         const jsonData = comboPartData?.jsonData || {};
                         const value = jsonData[fieldKey] ?? fieldSchema.default ?? '';
 
                         const updateJsonField = (newValue: any) => {
-                          onPartJsonDataChange(partKey, {
-                            ...jsonData,
-                            [fieldKey]: newValue
-                          });
+                          setNewComboData(prev => ({
+                            ...prev,
+                            [asset.path]: {
+                              ...prev[asset.path],
+                              baseName: prev[asset.path]?.baseName || '',
+                              parts: {
+                                ...prev[asset.path]?.parts,
+                                [partKey]: {
+                                  content: '',
+                                  jsonData: {
+                                    ...jsonData,
+                                    [fieldKey]: newValue
+                                  }
+                                }
+                              }
+                            }
+                          }));
                         };
 
                         return (
@@ -162,10 +185,7 @@ export const ComboAssetCreator = ({
                                 id={`combo-json-${partIdx}-${fieldKey}`}
                                 value={value}
                                 onChange={(e) => {
-                                  onPartJsonDataChange(partKey, {
-                                    ...jsonData,
-                                    [fieldKey]: e.target.value
-                                  });
+                                  updateJsonField(e.target.value);
                                 }}
                                 placeholder={fieldSchema.placeholder}
                                 className="min-h-[60px] text-xs"
@@ -179,10 +199,7 @@ export const ComboAssetCreator = ({
                                   const numValue = fieldSchema.type === 'integer' 
                                     ? parseInt(e.target.value) || 0 
                                     : parseFloat(e.target.value) || 0;
-                                  onPartJsonDataChange(partKey, {
-                                    ...jsonData,
-                                    [fieldKey]: numValue
-                                  });
+                                  updateJsonField(numValue);
                                 }}
                                 placeholder={fieldSchema.placeholder}
                                 className="h-8 text-xs"
@@ -192,10 +209,7 @@ export const ComboAssetCreator = ({
                                 id={`combo-json-${partIdx}-${fieldKey}`}
                                 value={value}
                                 onChange={(e) => {
-                                  onPartJsonDataChange(partKey, {
-                                    ...jsonData,
-                                    [fieldKey]: e.target.value
-                                  });
+                                  updateJsonField(e.target.value);
                                 }}
                                 placeholder={fieldSchema.placeholder}
                                 className="h-8 text-xs"
@@ -213,9 +227,19 @@ export const ComboAssetCreator = ({
                       </Label>
                       <Textarea
                         id={`combo-json-${partIdx}`}
-                        value={newComboData?.parts[partKey]?.content || ''}
+                        value={comboData?.parts[partKey]?.content || ''}
                         onChange={(e) => {
-                          onPartContentChange(partKey, e.target.value);
+                          setNewComboData(prev => ({
+                            ...prev,
+                            [asset.path]: {
+                              ...prev[asset.path],
+                              baseName: prev[asset.path]?.baseName || '',
+                              parts: {
+                                ...prev[asset.path]?.parts,
+                                [partKey]: { content: e.target.value }
+                              }
+                            }
+                          }));
                         }}
                         placeholder='{"key": "value"}'
                         className="min-h-[60px] font-mono text-xs"
@@ -232,8 +256,20 @@ export const ComboAssetCreator = ({
                   </Label>
                   <Textarea
                     id={`combo-text-${partIdx}`}
-                    value={newComboData?.parts[partKey]?.content || ''}
-                    onChange={(e) => onPartContentChange(partKey, e.target.value)}
+                    value={comboData?.parts[partKey]?.content || ''}
+                    onChange={(e) => {
+                      setNewComboData(prev => ({
+                        ...prev,
+                        [asset.path]: {
+                          ...prev[asset.path],
+                          baseName: prev[asset.path]?.baseName || '',
+                          parts: {
+                            ...prev[asset.path]?.parts,
+                            [partKey]: { content: e.target.value }
+                          }
+                        }
+                      }));
+                    }}
                     placeholder="Enter text content..."
                     className="min-h-[60px] text-xs"
                   />
@@ -250,7 +286,7 @@ export const ComboAssetCreator = ({
 
       {/* Submit Button */}
       <Button
-        onClick={onSubmit}
+        onClick={() => submitNewCombo(asset)}
         className="w-full"
         size="sm"
       >
