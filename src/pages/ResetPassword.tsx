@@ -17,16 +17,31 @@ const ResetPassword = () => {
   const navigate = useNavigate();
 
   useEffect(() => {
-    // Check if the user has a valid recovery session
-    supabase.auth.getSession().then(({ data: { session } }) => {
+    // Listen for auth state changes to detect password recovery
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      if (event === 'PASSWORD_RECOVERY') {
+        setValidSession(true);
+      } else if (event === 'SIGNED_IN' && session) {
+        setValidSession(true);
+      }
+    });
+
+    // Also check for existing session after a brief delay to allow URL hash processing
+    const timer = setTimeout(async () => {
+      const { data: { session } } = await supabase.auth.getSession();
       if (session) {
         setValidSession(true);
-      } else {
+      } else if (!validSession) {
         toast.error("Invalid or expired reset link");
         navigate("/auth");
       }
-    });
-  }, [navigate]);
+    }, 500);
+
+    return () => {
+      subscription.unsubscribe();
+      clearTimeout(timer);
+    };
+  }, [navigate, validSession]);
 
   const handleResetPassword = async (e: React.FormEvent) => {
     e.preventDefault();

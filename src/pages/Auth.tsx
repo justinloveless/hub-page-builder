@@ -88,8 +88,14 @@ const Auth = () => {
     setLoading(true);
 
     try {
+      // Use production URL if in production, otherwise use current origin
+      const isProduction = window.location.hostname === 'staticsnack.com';
+      const redirectUrl = isProduction 
+        ? 'https://staticsnack.com/reset-password'
+        : `${window.location.origin}/reset-password`;
+      
       const { error } = await supabase.auth.resetPasswordForEmail(resetEmail, {
-        redirectTo: `${window.location.origin}/reset-password`,
+        redirectTo: redirectUrl,
       });
 
       if (error) throw error;
