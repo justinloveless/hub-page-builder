@@ -9,6 +9,9 @@ import { Label } from "@/components/ui/label";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { Folder, FileText, Image, AlertCircle, RefreshCw, GitPullRequest, ChevronDown, ChevronRight, Plus, Trash2, File, Users, Edit, GripVertical, ArrowUp, ArrowDown } from "lucide-react";
+import { AssetManagerSidebarHeader } from "./AssetManagerSidebar/AssetManagerSidebarHeader";
+import { AssetManagerSidebarNoConfig } from "./AssetManagerSidebar/AssetManagerSidebarNoConfig";
+import { getAssetIcon, formatFileSize, isImageFile, getFileBaseName, getFileExtension } from "./AssetManagerSidebar/utils";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import CreateShareDialog from "./CreateShareDialog";
 import type { PendingAssetChange } from "@/pages/Manage";
@@ -1033,20 +1036,6 @@ const AssetManagerSidebar = ({ siteId, pendingChanges, setPendingChanges }: Asse
     reader.readAsDataURL(file);
   };
 
-  const isImageFile = (fileName: string): boolean => {
-    const imageExtensions = ['.jpg', '.jpeg', '.png', '.gif', '.webp', '.svg', '.bmp', '.ico'];
-    return imageExtensions.some(ext => fileName.toLowerCase().endsWith(ext));
-  };
-
-  const getFileBaseName = (fileName: string): string => {
-    const lastDotIndex = fileName.lastIndexOf('.');
-    return lastDotIndex > 0 ? fileName.substring(0, lastDotIndex) : fileName;
-  };
-
-  const getFileExtension = (fileName: string): string => {
-    const lastDotIndex = fileName.lastIndexOf('.');
-    return lastDotIndex > 0 ? fileName.substring(lastDotIndex) : '';
-  };
 
   const getMergedDirectoryFiles = (assetPath: string): AssetFile[] => {
     const committedFiles = directoryFiles[assetPath] || [];
@@ -1428,25 +1417,6 @@ const AssetManagerSidebar = ({ siteId, pendingChanges, setPendingChanges }: Asse
     }
   };
 
-  const getAssetIcon = (type: string) => {
-    switch (type.toLowerCase()) {
-      case 'image':
-      case 'img':
-        return <Image className="h-4 w-4 text-blue-500" />;
-      case 'directory':
-      case 'folder':
-        return <Folder className="h-4 w-4 text-yellow-500" />;
-      default:
-        return <FileText className="h-4 w-4 text-muted-foreground" />;
-    }
-  };
-
-  const formatFileSize = (bytes?: number) => {
-    if (!bytes) return 'No limit';
-    if (bytes < 1024) return `${bytes} B`;
-    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
-    return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
-  };
 
   if (loading) {
     return (
@@ -1459,36 +1429,7 @@ const AssetManagerSidebar = ({ siteId, pendingChanges, setPendingChanges }: Asse
   }
 
   if (found === false) {
-    return (
-      <Alert className="mb-4">
-        <AlertCircle className="h-4 w-4" />
-        <AlertTitle className="text-sm">No Asset Configuration</AlertTitle>
-        <AlertDescription className="text-xs">
-          <p className="mb-2">
-            No <code className="bg-muted px-1 py-0.5 rounded text-xs">site-assets.json</code> found.
-          </p>
-
-          <Button
-            onClick={createTemplatePr}
-            disabled={creatingPr}
-            size="sm"
-            className="w-full"
-          >
-            {creatingPr ? (
-              <>
-                <RefreshCw className="mr-2 h-3 w-3 animate-spin" />
-                Creating...
-              </>
-            ) : (
-              <>
-                <GitPullRequest className="mr-2 h-3 w-3" />
-                Create Template PR
-              </>
-            )}
-          </Button>
-        </AlertDescription>
-      </Alert>
-    );
+    return <AssetManagerSidebarNoConfig onCreatePr={createTemplatePr} creatingPr={creatingPr} />;
   }
 
   if (!config) {
@@ -1502,32 +1443,14 @@ const AssetManagerSidebar = ({ siteId, pendingChanges, setPendingChanges }: Asse
 
   return (
     <div className="space-y-3 w-full max-w-full">
-      <div className="flex items-center justify-between mb-3 gap-2 w-full max-w-full">
-        <div className="flex items-center gap-2 min-w-0 flex-1 overflow-hidden">
-          <Badge variant="secondary" className="text-xs flex-shrink-0">v{config.version}</Badge>
-          <span className="text-xs text-muted-foreground whitespace-nowrap truncate">{config.assets.length} assets</span>
-        </div>
-        <div className="flex items-center gap-1 flex-shrink-0">
-          <CreateShareDialog
-            siteId={siteId}
-            assets={config.assets}
-            trigger={
-              <Button variant="ghost" size="sm" className="h-7 px-2">
-                <Users className="h-3 w-3" />
-              </Button>
-            }
-          />
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={handleRefresh}
-            disabled={loading}
-            className="h-7 w-7 p-0 flex-shrink-0"
-          >
-            <RefreshCw className={`h-3 w-3 ${loading ? 'animate-spin' : ''}`} />
-          </Button>
-        </div>
-      </div>
+      <AssetManagerSidebarHeader
+        version={config.version}
+        assetCount={config.assets.length}
+        loading={loading}
+        onRefresh={handleRefresh}
+        assets={config.assets}
+        siteId={siteId}
+      />
 
       <div className="space-y-2 w-full max-w-full">
         {config.assets.map((asset, index) => {
