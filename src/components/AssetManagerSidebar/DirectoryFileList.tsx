@@ -4,52 +4,35 @@ import { Label } from "@/components/ui/label";
 import { ArrowUp, ArrowDown, GripVertical, File, FileText, Edit, Trash2, RefreshCw } from "lucide-react";
 import { isImageFile } from "./utils";
 import type { AssetConfig, AssetFile } from "./types";
+import { useAssetManagerSidebarContext } from "./AssetManagerSidebarContext";
 
 interface DirectoryFileListProps {
   asset: AssetConfig;
   files: AssetFile[];
-  draggedItem: number | null;
-  dragOverItem: number | null;
-  renamingFile: string | null;
-  newFileName: string;
-  deletingFile: string | null;
-  onDragStart: (index: number) => void;
-  onDragOver: (e: React.DragEvent, index: number) => void;
-  onDrop: (e: React.DragEvent, index: number) => void;
-  onDragEnd: () => void;
-  onDragLeave: () => void;
-  onMoveUp: (index: number) => void;
-  onMoveDown: (index: number) => void;
-  onRename: (file: AssetFile) => void;
-  onRenameCancel: () => void;
-  onRenameStart: (file: AssetFile) => void;
-  onNewFileNameChange: (value: string) => void;
-  onDelete: (file: AssetFile) => void;
-  onOpenFile: (file: AssetFile) => void;
 }
 
 export const DirectoryFileList = ({
   asset,
   files,
-  draggedItem,
-  dragOverItem,
-  renamingFile,
-  newFileName,
-  deletingFile,
-  onDragStart,
-  onDragOver,
-  onDrop,
-  onDragEnd,
-  onDragLeave,
-  onMoveUp,
-  onMoveDown,
-  onRename,
-  onRenameCancel,
-  onRenameStart,
-  onNewFileNameChange,
-  onDelete,
-  onOpenFile,
 }: DirectoryFileListProps) => {
+  const {
+    draggedItem,
+    dragOverItem,
+    renamingFile,
+    newFileName,
+    deletingFile,
+    setDraggedItem,
+    setDragOverItem,
+    setRenamingFile,
+    setNewFileName,
+    handleAutoScroll,
+    handleStopAutoScroll,
+    handleDeleteFile,
+    handleRenameFile,
+    handleMoveDirectoryItem,
+    handleReorderDirectoryItems,
+    getMergedDirectoryFiles,
+  } = useAssetManagerSidebarContext();
   if (files.length === 0) {
     return null;
   }
@@ -62,24 +45,38 @@ export const DirectoryFileList = ({
           <div
             key={file.path}
             draggable
-            onDragStart={() => onDragStart(fileIndex)}
+            onDragStart={() => setDraggedItem(fileIndex)}
             onDragOver={(e) => {
               e.preventDefault();
-              onDragOver(e, fileIndex);
+              handleAutoScroll(e);
+              setDragOverItem(fileIndex);
             }}
             onDrop={(e) => {
               e.preventDefault();
-              onDrop(e, fileIndex);
+              handleStopAutoScroll();
+              if (draggedItem !== null) {
+                const filesInDir = getMergedDirectoryFiles(asset.path);
+                const newOrder = [...Array(filesInDir.length).keys()];
+                const [removed] = newOrder.splice(draggedItem, 1);
+                newOrder.splice(fileIndex, 0, removed);
+                handleReorderDirectoryItems(asset, filesInDir, newOrder);
+              }
+              setDraggedItem(null);
+              setDragOverItem(null);
             }}
-            onDragEnd={onDragEnd}
-            onDragLeave={onDragLeave}
+            onDragEnd={() => {
+              handleStopAutoScroll();
+              setDraggedItem(null);
+              setDragOverItem(null);
+            }}
+            onDragLeave={handleStopAutoScroll}
             className={`flex items-center gap-2 p-2 border rounded-lg hover:bg-muted/50 w-full max-w-full ${dragOverItem === fileIndex ? 'border-primary' : ''}`}
           >
             <div className="flex flex-col gap-0.5 flex-shrink-0">
               <Button
                 variant="ghost"
                 size="sm"
-                onClick={() => onMoveUp(fileIndex)}
+                onClick={() => handleMoveDirectoryItem(asset, getMergedDirectoryFiles(asset.path), fileIndex, 'up')}
                 disabled={fileIndex === 0}
                 className="h-4 w-4 p-0 hover:bg-muted"
                 title="Move up"
@@ -89,7 +86,7 @@ export const DirectoryFileList = ({
               <Button
                 variant="ghost"
                 size="sm"
-                onClick={() => onMoveDown(fileIndex)}
+                onClick={() => handleMoveDirectoryItem(asset, getMergedDirectoryFiles(asset.path), fileIndex, 'down')}
                 disabled={fileIndex === files.length - 1}
                 className="h-4 w-4 p-0 hover:bg-muted"
                 title="Move down"
@@ -114,12 +111,13 @@ export const DirectoryFileList = ({
                 <div className="flex items-center gap-1">
                   <Input
                     value={newFileName}
-                    onChange={(e) => onNewFileNameChange(e.target.value)}
+                    onChange={(e) => setNewFileName(e.target.value)}
                     onKeyDown={(e) => {
                       if (e.key === 'Enter') {
-                        onRename(file);
+                        handleRenameFile(asset, file);
                       } else if (e.key === 'Escape') {
-                        onRenameCancel();
+                        setRenamingFile(null);
+                        setNewFileName("");
                       }
                     }}
                     className="h-7 text-xs"
@@ -128,7 +126,7 @@ export const DirectoryFileList = ({
                   <Button
                     variant="ghost"
                     size="sm"
-                    onClick={() => onRename(file)}
+                    onClick={() => handleRenameFile(asset, file)}
                     className="h-7 px-2 text-xs"
                   >
                     Save
@@ -136,7 +134,10 @@ export const DirectoryFileList = ({
                   <Button
                     variant="ghost"
                     size="sm"
-                    onClick={onRenameCancel}
+                    onClick={() => {
+                      setRenamingFile(null);
+                      setNewFileName("");
+                    }}
                     className="h-7 px-2 text-xs"
                   >
                     Cancel
@@ -156,7 +157,7 @@ export const DirectoryFileList = ({
                 <Button
                   variant="ghost"
                   size="sm"
-                  onClick={() => onOpenFile(file)}
+                  onClick={() => window.open(file.download_url, '_blank')}
                   className="h-7 w-7 p-0"
                   title="Open file"
                 >
@@ -165,7 +166,10 @@ export const DirectoryFileList = ({
                 <Button
                   variant="ghost"
                   size="sm"
-                  onClick={() => onRenameStart(file)}
+                  onClick={() => {
+                    setRenamingFile(file.path);
+                    setNewFileName(file.name);
+                  }}
                   className="h-7 w-7 p-0"
                   title="Rename file"
                 >
@@ -174,7 +178,7 @@ export const DirectoryFileList = ({
                 <Button
                   variant="ghost"
                   size="sm"
-                  onClick={() => onDelete(file)}
+                  onClick={() => handleDeleteFile(asset, file.path, file.sha)}
                   disabled={deletingFile === file.path}
                   className="h-7 w-7 p-0"
                   title="Delete file"

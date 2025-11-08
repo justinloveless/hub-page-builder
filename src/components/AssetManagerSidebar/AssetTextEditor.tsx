@@ -1,28 +1,25 @@
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Skeleton } from "@/components/ui/skeleton";
-
-interface AssetConfig {
-  path: string;
-  type: string;
-  label?: string;
-}
+import type { AssetConfig } from "./types";
+import { useAssetManagerSidebarContext } from "./AssetManagerSidebarContext";
 
 interface AssetTextEditorProps {
   asset: AssetConfig;
-  content: string;
-  loading: boolean;
-  onContentChange: (content: string) => void;
-  onBlur: (content: string) => void;
 }
 
 export const AssetTextEditor = ({
   asset,
-  content,
-  loading,
-  onContentChange,
-  onBlur,
 }: AssetTextEditorProps) => {
+  const {
+    assetContents,
+    loadingContent,
+    setAssetContents,
+    handleContentChange,
+  } = useAssetManagerSidebarContext();
+  
+  const content = assetContents[asset.path] || '';
+  const loading = loadingContent[asset.path] || false;
   if (loading) {
     return <Skeleton className="h-24 w-full" />;
   }
@@ -32,8 +29,8 @@ export const AssetTextEditor = ({
       <Label className="text-xs">Current Content</Label>
       <Textarea
         value={content || ''}
-        onChange={(e) => onContentChange(e.target.value)}
-        onBlur={(e) => onBlur(e.target.value)}
+        onChange={(e) => setAssetContents(prev => ({ ...prev, [asset.path]: e.target.value }))}
+        onBlur={(e) => handleContentChange(asset, e.target.value)}
         placeholder="Enter content..."
         className="min-h-[100px] font-mono text-xs"
       />

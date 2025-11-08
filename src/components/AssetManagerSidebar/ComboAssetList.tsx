@@ -3,78 +3,43 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { File, FileText, Edit, Trash2, RefreshCw } from "lucide-react";
 import type { AssetConfig, AssetFile } from "./types";
-import { isImageFile } from "./utils";
+import { isImageFile, getFileAssetType } from "./utils";
 import { ComboAssetGroup } from "./ComboAssetGroup";
+import { useAssetManagerSidebarContext } from "./AssetManagerSidebarContext";
 
 interface ComboAssetListProps {
   asset: AssetConfig;
   groups: [string, { files: AssetFile[]; types: string[] }][];
   standalone: AssetFile[];
-  comboFileContents: Record<string, string>;
-  loadingComboFile: Record<string, boolean>;
-  renamingFile: string | null;
-  newFileName: string;
-  deletingFile: string | null;
-  draggedComboItem: number | null;
-  dragOverComboItem: number | null;
-  onDragStart: (groupIndex: number) => void;
-  onDragOver: (e: React.DragEvent, groupIndex: number) => void;
-  onDrop: (e: React.DragEvent, groupIndex: number) => void;
-  onDragEnd: () => void;
-  onDragLeave: () => void;
-  onMoveComboAsset: (groupIndex: number, direction: 'up' | 'down') => void;
-  onRenameComboStart: (baseName: string) => void;
-  onRenameComboSave: (baseName: string, files: AssetFile[]) => void;
-  onRenameComboCancel: () => void;
-  onNewFileNameChange: (value: string) => void;
-  onDeleteComboAsset: (baseName: string, files: AssetFile[]) => void;
-  onRenameFileStart: (file: AssetFile) => void;
-  onRenameFileSave: (file: AssetFile) => void;
-  onRenameFileCancel: () => void;
-  onDeleteFile: (file: AssetFile) => void;
-  onOpenFile: (file: AssetFile) => void;
-  onFileContentChange: (filePath: string, content: string) => void;
-  onComboFileContentChange: (filePath: string, content: string) => void;
-  onSetComboFileContent: (filePath: string, content: string) => void;
-  onFileUpload: (filePath: string, file: File) => void;
-  onLoadComboFileContent: (filePath: string) => void;
-  getFileAssetType: (fileName: string) => string | undefined;
 }
 
 export const ComboAssetList = ({
   asset,
   groups,
   standalone,
-  comboFileContents,
-  loadingComboFile,
-  renamingFile,
-  newFileName,
-  deletingFile,
-  draggedComboItem,
-  dragOverComboItem,
-  onDragStart,
-  onDragOver,
-  onDrop,
-  onDragEnd,
-  onDragLeave,
-  onMoveComboAsset,
-  onRenameComboStart,
-  onRenameComboSave,
-  onRenameComboCancel,
-  onNewFileNameChange,
-  onDeleteComboAsset,
-  onRenameFileStart,
-  onRenameFileSave,
-  onRenameFileCancel,
-  onDeleteFile,
-  onOpenFile,
-  onFileContentChange,
-  onComboFileContentChange,
-  onSetComboFileContent,
-  onFileUpload,
-  onLoadComboFileContent,
-  getFileAssetType,
 }: ComboAssetListProps) => {
+  const {
+    comboFileContents,
+    loadingComboFile,
+    renamingFile,
+    newFileName,
+    deletingFile,
+    draggedComboItem,
+    dragOverComboItem,
+    setDraggedComboItem,
+    setDragOverComboItem,
+    setRenamingFile,
+    setNewFileName,
+    handleAutoScroll,
+    handleStopAutoScroll,
+    handleDeleteFile,
+    handleRenameFile,
+    handleDeleteComboAsset,
+    handleRenameComboAsset,
+    handleReorderComboAssets,
+    handleMoveComboAsset,
+    getMergedDirectoryFiles,
+  } = useAssetManagerSidebarContext();
   return (
     <>
       {groups.length > 0 && (
@@ -82,8 +47,8 @@ export const ComboAssetList = ({
           {groups.map(([baseName, group], groupIndex) => {
             // Sort files by type: images first, then text, then json
             const sortedFiles = [...group.files].sort((a, b) => {
-              const aType = getFileAssetType(a.name);
-              const bType = getFileAssetType(b.name);
+              const aType = getFileAssetType(a.name, asset.contains!.parts!);
+              const bType = getFileAssetType(b.name, asset.contains!.parts!);
               const aIsImage = aType === 'image' || isImageFile(a.name);
               const bIsImage = bType === 'image' || isImageFile(b.name);
               const order = { image: 0, text: 1, markdown: 1, json: 2 };
@@ -103,29 +68,6 @@ export const ComboAssetList = ({
                 groupIndex={groupIndex}
                 totalGroups={groups.length}
                 sortedFiles={sortedFiles}
-                comboFileContents={comboFileContents}
-                loadingComboFile={loadingComboFile}
-                renamingFile={renamingFile}
-                newFileName={newFileName}
-                draggedComboItem={draggedComboItem}
-                dragOverComboItem={dragOverComboItem}
-                onDragStart={() => onDragStart(groupIndex)}
-                onDragOver={(e) => onDragOver(e, groupIndex)}
-                onDrop={(e) => onDrop(e, groupIndex)}
-                onDragEnd={onDragEnd}
-                onDragLeave={onDragLeave}
-                onMoveUp={() => onMoveComboAsset(groupIndex, 'up')}
-                onMoveDown={() => onMoveComboAsset(groupIndex, 'down')}
-                onRenameStart={() => onRenameComboStart(baseName)}
-                onRenameSave={() => onRenameComboSave(baseName, group.files)}
-                onRenameCancel={onRenameComboCancel}
-                onNewFileNameChange={onNewFileNameChange}
-                onDelete={() => onDeleteComboAsset(baseName, group.files)}
-                onFileContentChange={onFileContentChange}
-                onComboFileContentChange={onComboFileContentChange}
-                onSetComboFileContent={onSetComboFileContent}
-                onFileUpload={onFileUpload}
-                onLoadComboFileContent={onLoadComboFileContent}
               />
             );
           })}
@@ -153,12 +95,13 @@ export const ComboAssetList = ({
                     <div className="flex items-center gap-1">
                       <Input
                         value={newFileName}
-                        onChange={(e) => onNewFileNameChange(e.target.value)}
+                        onChange={(e) => setNewFileName(e.target.value)}
                         onKeyDown={(e) => {
                           if (e.key === 'Enter') {
-                            onRenameFileSave(file);
+                            handleRenameFile(asset, file);
                           } else if (e.key === 'Escape') {
-                            onRenameFileCancel();
+                            setRenamingFile(null);
+                            setNewFileName("");
                           }
                         }}
                         className="h-7 text-xs"
@@ -167,7 +110,7 @@ export const ComboAssetList = ({
                       <Button
                         variant="ghost"
                         size="sm"
-                        onClick={() => onRenameFileSave(file)}
+                        onClick={() => handleRenameFile(asset, file)}
                         className="h-7 px-2 text-xs"
                       >
                         Save
@@ -175,7 +118,10 @@ export const ComboAssetList = ({
                       <Button
                         variant="ghost"
                         size="sm"
-                        onClick={onRenameFileCancel}
+                        onClick={() => {
+                          setRenamingFile(null);
+                          setNewFileName("");
+                        }}
                         className="h-7 px-2 text-xs"
                       >
                         Cancel
@@ -195,7 +141,7 @@ export const ComboAssetList = ({
                     <Button
                       variant="ghost"
                       size="sm"
-                      onClick={() => onOpenFile(file)}
+                      onClick={() => window.open(file.download_url, '_blank')}
                       className="h-7 w-7 p-0"
                       title="Open file"
                     >
@@ -204,7 +150,10 @@ export const ComboAssetList = ({
                     <Button
                       variant="ghost"
                       size="sm"
-                      onClick={() => onRenameFileStart(file)}
+                      onClick={() => {
+                        setRenamingFile(file.path);
+                        setNewFileName(file.name);
+                      }}
                       className="h-7 w-7 p-0"
                       title="Rename file"
                     >
@@ -213,7 +162,7 @@ export const ComboAssetList = ({
                     <Button
                       variant="ghost"
                       size="sm"
-                      onClick={() => onDeleteFile(file)}
+                      onClick={() => handleDeleteFile(asset, file.path, file.sha)}
                       disabled={deletingFile === file.path}
                       className="h-7 w-7 p-0"
                       title="Delete file"

@@ -15,6 +15,7 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/component
 import CreateShareDialog from "./CreateShareDialog";
 import type { PendingAssetChange } from "@/pages/Manage";
 import { useAssetManagerSidebar } from "./AssetManagerSidebar/useAssetManagerSidebar";
+import { AssetManagerSidebarProvider } from "./AssetManagerSidebar/AssetManagerSidebarContext";
 import { AssetManagerSidebarHeader } from "./AssetManagerSidebar/AssetManagerSidebarHeader";
 import { AssetManagerSidebarNoConfig } from "./AssetManagerSidebar/AssetManagerSidebarNoConfig";
 import { AssetTextEditor } from "./AssetManagerSidebar/AssetTextEditor";
@@ -119,8 +120,72 @@ const AssetManagerSidebar = ({ siteId, pendingChanges, setPendingChanges }: Asse
     );
   }
 
+  const contextValue = {
+    // State
+    expandedAssets,
+    assetContents,
+    loadingContent,
+    jsonFormData,
+    newKeys,
+    directoryFiles,
+    loadingFiles,
+    deletingFile,
+    imageUrls,
+    comboFileContents,
+    loadingComboFile,
+    creatingCombo,
+    newComboData,
+    draggedItem,
+    dragOverItem,
+    renamingFile,
+    newFileName,
+    draggedComboItem,
+    dragOverComboItem,
+    creatingPr,
+    // Setters
+    setAssetContents,
+    setNewKeys,
+    setComboFileContents,
+    setNewComboData,
+    setRenamingFile,
+    setNewFileName,
+    setDraggedItem,
+    setDragOverItem,
+    setDraggedComboItem,
+    setDragOverComboItem,
+    // Handlers
+    handleRefresh,
+    toggleExpanded,
+    handleContentChange,
+    handleJsonFormChange,
+    addNewEntry,
+    removeEntry,
+    handleFileUpload,
+    getMergedDirectoryFiles,
+    handleDeleteFile,
+    handleRenameFile,
+    handleDeleteComboAsset,
+    handleRenameComboAsset,
+    handleReorderDirectoryItems,
+    handleAutoScroll,
+    handleStopAutoScroll,
+    handleReorderComboAssets,
+    handleMoveComboAsset,
+    handleMoveDirectoryItem,
+    loadComboFileContent,
+    handleComboFileContentChange,
+    startCreatingCombo,
+    cancelCreatingCombo,
+    submitNewCombo,
+    createTemplatePr,
+  };
+
   if (found === false) {
-    return <AssetManagerSidebarNoConfig onCreatePr={createTemplatePr} creatingPr={creatingPr} />;
+    return (
+      <AssetManagerSidebarProvider value={contextValue}>
+        <AssetManagerSidebarNoConfig onCreatePr={createTemplatePr} creatingPr={creatingPr} />
+      </AssetManagerSidebarProvider>
+    );
   }
 
   if (!config) {
@@ -133,6 +198,7 @@ const AssetManagerSidebar = ({ siteId, pendingChanges, setPendingChanges }: Asse
   }
 
   return (
+    <AssetManagerSidebarProvider value={contextValue}>
     <div className="space-y-3 w-full max-w-full">
       <AssetManagerSidebarHeader
         version={config.version}
@@ -209,10 +275,6 @@ const AssetManagerSidebar = ({ siteId, pendingChanges, setPendingChanges }: Asse
                     {isTextAsset && (
                       <AssetTextEditor
                         asset={asset}
-                        content={assetContents[asset.path] || ''}
-                        loading={loadingContent[asset.path] || false}
-                        onContentChange={(content) => setAssetContents(prev => ({ ...prev, [asset.path]: content }))}
-                        onBlur={(content) => handleContentChange(asset, content)}
                       />
                     )}
 
@@ -243,68 +305,6 @@ const AssetManagerSidebar = ({ siteId, pendingChanges, setPendingChanges }: Asse
                                     asset={asset}
                                     groups={groups}
                                     standalone={standalone}
-                                comboFileContents={comboFileContents}
-                                loadingComboFile={loadingComboFile}
-                                renamingFile={renamingFile}
-                                newFileName={newFileName}
-                                deletingFile={deletingFile}
-                                draggedComboItem={draggedComboItem}
-                                dragOverComboItem={dragOverComboItem}
-                                onDragStart={(groupIndex) => setDraggedComboItem(groupIndex)}
-                                onDragOver={(e, groupIndex) => {
-                                  handleAutoScroll(e);
-                                  setDragOverComboItem(groupIndex);
-                                }}
-                                onDrop={(e, groupIndex) => {
-                                  handleStopAutoScroll();
-                                  if (draggedComboItem !== null && draggedComboItem !== groupIndex) {
-                                    const { groups } = groupComboAssets(getMergedDirectoryFiles(asset.path), asset.contains.parts!);
-                                    handleReorderComboAssets(asset, groups, draggedComboItem, groupIndex);
-                                  }
-                                }}
-                                onDragEnd={() => {
-                                  handleStopAutoScroll();
-                                  setDraggedComboItem(null);
-                                  setDragOverComboItem(null);
-                                }}
-                                onDragLeave={() => handleStopAutoScroll()}
-                                onMoveComboAsset={(groupIndex, direction) => {
-                                  const { groups } = groupComboAssets(getMergedDirectoryFiles(asset.path), asset.contains.parts!);
-                                  handleMoveComboAsset(asset, groups, groupIndex, direction);
-                                }}
-                                onRenameComboStart={(baseName) => {
-                                  setRenamingFile(baseName);
-                                  setNewFileName(baseName);
-                                }}
-                                onRenameComboSave={(baseName, files) => {
-                                  handleRenameComboAsset(asset, baseName, files, asset.contains.parts!);
-                                }}
-                                onRenameComboCancel={() => {
-                                  setRenamingFile(null);
-                                  setNewFileName("");
-                                }}
-                                onNewFileNameChange={(value) => setNewFileName(value)}
-                                onDeleteComboAsset={(baseName, files) => handleDeleteComboAsset(asset, baseName, files)}
-                                onRenameFileStart={(file) => {
-                                  setRenamingFile(file.path);
-                                  setNewFileName(file.name);
-                                }}
-                                onRenameFileSave={(file) => handleRenameFile(asset, file)}
-                                onRenameFileCancel={() => {
-                                  setRenamingFile(null);
-                                  setNewFileName("");
-                                }}
-                                onDeleteFile={(file) => handleDeleteFile(asset, file.path, file.sha)}
-                                onOpenFile={(file) => window.open(file.download_url, '_blank')}
-                                onFileContentChange={(filePath, content) => handleComboFileContentChange(filePath, content)}
-                                onComboFileContentChange={(filePath, content) => handleComboFileContentChange(filePath, content)}
-                                onSetComboFileContent={(filePath, content) => setComboFileContents(prev => ({ ...prev, [filePath]: content }))}
-                                onFileUpload={(filePath, file) => {
-                                  const uploadAsset = { ...asset, path: filePath };
-                                  handleFileUpload(uploadAsset, file);
-                                }}
-                                onLoadComboFileContent={(filePath) => loadComboFileContent(filePath)}
-                                getFileAssetType={(fileName) => getFileAssetType(fileName, asset.contains.parts!)}
                                   />
                                 );
                               })()
@@ -314,42 +314,6 @@ const AssetManagerSidebar = ({ siteId, pendingChanges, setPendingChanges }: Asse
                                 <DirectoryFileList
                                   asset={asset}
                                   files={getMergedDirectoryFiles(asset.path)}
-                                  draggedItem={draggedItem}
-                                  dragOverItem={dragOverItem}
-                                  renamingFile={renamingFile}
-                                  newFileName={newFileName}
-                                  deletingFile={deletingFile}
-                                  onDragStart={(index) => setDraggedItem(index)}
-                                  onDragOver={(e, index) => {
-                                    handleAutoScroll(e);
-                                    setDragOverItem(index);
-                                  }}
-                                  onDrop={(e, index) => {
-                                    handleStopAutoScroll();
-                                    if (draggedItem !== null) {
-                                      const files = getMergedDirectoryFiles(asset.path);
-                                      const newOrder = [...Array(files.length).keys()];
-                                      const [removed] = newOrder.splice(draggedItem, 1);
-                                      newOrder.splice(index, 0, removed);
-                                      handleReorderDirectoryItems(asset, files, newOrder);
-                                    }
-                                  }}
-                                  onDragEnd={() => handleStopAutoScroll()}
-                                  onDragLeave={() => handleStopAutoScroll()}
-                                  onMoveUp={(index) => handleMoveDirectoryItem(asset, getMergedDirectoryFiles(asset.path), index, 'up')}
-                                  onMoveDown={(index) => handleMoveDirectoryItem(asset, getMergedDirectoryFiles(asset.path), index, 'down')}
-                                  onRename={(file) => handleRenameFile(asset, file)}
-                                  onRenameCancel={() => {
-                                    setRenamingFile(null);
-                                    setNewFileName("");
-                                  }}
-                                  onRenameStart={(file) => {
-                                    setRenamingFile(file.path);
-                                    setNewFileName(file.name);
-                                  }}
-                                  onNewFileNameChange={(value) => setNewFileName(value)}
-                                  onDelete={(file) => handleDeleteFile(asset, file.path, file.sha)}
-                                  onOpenFile={(file) => window.open(file.download_url, '_blank')}
                                 />
                               )
                             )}
@@ -358,63 +322,6 @@ const AssetManagerSidebar = ({ siteId, pendingChanges, setPendingChanges }: Asse
                             {asset.contains?.type === 'combo' && asset.contains.parts ? (
                               <ComboAssetCreator
                                 asset={asset}
-                                creatingCombo={!!creatingCombo[asset.path]}
-                                newComboData={newComboData[asset.path]}
-                                onStartCreating={() => startCreatingCombo(asset)}
-                                onCancelCreating={() => cancelCreatingCombo(asset.path)}
-                                onBaseNameChange={(value) => {
-                                  setNewComboData(prev => ({
-                                    ...prev,
-                                    [asset.path]: {
-                                      ...prev[asset.path],
-                                      baseName: value,
-                                      parts: prev[asset.path]?.parts || {}
-                                    }
-                                  }));
-                                }}
-                                onPartFileChange={(partKey, file) => {
-                                  setNewComboData(prev => ({
-                                    ...prev,
-                                    [asset.path]: {
-                                      ...prev[asset.path],
-                                      baseName: prev[asset.path]?.baseName || '',
-                                      parts: {
-                                        ...prev[asset.path]?.parts,
-                                        [partKey]: { content: '', file }
-                                      }
-                                    }
-                                  }));
-                                }}
-                                onPartJsonDataChange={(partKey, jsonData) => {
-                                  setNewComboData(prev => ({
-                                    ...prev,
-                                    [asset.path]: {
-                                      ...prev[asset.path],
-                                      baseName: prev[asset.path]?.baseName || '',
-                                      parts: {
-                                        ...prev[asset.path]?.parts,
-                                        [partKey]: {
-                                          content: '',
-                                          jsonData
-                                        }
-                                      }
-                                    }
-                                  }));
-                                }}
-                                onPartContentChange={(partKey, content) => {
-                                  setNewComboData(prev => ({
-                                    ...prev,
-                                    [asset.path]: {
-                                      ...prev[asset.path],
-                                      baseName: prev[asset.path]?.baseName || '',
-                                      parts: {
-                                        ...prev[asset.path]?.parts,
-                                        [partKey]: { content }
-                                      }
-                                    }
-                                  }));
-                                }}
-                                onSubmit={() => submitNewCombo(asset)}
                               />
                             ) : (
                               /* Standard File Upload */
@@ -460,6 +367,7 @@ const AssetManagerSidebar = ({ siteId, pendingChanges, setPendingChanges }: Asse
         })}
       </div>
     </div>
+    </AssetManagerSidebarProvider>
   );
 };
 
