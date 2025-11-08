@@ -20,6 +20,7 @@ interface FeatureFlagProviderProps {
 export function FeatureFlagProvider({ children }: FeatureFlagProviderProps) {
   const [flags, setFlags] = useState<Record<string, FeatureFlag>>({});
   const [isLoading, setIsLoading] = useState(true);
+  const [userId, setUserId] = useState<string | null>(null);
 
   const loadFlags = async () => {
     try {
@@ -45,6 +46,16 @@ export function FeatureFlagProvider({ children }: FeatureFlagProviderProps) {
   useEffect(() => {
     loadFlags();
 
+    // Get current user
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setUserId(session?.user?.id ?? null);
+    });
+
+    // Subscribe to auth changes
+    const { data: { subscription: authSubscription } } = supabase.auth.onAuthStateChange((_, session) => {
+      setUserId(session?.user?.id ?? null);
+    });
+
     // Subscribe to real-time changes
     const subscription = supabase
       .channel('feature_flags_changes')
@@ -62,6 +73,7 @@ export function FeatureFlagProvider({ children }: FeatureFlagProviderProps) {
       .subscribe();
 
     return () => {
+      authSubscription.unsubscribe();
       subscription.unsubscribe();
     };
   }, []);
@@ -69,14 +81,37 @@ export function FeatureFlagProvider({ children }: FeatureFlagProviderProps) {
   const isEnabled = (flagKey: string): boolean => {
     const flag = flags[flagKey];
     if (!flag) return false;
-    
+
     // Basic enabled check
     if (!flag.enabled) return false;
 
-    // Check rollout percentage (simple random-based rollout)
+    // Check user targeting (whitelist/blacklist)
+    if (userId && flag.user_targeting) {
+      const targeting = flag.user_targeting as {
+        whitelist?: string[];
+        blacklist?: string[];
+      };
+
+      // Blacklist takes precedence - if user is blacklisted, always return false
+      if (targeting.blacklist && targeting.blacklist.includes(userId)) {
+        return false;
+      }
+
+      // Whitelist overrides rollout percentage - if user is whitelisted, always return true
+      if (targeting.whitelist && targeting.whitelist.includes(userId)) {
+        return true;
+      }
+    }
+
+    // Check rollout percentage (user-based rollout)
     if (flag.rollout_percentage < 100) {
-      // Use a deterministic hash based on the flag key for consistent behavior per user session
-      const hash = flagKey.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0);
+      // If no user is logged in, default to not showing the feature
+      if (!userId) return false;
+
+      // Use a deterministic hash based on the flag key AND user ID
+      // This ensures each user gets a consistent experience per flag
+      const hashInput = `${flagKey}-${userId}`;
+      const hash = hashInput.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0);
       const threshold = (hash % 100);
       return threshold < flag.rollout_percentage;
     }

@@ -8,6 +8,7 @@ import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { Textarea } from '@/components/ui/textarea';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { UserSearch } from '@/components/UserSearch';
 import { useToast } from '@/hooks/use-toast';
 import { Plus, Pencil, Trash2, RefreshCw } from 'lucide-react';
 import type { Tables } from '@/integrations/supabase/types';
@@ -20,6 +21,8 @@ interface FlagFormData {
   description: string;
   enabled: boolean;
   rollout_percentage: number;
+  whitelistIds: string[];
+  blacklistIds: string[];
 }
 
 export function FeatureFlagManagement() {
@@ -33,6 +36,8 @@ export function FeatureFlagManagement() {
     description: '',
     enabled: false,
     rollout_percentage: 100,
+    whitelistIds: [],
+    blacklistIds: [],
   });
 
   const resetForm = () => {
@@ -42,15 +47,31 @@ export function FeatureFlagManagement() {
       description: '',
       enabled: false,
       rollout_percentage: 100,
+      whitelistIds: [],
+      blacklistIds: [],
     });
     setEditingFlag(null);
   };
 
   const handleCreate = async () => {
     try {
+      const user_targeting = (formData.whitelistIds.length > 0 || formData.blacklistIds.length > 0)
+        ? {
+          whitelist: formData.whitelistIds,
+          blacklist: formData.blacklistIds
+        }
+        : null;
+
       const { error } = await supabase
         .from('feature_flags')
-        .insert([formData]);
+        .insert([{
+          flag_key: formData.flag_key,
+          name: formData.name,
+          description: formData.description,
+          enabled: formData.enabled,
+          rollout_percentage: formData.rollout_percentage,
+          user_targeting,
+        }]);
 
       if (error) throw error;
 
@@ -73,6 +94,13 @@ export function FeatureFlagManagement() {
 
   const handleUpdate = async (flag: FeatureFlag) => {
     try {
+      const user_targeting = (formData.whitelistIds.length > 0 || formData.blacklistIds.length > 0)
+        ? {
+          whitelist: formData.whitelistIds,
+          blacklist: formData.blacklistIds
+        }
+        : null;
+
       const { error } = await supabase
         .from('feature_flags')
         .update({
@@ -80,6 +108,7 @@ export function FeatureFlagManagement() {
           description: formData.description,
           enabled: formData.enabled,
           rollout_percentage: formData.rollout_percentage,
+          user_targeting,
         })
         .eq('id', flag.id);
 
@@ -148,12 +177,16 @@ export function FeatureFlagManagement() {
   };
 
   const openEditDialog = (flag: FeatureFlag) => {
+    const targeting = flag.user_targeting as { whitelist?: string[]; blacklist?: string[] } | null;
+
     setFormData({
       flag_key: flag.flag_key,
       name: flag.name,
       description: flag.description || '',
       enabled: flag.enabled,
       rollout_percentage: flag.rollout_percentage,
+      whitelistIds: targeting?.whitelist || [],
+      blacklistIds: targeting?.blacklist || [],
     });
     setEditingFlag(flag);
   };
@@ -228,6 +261,32 @@ export function FeatureFlagManagement() {
                   />
                   <p className="text-xs text-muted-foreground">
                     Percentage of users who will see this feature (0-100)
+                  </p>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="whitelist">Whitelist (Users)</Label>
+                  <UserSearch
+                    selectedUserIds={formData.whitelistIds}
+                    onUsersChange={(ids) => setFormData({ ...formData, whitelistIds: ids })}
+                    placeholder="Search users by email to whitelist..."
+                    excludedUserIds={formData.blacklistIds}
+                    excludedLabel="in blacklist"
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Users who will always see this feature
+                  </p>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="blacklist">Blacklist (Users)</Label>
+                  <UserSearch
+                    selectedUserIds={formData.blacklistIds}
+                    onUsersChange={(ids) => setFormData({ ...formData, blacklistIds: ids })}
+                    placeholder="Search users by email to blacklist..."
+                    excludedUserIds={formData.whitelistIds}
+                    excludedLabel="in whitelist"
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Users who will never see this feature
                   </p>
                 </div>
                 <div className="flex items-center space-x-2">
@@ -364,6 +423,32 @@ export function FeatureFlagManagement() {
                 value={formData.rollout_percentage}
                 onChange={(e) => setFormData({ ...formData, rollout_percentage: parseInt(e.target.value) })}
               />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="edit_whitelist">Whitelist (Users)</Label>
+              <UserSearch
+                selectedUserIds={formData.whitelistIds}
+                onUsersChange={(ids) => setFormData({ ...formData, whitelistIds: ids })}
+                placeholder="Search users by email to whitelist..."
+                excludedUserIds={formData.blacklistIds}
+                excludedLabel="in blacklist"
+              />
+              <p className="text-xs text-muted-foreground">
+                Users who will always see this feature
+              </p>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="edit_blacklist">Blacklist (Users)</Label>
+              <UserSearch
+                selectedUserIds={formData.blacklistIds}
+                onUsersChange={(ids) => setFormData({ ...formData, blacklistIds: ids })}
+                placeholder="Search users by email to blacklist..."
+                excludedUserIds={formData.whitelistIds}
+                excludedLabel="in whitelist"
+              />
+              <p className="text-xs text-muted-foreground">
+                Users who will never see this feature
+              </p>
             </div>
             <div className="flex items-center space-x-2">
               <Switch

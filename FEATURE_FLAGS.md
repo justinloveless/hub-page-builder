@@ -132,11 +132,57 @@ Set the `rollout_percentage` to control how many users see the feature:
 - `50%` - Approximately half of users see the feature
 - `100%` - All users see the feature (default)
 
-The current implementation uses a simple hash-based approach for consistency within a session. For production use with user-specific rollouts, you can extend the `isEnabled` function in `FeatureFlagContext.tsx` to incorporate user IDs.
+The implementation uses a **deterministic hash-based approach** combining the flag key and user ID. This ensures:
+- Each user gets a consistent experience per flag (same user always sees the same result)
+- Different users see different results based on the rollout percentage
+- The distribution is approximately uniform across users
+- Users not logged in will not see features with rollout < 100%
 
-### User Targeting (Ready for Extension)
+**How it works:**
+1. Creates a hash from `flagKey + userId`
+2. Converts hash to a threshold value (0-99)
+3. Compares threshold to rollout percentage
+4. User sees feature if threshold < rollout_percentage
 
-The `user_targeting` field (JSONB) is available for implementing user-specific targeting:
+Example: With 30% rollout, approximately 30% of users will see the feature consistently.
+
+### User Targeting (Whitelist/Blacklist)
+
+You can explicitly include or exclude specific users from seeing a feature flag, regardless of the rollout percentage. This is useful for:
+- Beta testing with specific users
+- Blocking problematic users from new features
+- Giving early access to VIP users or team members
+
+**Priority Order:**
+1. **Blacklist** - If a user is blacklisted, they will NEVER see the feature (highest priority)
+2. **Whitelist** - If a user is whitelisted, they will ALWAYS see the feature (overrides rollout percentage)
+3. **Rollout Percentage** - If user is not in whitelist/blacklist, normal rollout percentage applies
+
+**In the Admin UI:**
+- Use the email search to find and add users
+- Type an email address to search
+- Select users from the dropdown
+- Selected users appear as badges showing their email
+- Click the X on a badge to remove a user
+- No need to manually copy/paste user IDs!
+- **Users cannot be in both whitelist and blacklist** - if a user is in one list, they'll appear disabled in the other list's search with a label indicating which list they're already in
+
+**Using the `user_targeting` field programmatically:**
+
+```json
+{
+  "whitelist": ["user-id-1", "user-id-2"],
+  "blacklist": ["user-id-3", "user-id-4"]
+}
+```
+
+**Example scenarios:**
+
+1. **Beta testers** - Set rollout to 0%, search for beta testers by email and add to whitelist
+2. **Gradual rollout with VIPs** - Set rollout to 10%, search for VIP users and add to whitelist
+3. **Block specific users** - Keep rollout at 100%, search for problematic users and add to blacklist
+
+The `user_targeting` field (JSONB) can also be extended for more advanced targeting:
 
 ```json
 {
@@ -210,6 +256,45 @@ function BetaFeatureAccess() {
   }
 
   return <BetaFeatureContent />;
+}
+```
+
+### Whitelist/Blacklist Examples
+
+```tsx
+// Example 1: Beta testing with specific users
+// In Settings: Set 'beta_editor' rollout to 0%, add tester user IDs to whitelist
+function EditorPage() {
+  const { isEnabled } = useFeatureFlags();
+  
+  if (isEnabled('beta_editor')) {
+    return <BetaEditor />; // Only whitelisted users see this
+  }
+  return <OldEditor />;
+}
+
+// Example 2: Gradual rollout with VIP early access
+// In Settings: Set 'new_feature' rollout to 25%, add VIP user IDs to whitelist
+function Dashboard() {
+  const { isEnabled } = useFeatureFlags();
+  
+  // VIPs always see it, plus 25% of other users
+  if (isEnabled('new_feature')) {
+    return <NewDashboard />;
+  }
+  return <OldDashboard />;
+}
+
+// Example 3: Block problematic users from resource-intensive feature
+// In Settings: Set 'ai_assistant' enabled, add blocked user IDs to blacklist
+function ChatPage() {
+  const { isEnabled } = useFeatureFlags();
+  
+  // Blacklisted users never see this, even if enabled
+  if (isEnabled('ai_assistant')) {
+    return <AIChat />;
+  }
+  return <BasicChat />;
 }
 ```
 
