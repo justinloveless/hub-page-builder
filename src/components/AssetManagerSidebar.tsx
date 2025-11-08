@@ -21,6 +21,7 @@ import { AssetManagerSidebarHeader } from "./AssetManagerSidebar/AssetManagerSid
 import { AssetManagerSidebarNoConfig } from "./AssetManagerSidebar/AssetManagerSidebarNoConfig";
 import { AssetTextEditor } from "./AssetManagerSidebar/AssetTextEditor";
 import { AssetImageEditor } from "./AssetManagerSidebar/AssetImageEditor";
+import { AssetJsonEditor } from "./AssetManagerSidebar/AssetJsonEditor";
 import { getAssetIcon, formatFileSize, isImageFile, getFileBaseName, getFileExtension } from "./AssetManagerSidebar/utils";
 
 interface AssetConfig {
@@ -1504,67 +1505,17 @@ const AssetManagerSidebar = ({ siteId, pendingChanges, setPendingChanges }: Asse
 
                     {/* JSON with Schema - Form Editor */}
                     {isJsonWithSchema && (
-                      <div className="space-y-3">
-                        {loadingContent[asset.path] ? (
-                          <Skeleton className="h-32 w-full" />
-                        ) : (
-                          <>
-                            {asset.schema.properties && (
-                              <div className="space-y-2">
-                                {Object.entries(asset.schema.properties).map(([key, fieldSchema]: [string, any]) =>
-                                  renderSchemaField(asset, key, fieldSchema)
-                                )}
-                              </div>
-                            )}
-
-                            {asset.schema.additionalProperties && (
-                              <div className="space-y-2 pt-2 border-t">
-                                <Label className="text-xs font-semibold">Entries</Label>
-                                {Object.keys(jsonFormData[asset.path] || {}).map((key) => (
-                                  <div key={key} className="p-2 border rounded-lg space-y-2 w-full">
-                                    <div className="flex items-center justify-between gap-2 w-full">
-                                      <Label className="text-xs font-semibold truncate flex-1 min-w-0">{key}</Label>
-                                      <Button
-                                        variant="ghost"
-                                        size="sm"
-                                        onClick={() => removeEntry(asset, key)}
-                                        className="h-6 w-6 p-0 flex-shrink-0"
-                                      >
-                                        <Trash2 className="h-3 w-3" />
-                                      </Button>
-                                    </div>
-                                    {asset.schema.additionalProperties.properties && (
-                                      <div className="space-y-2 pl-2">
-                                        {Object.entries(asset.schema.additionalProperties.properties).map(([nestedKey, nestedSchema]: [string, any]) =>
-                                          renderSchemaField(asset, nestedKey, nestedSchema, key)
-                                        )}
-                                      </div>
-                                    )}
-                                  </div>
-                                ))}
-
-                                <div className="flex gap-2 pt-2 w-full">
-                                  <Input
-                                    placeholder="New key..."
-                                    value={newKeys[asset.path] || ''}
-                                    onChange={(e) => setNewKeys(prev => ({ ...prev, [asset.path]: e.target.value }))}
-                                    className="h-8 text-xs flex-1 min-w-0"
-                                  />
-                                  <Button
-                                    variant="outline"
-                                    size="sm"
-                                    onClick={() => addNewEntry(asset)}
-                                    className="h-8 flex-shrink-0"
-                                  >
-                                    <Plus className="h-3 w-3" />
-                                  </Button>
-                                </div>
-                              </div>
-                            )}
-                            <p className="text-xs text-muted-foreground">Changes are automatically saved to batch</p>
-                          </>
-                        )}
-                      </div>
+                      <AssetJsonEditor
+                        asset={asset}
+                        jsonFormData={jsonFormData}
+                        loading={loadingContent[asset.path] || false}
+                        newKey={newKeys[asset.path] || ''}
+                        onJsonFormChange={(jsonData) => handleJsonFormChange(asset, jsonData)}
+                        onAddEntry={() => addNewEntry(asset)}
+                        onRemoveEntry={(key) => removeEntry(asset, key)}
+                        onNewKeyChange={(value) => setNewKeys(prev => ({ ...prev, [asset.path]: value }))}
+                        renderSchemaField={(key, fieldSchema, parentKey) => renderSchemaField(asset, key, fieldSchema, parentKey)}
+                      />
                     )}
 
                     {/* Text/Markdown inline editor */}
