@@ -1,16 +1,10 @@
-import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Plus, Trash2 } from "lucide-react";
-
-interface AssetConfig {
-  path: string;
-  type: string;
-  schema?: Record<string, any>;
-}
+import { SchemaFieldRenderer } from "./SchemaFieldRenderer";
+import type { AssetConfig } from "./types";
 
 interface AssetJsonEditorProps {
   asset: AssetConfig;
@@ -21,7 +15,6 @@ interface AssetJsonEditorProps {
   onAddEntry: () => void;
   onRemoveEntry: (key: string) => void;
   onNewKeyChange: (value: string) => void;
-  renderSchemaField: (key: string, fieldSchema: any, parentKey?: string) => React.ReactNode;
 }
 
 export const AssetJsonEditor = ({
@@ -33,7 +26,6 @@ export const AssetJsonEditor = ({
   onAddEntry,
   onRemoveEntry,
   onNewKeyChange,
-  renderSchemaField,
 }: AssetJsonEditorProps) => {
   if (loading) {
     return <Skeleton className="h-32 w-full" />;
@@ -45,9 +37,16 @@ export const AssetJsonEditor = ({
     <div className="space-y-3">
       {asset.schema?.properties && (
         <div className="space-y-2">
-          {Object.entries(asset.schema.properties).map(([key, fieldSchema]: [string, any]) =>
-            renderSchemaField(key, fieldSchema)
-          )}
+          {Object.entries(asset.schema.properties).map(([key, fieldSchema]: [string, any]) => (
+            <SchemaFieldRenderer
+              key={key}
+              asset={asset}
+              fieldKey={key}
+              fieldSchema={fieldSchema}
+              jsonFormData={jsonFormData}
+              onJsonFormChange={onJsonFormChange}
+            />
+          ))}
         </div>
       )}
 
@@ -69,9 +68,17 @@ export const AssetJsonEditor = ({
               </div>
               {asset.schema?.additionalProperties?.properties && (
                 <div className="space-y-2 pl-2">
-                  {Object.entries(asset.schema.additionalProperties.properties).map(([nestedKey, nestedSchema]: [string, any]) =>
-                    renderSchemaField(nestedKey, nestedSchema, key)
-                  )}
+                  {Object.entries(asset.schema.additionalProperties.properties).map(([nestedKey, nestedSchema]: [string, any]) => (
+                    <SchemaFieldRenderer
+                      key={nestedKey}
+                      asset={asset}
+                      fieldKey={nestedKey}
+                      fieldSchema={nestedSchema}
+                      parentKey={key}
+                      jsonFormData={jsonFormData}
+                      onJsonFormChange={onJsonFormChange}
+                    />
+                  ))}
                 </div>
               )}
             </div>
