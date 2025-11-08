@@ -9,9 +9,6 @@ import { Label } from "@/components/ui/label";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { Folder, FileText, Image, AlertCircle, RefreshCw, GitPullRequest, ChevronDown, ChevronRight, Plus, Trash2, File, Users, Edit, GripVertical, ArrowUp, ArrowDown } from "lucide-react";
-import { AssetManagerSidebarHeader } from "./AssetManagerSidebar/AssetManagerSidebarHeader";
-import { AssetManagerSidebarNoConfig } from "./AssetManagerSidebar/AssetManagerSidebarNoConfig";
-import { getAssetIcon, formatFileSize, isImageFile, getFileBaseName, getFileExtension } from "./AssetManagerSidebar/utils";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import CreateShareDialog from "./CreateShareDialog";
 import type { PendingAssetChange } from "@/pages/Manage";
@@ -20,6 +17,11 @@ import { useQueryClient } from "@tanstack/react-query";
 import { useAssetContent } from "@/hooks/useAssetContent";
 import { useDirectoryFiles } from "@/hooks/useDirectoryFiles";
 import { usePrefetchAssets } from "@/hooks/usePrefetchAssets";
+import { AssetManagerSidebarHeader } from "./AssetManagerSidebar/AssetManagerSidebarHeader";
+import { AssetManagerSidebarNoConfig } from "./AssetManagerSidebar/AssetManagerSidebarNoConfig";
+import { AssetTextEditor } from "./AssetManagerSidebar/AssetTextEditor";
+import { AssetImageEditor } from "./AssetManagerSidebar/AssetImageEditor";
+import { getAssetIcon, formatFileSize, isImageFile, getFileBaseName, getFileExtension } from "./AssetManagerSidebar/utils";
 
 interface AssetConfig {
   path: string;
@@ -1567,74 +1569,24 @@ const AssetManagerSidebar = ({ siteId, pendingChanges, setPendingChanges }: Asse
 
                     {/* Text/Markdown inline editor */}
                     {isTextAsset && (
-                      <div className="space-y-2">
-                        <Label className="text-xs">Current Content</Label>
-                        {loadingContent[asset.path] ? (
-                          <Skeleton className="h-24 w-full" />
-                        ) : (
-                          <Textarea
-                            value={assetContents[asset.path] || ''}
-                            onChange={(e) => setAssetContents(prev => ({ ...prev, [asset.path]: e.target.value }))}
-                            onBlur={(e) => handleContentChange(asset, e.target.value)}
-                            placeholder="Enter content..."
-                            className="min-h-[100px] font-mono text-xs"
-                          />
-                        )}
-                        <p className="text-xs text-muted-foreground">Changes are automatically saved to batch</p>
-                      </div>
+                      <AssetTextEditor
+                        asset={asset}
+                        content={assetContents[asset.path] || ''}
+                        loading={loadingContent[asset.path] || false}
+                        onContentChange={(content) => setAssetContents(prev => ({ ...prev, [asset.path]: content }))}
+                        onBlur={(content) => handleContentChange(asset, content)}
+                      />
                     )}
 
                     {/* Image upload */}
                     {isImageAsset && (
-                      <div className="space-y-3">
-                        {loadingContent[asset.path] ? (
-                          <Skeleton className="h-48 w-full" />
-                        ) : (
-                          <>
-                            {imageUrls[asset.path] && (
-                              <div className="space-y-2">
-                                <Label className="text-xs">Current Image</Label>
-                                <div className="relative border rounded-lg overflow-hidden">
-                                  <img
-                                    src={imageUrls[asset.path]}
-                                    alt={asset.label || asset.path}
-                                    className="w-full h-auto"
-                                  />
-                                </div>
-                              </div>
-                            )}
-
-                            <div className="space-y-2">
-                              <Label htmlFor={`file-${index}`} className="text-xs">
-                                {imageUrls[asset.path] ? 'Replace Image' : 'Upload Image'}
-                              </Label>
-                              <Input
-                                id={`file-${index}`}
-                                type="file"
-                                accept={asset.allowedExtensions?.join(',') || 'image/*'}
-                                onChange={(e) => {
-                                  const file = e.target.files?.[0];
-                                  if (file) {
-                                    if (asset.maxSize && file.size > asset.maxSize) {
-                                      toast.error(`File size exceeds maximum of ${(asset.maxSize / 1024 / 1024).toFixed(1)} MB`);
-                                      return;
-                                    }
-                                    handleFileUpload(asset, file);
-                                    e.target.value = '';
-                                  }
-                                }}
-                                className="text-xs"
-                              />
-                              <div className="flex flex-col gap-1 text-xs text-muted-foreground">
-                                <span>Max size: {formatFileSize(asset.maxSize)}</span>
-                                {asset.allowedExtensions && (
-                                  <span>Types: {asset.allowedExtensions.join(', ')}</span>
-                                )}
-                              </div>
-                            </div>
-                          </>
-                        )}
-                      </div>
+                      <AssetImageEditor
+                        asset={asset}
+                        imageUrl={imageUrls[asset.path]}
+                        loading={loadingContent[asset.path] || false}
+                        index={index}
+                        onFileUpload={(file) => handleFileUpload(asset, file)}
+                      />
                     )}
 
                     {/* Directory with file list */}
