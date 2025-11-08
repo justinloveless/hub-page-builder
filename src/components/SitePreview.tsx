@@ -967,7 +967,7 @@ if (typeof window.__moduleImportMap === 'undefined') {
         ref={iframeRef}
         src={previewUrl}
         className="w-full flex-1 border-0"
-        sandbox="allow-scripts allow-same-origin"
+        sandbox="allow-scripts allow-same-origin allow-popups allow-popups-to-escape-sandbox"
         title="Site Preview"
       />
     </Card>
