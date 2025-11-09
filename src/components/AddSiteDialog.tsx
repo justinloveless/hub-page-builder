@@ -687,7 +687,7 @@ const AddSiteDialog = ({ onSiteAdded }: AddSiteDialogProps) => {
             </TabsContent>
 
             <TabsContent value="github" className="mt-0 h-full">
-              <div className="space-y-4 pb-4 px-1">
+              <div className="space-y-4 pb-4 px-1 overflow-x-hidden">
                 <div className="space-y-2">
                   <Button
                     type="button"
@@ -759,14 +759,14 @@ const AddSiteDialog = ({ onSiteAdded }: AddSiteDialogProps) => {
                     {filteredInstallations.length > 0 ? (
                       filteredInstallations.map((installation) => (
                         <div key={installation.id} className="space-y-2">
-                          <div className="flex items-center gap-2 text-sm font-medium">
+                          <div className="flex items-center gap-2 text-sm font-medium min-w-0 overflow-hidden">
                             <img
                               src={installation.account.avatar_url}
                               alt={installation.account.login}
-                              className="w-5 h-5 rounded-full"
+                              className="w-5 h-5 rounded-full flex-shrink-0"
                             />
-                            <span>{installation.account.login}</span>
-                            <Badge variant="outline" className="text-xs">
+                            <span className="truncate min-w-0">{installation.account.login}</span>
+                            <Badge variant="outline" className="text-xs flex-shrink-0">
                               {installation.account.type}
                             </Badge>
                           </div>
@@ -776,22 +776,22 @@ const AddSiteDialog = ({ onSiteAdded }: AddSiteDialogProps) => {
                               const isAdded = isRepositoryAdded(repo.full_name);
 
                               return (
-                                <Card key={repo.full_name} className="hover:bg-accent/50 transition-colors w-full">
+                                <Card key={repo.full_name} className="hover:bg-accent/50 transition-colors w-full min-w-0">
                                   <CardHeader className="pb-3">
-                                    <CardTitle className="text-sm flex items-center gap-2 break-words">
+                                    <CardTitle className="text-sm flex items-center gap-2 break-words min-w-0">
                                       <Github className="h-4 w-4 flex-shrink-0" />
-                                      <span className="break-words">{repo.name}</span>
+                                      <span className="break-words min-w-0 flex-1">{repo.name}</span>
                                       {repo.private && (
                                         <Badge variant="secondary" className="text-xs flex-shrink-0">Private</Badge>
                                       )}
                                     </CardTitle>
-                                    <CardDescription className="text-xs break-words">
+                                    <CardDescription className="text-xs break-words overflow-hidden">
                                       {repo.full_name}
                                     </CardDescription>
                                   </CardHeader>
                                   <CardContent className="pb-3">
-                                    <p className="text-xs text-muted-foreground break-words">
-                                      Default branch: <span className="font-mono">{repo.default_branch}</span>
+                                    <p className="text-xs text-muted-foreground break-words overflow-hidden">
+                                      Default branch: <span className="font-mono break-all">{repo.default_branch}</span>
                                     </p>
                                   </CardContent>
                                   <CardFooter className="flex-col gap-2">
