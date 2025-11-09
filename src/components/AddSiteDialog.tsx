@@ -752,7 +752,10 @@ const AddSiteDialog = ({ onSiteAdded }: AddSiteDialogProps) => {
                     <div className="flex items-center justify-between">
                       <h3 className="text-sm font-medium">Available Repositories</h3>
                       <Badge variant="secondary">
-                        {filteredInstallations.reduce((total, inst) => total + inst.repositories.length, 0)} repos
+                        {githubSearchQuery 
+                          ? `${filteredInstallations.reduce((total, inst) => total + inst.repositories.length, 0)} of ${installations.reduce((total, inst) => total + inst.repository_count, 0)} repos`
+                          : `${installations.reduce((total, inst) => total + inst.repository_count, 0)} repos`
+                        }
                       </Badge>
                     </div>
 
