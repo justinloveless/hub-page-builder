@@ -67,97 +67,100 @@ export const SchemaFieldRenderer = ({
 
   switch (fieldSchema.type) {
     case 'array':
-      if (fieldSchema.items) {
-        const arrayValue = parentKey ? assetData[parentKey]?.[fieldKey] : assetData[fieldKey];
-        const items = Array.isArray(arrayValue) ? arrayValue : [];
+      if (!fieldSchema.items) {
+        return null;
+      }
+      const arrayValue = parentKey ? assetData[parentKey]?.[fieldKey] : assetData[fieldKey];
+      const items = Array.isArray(arrayValue) ? arrayValue : [];
 
-        const addArrayItem = async () => {
-          let newItem: any;
-          if (fieldSchema.items.type === 'object' && fieldSchema.items.properties) {
-            // Array of objects
-            newItem = {};
-            Object.entries(fieldSchema.items.properties).forEach(([propKey, propSchema]: [string, any]) => {
-              newItem[propKey] = propSchema.default ?? '';
-            });
-          } else if (fieldSchema.items.type === 'string') {
-            // Array of strings
-            newItem = '';
-          } else if (fieldSchema.items.type === 'number' || fieldSchema.items.type === 'integer') {
-            // Array of numbers
-            newItem = 0;
-          } else if (fieldSchema.items.type === 'boolean') {
-            // Array of booleans
-            newItem = false;
-          } else {
-            // Default to string if no type specified
-            newItem = '';
-          }
+      const addArrayItem = async () => {
+        let newItem: any;
+        if (fieldSchema.items.type === 'object' && fieldSchema.items.properties) {
+          // Array of objects
+          newItem = {};
+          Object.entries(fieldSchema.items.properties).forEach(([propKey, propSchema]: [string, any]) => {
+            newItem[propKey] = propSchema.default ?? '';
+          });
+        } else if (fieldSchema.items.type === 'string') {
+          // Array of strings
+          newItem = '';
+        } else if (fieldSchema.items.type === 'number' || fieldSchema.items.type === 'integer') {
+          // Array of numbers
+          newItem = 0;
+        } else if (fieldSchema.items.type === 'boolean') {
+          // Array of booleans
+          newItem = false;
+        } else {
+          // Default to string if no type specified
+          newItem = '';
+        }
 
-          const newItems = [...items, newItem];
-          const updatedData = parentKey
-            ? { ...(jsonFormData[asset.path] || {}), [parentKey]: { ...(jsonFormData[asset.path]?.[parentKey] || {}), [fieldKey]: newItems } }
-            : { ...(jsonFormData[asset.path] || {}), [fieldKey]: newItems };
+        const newItems = [...items, newItem];
+        const updatedData = parentKey
+          ? { ...(jsonFormData[asset.path] || {}), [parentKey]: { ...(jsonFormData[asset.path]?.[parentKey] || {}), [fieldKey]: newItems } }
+          : { ...(jsonFormData[asset.path] || {}), [fieldKey]: newItems };
 
-          await onJsonFormChange(asset, updatedData);
-        };
+        await onJsonFormChange(asset, updatedData);
+      };
 
-        const removeArrayItem = async (index: number) => {
-          const newItems = items.filter((_, i) => i !== index);
-          const updatedData = parentKey
-            ? { ...(jsonFormData[asset.path] || {}), [parentKey]: { ...(jsonFormData[asset.path]?.[parentKey] || {}), [fieldKey]: newItems } }
-            : { ...(jsonFormData[asset.path] || {}), [fieldKey]: newItems };
+      const removeArrayItem = async (index: number) => {
+        const newItems = items.filter((_, i) => i !== index);
+        const updatedData = parentKey
+          ? { ...(jsonFormData[asset.path] || {}), [parentKey]: { ...(jsonFormData[asset.path]?.[parentKey] || {}), [fieldKey]: newItems } }
+          : { ...(jsonFormData[asset.path] || {}), [fieldKey]: newItems };
 
-          await onJsonFormChange(asset, updatedData);
-        };
+        await onJsonFormChange(asset, updatedData);
+      };
 
-        return (
-          <div key={fullKey} className="space-y-2 p-3 border rounded-lg bg-accent/5">
-            <div className="flex items-center justify-between">
-              <div>
-                <h4 className="font-semibold text-xs uppercase tracking-wide text-muted-foreground">
-                  {fieldSchema.title || fieldKey}
-                </h4>
-                {fieldSchema.description && (
-                  <p className="text-xs text-muted-foreground mt-1">{fieldSchema.description}</p>
-                )}
-              </div>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={addArrayItem}
-                className="h-7 flex-shrink-0"
-              >
-                <Plus className="h-3 w-3 mr-1" />
-                Add
-              </Button>
+      return (
+        <div key={fullKey} className="space-y-2 p-3 border rounded-lg bg-accent/5">
+          <div className="flex items-center justify-between">
+            <div>
+              <h4 className="font-semibold text-xs uppercase tracking-wide text-muted-foreground">
+                {fieldSchema.title || fieldKey}
+              </h4>
+              {fieldSchema.description && (
+                <p className="text-xs text-muted-foreground mt-1">{fieldSchema.description}</p>
+              )}
             </div>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={addArrayItem}
+              className="h-7 flex-shrink-0"
+            >
+              <Plus className="h-3 w-3 mr-1" />
+              Add
+            </Button>
+          </div>
 
-            <div className="space-y-2">
-              {items.map((item, index) => {
-                const updateArrayItem = async (newValue: any) => {
-                  const newItems = [...items];
-                  newItems[index] = newValue;
-                  const updatedData = parentKey
-                    ? { ...(jsonFormData[asset.path] || {}), [parentKey]: { ...(jsonFormData[asset.path]?.[parentKey] || {}), [fieldKey]: newItems } }
-                    : { ...(jsonFormData[asset.path] || {}), [fieldKey]: newItems };
+          <div className="space-y-2">
+            {items.map((item, index) => {
+              const updateArrayItem = async (newValue: any) => {
+                const newItems = [...items];
+                newItems[index] = newValue;
+                const updatedData = parentKey
+                  ? { ...(jsonFormData[asset.path] || {}), [parentKey]: { ...(jsonFormData[asset.path]?.[parentKey] || {}), [fieldKey]: newItems } }
+                  : { ...(jsonFormData[asset.path] || {}), [fieldKey]: newItems };
 
-                  await onJsonFormChange(asset, updatedData);
-                };
+                await onJsonFormChange(asset, updatedData);
+              };
 
-                return (
-                  <div key={index} className="p-2 border rounded-lg bg-background space-y-2">
-                    <div className="flex items-center justify-between">
-                      <Label className="text-xs font-semibold">Item {index + 1}</Label>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => removeArrayItem(index)}
-                        className="h-6 w-6 p-0"
-                      >
-                        <Trash2 className="h-3 w-3" />
-                      </Button>
-                    </div>
-                    {fieldSchema.items.type === 'object' && fieldSchema.items.properties ? (
+              return (
+                <div key={index} className="p-2 border rounded-lg bg-background space-y-2">
+                  <div className="flex items-center justify-between">
+                    <Label className="text-xs font-semibold">Item {index + 1}</Label>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => removeArrayItem(index)}
+                      className="h-6 w-6 p-0"
+                    >
+                      <Trash2 className="h-3 w-3" />
+                    </Button>
+                  </div>
+                  {fieldSchema.items.type === 'object' && fieldSchema.items.properties ?
+                    (
                       // Array of objects
                       <div className="space-y-2 pl-2">
                         {Object.entries(fieldSchema.items.properties).map(([propKey, propSchema]: [string, any]) => {
@@ -182,32 +185,94 @@ export const SchemaFieldRenderer = ({
                               {propSchema.description && (
                                 <p className="text-xs text-muted-foreground">{propSchema.description}</p>
                               )}
-                              {propSchema.type === 'string' && propSchema.multiline ? (
-                                <Textarea
-                                  id={propFullKey}
-                                  value={propValue}
-                                  onChange={(e) => updateArrayItemProp(e.target.value)}
-                                  placeholder={propSchema.placeholder}
-                                  className="min-h-[60px] text-xs"
-                                />
-                              ) : propSchema.type === 'number' || propSchema.type === 'integer' ? (
-                                <Input
-                                  id={propFullKey}
-                                  type="number"
-                                  value={propValue}
-                                  onChange={(e) => updateArrayItemProp(propSchema.type === 'integer' ? parseInt(e.target.value) || 0 : parseFloat(e.target.value) || 0)}
-                                  placeholder={propSchema.placeholder}
-                                  className="h-8 text-xs"
-                                />
-                              ) : (
-                                <Input
-                                  id={propFullKey}
-                                  value={propValue}
-                                  onChange={(e) => updateArrayItemProp(e.target.value)}
-                                  placeholder={propSchema.placeholder}
-                                  className="h-8 text-xs"
-                                />
-                              )}
+                              {propSchema.type === 'string' && propSchema.multiline ?
+                                (
+                                  <Textarea
+                                    id={propFullKey}
+                                    value={propValue}
+                                    onChange={(e) => updateArrayItemProp(e.target.value)}
+                                    placeholder={propSchema.placeholder}
+                                    className="min-h-[60px] text-xs"
+                                  />
+                                ) : propSchema.type === 'string' && propSchema.format === 'date' ? (
+                                  <Input
+                                    id={propFullKey}
+                                    type="date"
+                                    value={
+                                      propValue
+                                        ? propValue instanceof Date
+                                          ? propValue.toISOString().split('T')[0]
+                                          : typeof propValue === 'string'
+                                            ? propValue.split('T')[0]
+                                            : ''
+                                        : ''
+                                    }
+                                    onChange={(e) => updateArrayItemProp(e.target.value)}
+                                    placeholder={propSchema.placeholder || 'Enter date'}
+                                    className="h-8 text-xs"
+                                  />
+                                ) : propSchema.type === 'string' && propSchema.format === 'time' ? (
+                                  <Input
+                                    id={propFullKey}
+                                    type="time"
+                                    value={
+                                      propValue
+                                        ? typeof propValue === 'string'
+                                          ? propValue.includes('T')
+                                            ? propValue.split('T')[1]?.split('.')[0]?.substring(0, 5) ?? ''
+                                            : propValue.substring(0, 5)
+                                          : ''
+                                        : ''
+                                    }
+                                    onChange={(e) => updateArrayItemProp(e.target.value)}
+                                    placeholder={propSchema.placeholder || 'Enter time'}
+                                    className="h-8 text-xs"
+                                  />
+                                ) : propSchema.type === 'string' && (propSchema.format === 'date-time' || propSchema.format === 'datetime') ? (
+                                  <Input
+                                    id={propFullKey}
+                                    type="datetime-local"
+                                    value={
+                                      propValue
+                                        ? propValue instanceof Date
+                                          ? new Date(propValue.getTime() - propValue.getTimezoneOffset() * 60000).toISOString().slice(0, 16)
+                                          : typeof propValue === 'string'
+                                            ? propValue.includes('T')
+                                              ? propValue.substring(0, 16)
+                                              : propValue
+                                            : ''
+                                        : ''
+                                    }
+                                    onChange={(e) => {
+                                      const localValue = e.target.value;
+                                      if (localValue) {
+                                        const date = new Date(localValue);
+                                        updateArrayItemProp(date.toISOString());
+                                      } else {
+                                        updateArrayItemProp('');
+                                      }
+                                    }}
+                                    placeholder={propSchema.placeholder || 'Enter date and time'}
+                                    className="h-8 text-xs"
+                                  />
+                                ) : propSchema.type === 'number' || propSchema.type === 'integer' ? (
+                                  <Input
+                                    id={propFullKey}
+                                    type="number"
+                                    value={propValue}
+                                    onChange={(e) => updateArrayItemProp(propSchema.type === 'integer' ? parseInt(e.target.value) || 0 : parseFloat(e.target.value) || 0)}
+                                    placeholder={propSchema.placeholder}
+                                    className="h-8 text-xs"
+                                  />
+                                ) : (
+                                  <Input
+                                    id={propFullKey}
+                                    value={propValue}
+                                    onChange={(e) => updateArrayItemProp(e.target.value)}
+                                    placeholder={propSchema.placeholder}
+                                    className="h-8 text-xs"
+                                  />
+                                )}
                             </div>
                           );
                         })}
@@ -251,12 +316,12 @@ export const SchemaFieldRenderer = ({
                         ) : fieldSchema.items.type === 'string' && (fieldSchema.items.format === 'date-time' || fieldSchema.items.format === 'datetime') ? (
                           <Input
                             type="datetime-local"
-                            value={item 
-                              ? (item instanceof Date 
-                                  ? new Date(item.getTime() - item.getTimezoneOffset() * 60000).toISOString().slice(0, 16)
-                                  : item.includes('T') 
-                                    ? item.substring(0, 16)
-                                    : item)
+                            value={item
+                              ? (item instanceof Date
+                                ? new Date(item.getTime() - item.getTimezoneOffset() * 60000).toISOString().slice(0, 16)
+                                : item.includes('T')
+                                  ? item.substring(0, 16)
+                                  : item)
                               : ''}
                             onChange={(e) => {
                               const localValue = e.target.value;
@@ -281,17 +346,15 @@ export const SchemaFieldRenderer = ({
                         )}
                       </div>
                     )}
-                  </div>
-                );
-              })}
-              {items.length === 0 && (
-                <p className="text-xs text-muted-foreground text-center py-2">No items yet. Click "Add" to create one.</p>
-              )}
-            </div>
+                </div>
+              );
+            })}
+            {items.length === 0 && (
+              <p className="text-xs text-muted-foreground text-center py-2">No items yet. Click "Add" to create one.</p>
+            )}
           </div>
-        );
-      }
-      return null;
+        </div>
+      );
 
     case 'object':
       if (fieldSchema.properties) {
@@ -345,7 +408,7 @@ export const SchemaFieldRenderer = ({
           </div>
         );
       }
-      
+
       // Handle date and time formats
       if (fieldSchema.format === 'date') {
         // Convert ISO date string (YYYY-MM-DD) to input value
@@ -369,7 +432,7 @@ export const SchemaFieldRenderer = ({
           </div>
         );
       }
-      
+
       if (fieldSchema.format === 'time') {
         // Convert ISO time string (HH:MM:SS) to input value (HH:MM)
         const timeValue = value ? (value.includes('T') ? value.split('T')[1]?.split('.')[0]?.substring(0, 5) : value.substring(0, 5)) : '';
@@ -392,15 +455,15 @@ export const SchemaFieldRenderer = ({
           </div>
         );
       }
-      
+
       if (fieldSchema.format === 'date-time' || fieldSchema.format === 'datetime') {
         // Convert ISO datetime string to datetime-local input value
-        const datetimeValue = value 
-          ? (value instanceof Date 
-              ? new Date(value.getTime() - value.getTimezoneOffset() * 60000).toISOString().slice(0, 16)
-              : value.includes('T') 
-                ? value.substring(0, 16)
-                : value)
+        const datetimeValue = value
+          ? (value instanceof Date
+            ? new Date(value.getTime() - value.getTimezoneOffset() * 60000).toISOString().slice(0, 16)
+            : value.includes('T')
+              ? value.substring(0, 16)
+              : value)
           : '';
         return (
           <div key={fullKey} className="space-y-1">
@@ -430,7 +493,7 @@ export const SchemaFieldRenderer = ({
           </div>
         );
       }
-      
+
       return (
         <div key={fullKey} className="space-y-1">
           <Label htmlFor={fullKey} className="text-xs">
