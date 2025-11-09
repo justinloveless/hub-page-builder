@@ -68,7 +68,11 @@
     "tailwindcss-animate": "^1.0.7",
     "vaul": "^0.9.9",
     "vite-plugin-pwa": "^1.1.0",
-    "zod": "^3.25.76"
+    "zod": "^3.25.76",
+    "@tiptap/react": "^2.10.3",
+    "@tiptap/starter-kit": "^2.10.3",
+    "@tiptap/extension-placeholder": "^2.10.3",
+    "tiptap-markdown": "^0.8.4"
   },
   "devDependencies": {
     "@eslint/js": "^9.32.0",
