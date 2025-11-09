@@ -135,7 +135,7 @@ const Dashboard = () => {
               Manage all your static sites in one place
             </p>
           </div>
-          <div className="flex gap-2 sm:flex-shrink-0">
+          <div className="flex flex-col sm:flex-row gap-2 sm:flex-shrink-0">
             <SubmitTemplateDialog />
             <JoinWithCodeDialog />
             <AddSiteDialog onSiteAdded={loadSites} />
@@ -152,7 +152,7 @@ const Dashboard = () => {
               Get started by adding your first static site. Connect your GitHub repository
               and start managing content with ease. Or join an existing site with an invite code.
             </p>
-            <div className="flex gap-2 justify-center">
+            <div className="flex flex-col sm:flex-row gap-2 justify-center">
               <SubmitTemplateDialog />
               <JoinWithCodeDialog />
               <AddSiteDialog onSiteAdded={loadSites} />
