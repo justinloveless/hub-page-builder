@@ -10,7 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
 import { toast } from "sonner";
-import { ArrowLeft, ExternalLink, GitBranch, Users, FileText, Activity, Copy, Trash2, Check, User as UserIcon, Settings, UserCog, Crown, LogOut, Filter, CalendarIcon, X, Package, GitCommit, Upload, Shield, Menu, Edit, AlertCircle, Github, Code, Paintbrush } from "lucide-react";
+import { ArrowLeft, ExternalLink, GitBranch, Users, FileText, Activity, Copy, Trash2, Check, User as UserIcon, Settings, UserCog, Crown, LogOut, Filter, CalendarIcon, X, Package, GitCommit, Upload, Shield, Menu, Edit, AlertCircle, Github, Code, Paintbrush, Eye, EyeOff } from "lucide-react";
 import { Separator } from "@/components/ui/separator";
 import { format } from "date-fns";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
@@ -71,6 +71,7 @@ const Manage = () => {
   const [showDiffDrawer, setShowDiffDrawer] = useState(false);
   const [showMobileSidebar, setShowMobileSidebar] = useState(false);
   const [reconnecting, setReconnecting] = useState(false);
+  const [showPreview, setShowPreview] = useState(true);
   const ACTIVITIES_PER_PAGE = 10;
 
   // Activity filters
@@ -696,6 +697,19 @@ const Manage = () => {
 
   const sidebarContent = (
     <div className="h-full flex flex-col min-w-0 overflow-y-auto">
+      {!isMobile && !showPreview && (
+        <div className="p-4 border-b flex-shrink-0">
+          <Button
+            variant="outline"
+            size="sm"
+            className="w-full"
+            onClick={() => setShowPreview(true)}
+          >
+            <Eye className="h-4 w-4 mr-2" />
+            Show Live Preview
+          </Button>
+        </div>
+      )}
       <div className={`space-y-6 ${isMobile ? 'p-6' : 'p-4'}`}>
         {/* Site Details */}
         <div className="space-y-3 w-full">
@@ -1046,178 +1060,290 @@ const Manage = () => {
 
       {/* Desktop Layout with Resizable Panels */}
       {!isMobile ? (
-        <ResizablePanelGroup direction="horizontal" className="flex-1 min-h-0">
-          {/* Sidebar */}
-          <ResizablePanel defaultSize={20} minSize={15} maxSize={35} className="overflow-hidden min-h-0">
-            <div className="h-full flex flex-col min-w-0 border-r">
-              {sidebarContent}
-            </div>
-          </ResizablePanel>
-          <ResizableHandle withHandle />
-
-          <ResizablePanel defaultSize={80} minSize={50} className="overflow-hidden min-h-0">
-            <div className="flex flex-col h-full min-h-0">
-              {/* Preview and Controls */}
-              <main className="flex-1 flex flex-col p-4 gap-4 overflow-hidden min-h-0">
-                {/* Live Preview */}
-                <Card className="flex-1 overflow-hidden flex flex-col">
-                  <CardHeader className="pb-3 flex-shrink-0">
-                    <div className="flex items-center justify-between gap-4">
-                      <div className="flex-1 min-w-0">
-                        <CardTitle className="text-base">Live Preview</CardTitle>
-                        <CardDescription className="text-xs">
-                          {pendingChanges.length > 0
-                            ? `${pendingChanges.length} pending ${pendingChanges.length === 1 ? 'change' : 'changes'} ready to commit`
-                            : 'Changes appear here in real-time before committing'}
-                        </CardDescription>
-                      </div>
-                      {pendingChanges.length > 0 && (
-                        <div className="flex items-center gap-2 flex-shrink-0">
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => setShowDiffDrawer(true)}
-                          >
-                            <FileText className="h-4 w-4 mr-2" />
-                            View Details
-                          </Button>
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => {
-                              setPendingChanges([]);
-                              toast.success('All changes cleared');
-                            }}
-                          >
-                            <Trash2 className="h-4 w-4 mr-2" />
-                            Clear All
-                          </Button>
-                          <Button
-                            size="sm"
-                            onClick={async () => {
-                              const message = prompt("Enter commit message:");
-                              if (!message?.trim()) return;
-
-                              try {
-                                const assetChanges = pendingChanges.map(change => ({
-                                  repo_path: change.repoPath,
-                                  content: change.content
-                                }));
-
-                                const { data, error } = await supabase.functions.invoke('commit-batch-changes', {
-                                  body: {
-                                    site_id: siteId,
-                                    commit_message: message,
-                                    asset_changes: assetChanges
-                                  }
-                                });
-
-                                if (error) throw error;
-
-                                toast.success('All changes committed!');
-                                setPendingChanges([]);
-                                loadActivities();
-                              } catch (error: any) {
-                                toast.error(error.message || 'Failed to commit');
-                              }
-                            }}
-                          >
-                            <GitCommit className="h-4 w-4 mr-2" />
-                            Commit All
-                          </Button>
+        showPreview ? (
+          <ResizablePanelGroup direction="horizontal" className="flex-1 min-h-0">
+            {/* Sidebar */}
+            <ResizablePanel defaultSize={20} minSize={15} maxSize={35} className="overflow-hidden min-h-0">
+              <div className="h-full flex flex-col min-w-0 border-r">
+                {sidebarContent}
+              </div>
+            </ResizablePanel>
+            <ResizableHandle withHandle />
+            <ResizablePanel defaultSize={80} minSize={50} className="overflow-hidden min-h-0">
+              <div className="flex flex-col h-full min-h-0">
+                {/* Preview and Controls */}
+                <main className="flex-1 flex flex-col p-4 gap-4 overflow-hidden min-h-0">
+                  {/* Live Preview */}
+                  <Card className="flex-1 overflow-hidden flex flex-col">
+                    <CardHeader className="pb-3 flex-shrink-0">
+                      <div className="flex items-center justify-between gap-4">
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2">
+                            <CardTitle className="text-base">Live Preview</CardTitle>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-6 w-6"
+                              onClick={() => setShowPreview(false)}
+                              title="Hide preview"
+                            >
+                              <EyeOff className="h-4 w-4" />
+                            </Button>
+                          </div>
+                          <CardDescription className="text-xs">
+                            {pendingChanges.length > 0
+                              ? `${pendingChanges.length} pending ${pendingChanges.length === 1 ? 'change' : 'changes'} ready to commit`
+                              : 'Changes appear here in real-time before committing'}
+                          </CardDescription>
                         </div>
-                      )}
-                    </div>
-                  </CardHeader>
-                  <CardContent className="p-0 flex-1 overflow-hidden">
-                    <SitePreview
-                      siteId={siteId!}
-                      pendingChanges={pendingChanges}
-                    />
-                  </CardContent>
-                </Card>
-              </main>
+                        {pendingChanges.length > 0 && (
+                          <div className="flex items-center gap-2 flex-shrink-0">
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => setShowDiffDrawer(true)}
+                            >
+                              <FileText className="h-4 w-4 mr-2" />
+                              View Details
+                            </Button>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => {
+                                setPendingChanges([]);
+                                toast.success('All changes cleared');
+                              }}
+                            >
+                              <Trash2 className="h-4 w-4 mr-2" />
+                              Clear All
+                            </Button>
+                            <Button
+                              size="sm"
+                              onClick={async () => {
+                                const message = prompt("Enter commit message:");
+                                if (!message?.trim()) return;
+
+                                try {
+                                  const assetChanges = pendingChanges.map(change => ({
+                                    repo_path: change.repoPath,
+                                    content: change.content
+                                  }));
+
+                                  const { data, error } = await supabase.functions.invoke('commit-batch-changes', {
+                                    body: {
+                                      site_id: siteId,
+                                      commit_message: message,
+                                      asset_changes: assetChanges
+                                    }
+                                  });
+
+                                  if (error) throw error;
+
+                                  toast.success('All changes committed!');
+                                  setPendingChanges([]);
+                                  loadActivities();
+                                } catch (error: any) {
+                                  toast.error(error.message || 'Failed to commit');
+                                }
+                              }}
+                            >
+                              <GitCommit className="h-4 w-4 mr-2" />
+                              Commit All
+                            </Button>
+                          </div>
+                        )}
+                      </div>
+                    </CardHeader>
+                    <CardContent className="p-0 flex-1 overflow-hidden">
+                      <SitePreview
+                        siteId={siteId!}
+                        pendingChanges={pendingChanges}
+                      />
+                    </CardContent>
+                  </Card>
+                </main>
+              </div>
+            </ResizablePanel>
+          </ResizablePanelGroup>
+        ) : (
+          <div className="flex-1 flex min-h-0 w-full">
+            {/* Sidebar - Full Width with Centered Content */}
+            <div className="w-full h-full overflow-y-auto">
+              <div className="flex justify-center min-h-full">
+                <div className="w-full max-w-[60rem] flex flex-col border-r">
+                  {sidebarContent}
+                </div>
+              </div>
             </div>
-          </ResizablePanel>
-        </ResizablePanelGroup>
+          </div>
+        )
       ) : (
         // Mobile view - full-width preview
         <div className="flex-1 flex flex-col overflow-hidden min-h-0">
           <main className="flex-1 flex flex-col p-2 overflow-hidden min-h-0">
-            <Card className="flex-1 overflow-hidden flex flex-col">
-              {pendingChanges.length > 0 ? (
+            {showPreview ? (
+              <Card className="flex-1 overflow-hidden flex flex-col">
                 <CardHeader className="py-2 px-3 flex-shrink-0 border-b">
                   <div className="flex items-center justify-between gap-2">
-                    <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 flex-1 min-w-0">
                       <p className="text-xs font-medium">
-                        {pendingChanges.length} change{pendingChanges.length !== 1 && 's'}
+                        Live Preview
                       </p>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-6 w-6"
+                        onClick={() => setShowPreview(false)}
+                        title="Hide preview"
+                      >
+                        <EyeOff className="h-3.5 w-3.5" />
+                      </Button>
                     </div>
-                    <div className="flex items-center gap-1.5 flex-shrink-0">
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className="h-7 px-2"
-                        onClick={() => setShowDiffDrawer(true)}
-                      >
-                        <FileText className="h-3.5 w-3.5" />
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className="h-7 px-2"
-                        onClick={() => {
-                          setPendingChanges([]);
-                          toast.success('All changes cleared');
-                        }}
-                      >
-                        <Trash2 className="h-3.5 w-3.5" />
-                      </Button>
-                      <Button
-                        size="sm"
-                        className="h-7 px-2"
-                        onClick={async () => {
-                          const message = prompt("Enter commit message:");
-                          if (!message?.trim()) return;
-
-                          try {
-                            const assetChanges = pendingChanges.map(change => ({
-                              repo_path: change.repoPath,
-                              content: change.content
-                            }));
-
-                            const { data, error } = await supabase.functions.invoke('commit-batch-changes', {
-                              body: {
-                                site_id: siteId,
-                                commit_message: message,
-                                asset_changes: assetChanges
-                              }
-                            });
-
-                            if (error) throw error;
-
-                            toast.success('All changes committed!');
+                    {pendingChanges.length > 0 && (
+                      <div className="flex items-center gap-1.5 flex-shrink-0">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-7 px-2"
+                          onClick={() => setShowDiffDrawer(true)}
+                        >
+                          <FileText className="h-3.5 w-3.5" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-7 px-2"
+                          onClick={() => {
                             setPendingChanges([]);
-                            loadActivities();
-                          } catch (error: any) {
-                            toast.error(error.message || 'Failed to commit');
-                          }
-                        }}
-                      >
-                        <GitCommit className="h-3.5 w-3.5 mr-1.5" />
-                        Commit
-                      </Button>
-                    </div>
+                            toast.success('All changes cleared');
+                          }}
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </Button>
+                        <Button
+                          size="sm"
+                          className="h-7 px-2"
+                          onClick={async () => {
+                            const message = prompt("Enter commit message:");
+                            if (!message?.trim()) return;
+
+                            try {
+                              const assetChanges = pendingChanges.map(change => ({
+                                repo_path: change.repoPath,
+                                content: change.content
+                              }));
+
+                              const { data, error } = await supabase.functions.invoke('commit-batch-changes', {
+                                body: {
+                                  site_id: siteId,
+                                  commit_message: message,
+                                  asset_changes: assetChanges
+                                }
+                              });
+
+                              if (error) throw error;
+
+                              toast.success('All changes committed!');
+                              setPendingChanges([]);
+                              loadActivities();
+                            } catch (error: any) {
+                              toast.error(error.message || 'Failed to commit');
+                            }
+                          }}
+                        >
+                          <GitCommit className="h-3.5 w-3.5 mr-1.5" />
+                          Commit
+                        </Button>
+                      </div>
+                    )}
                   </div>
                 </CardHeader>
-              ) : null}
-              <CardContent className="p-0 flex-1 overflow-hidden">
-                <SitePreview
-                  siteId={siteId!}
-                  pendingChanges={pendingChanges}
-                />
-              </CardContent>
-            </Card>
+                <CardContent className="p-0 flex-1 overflow-hidden">
+                  <SitePreview
+                    siteId={siteId!}
+                    pendingChanges={pendingChanges}
+                  />
+                </CardContent>
+              </Card>
+            ) : (
+              <Card>
+                <CardHeader className="py-2 px-3">
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="flex items-center gap-2 flex-1 min-w-0">
+                      <p className="text-xs font-medium">
+                        Live Preview
+                      </p>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-6 w-6"
+                        onClick={() => setShowPreview(true)}
+                        title="Show preview"
+                      >
+                        <Eye className="h-3.5 w-3.5" />
+                      </Button>
+                    </div>
+                    {pendingChanges.length > 0 && (
+                      <div className="flex items-center gap-1.5 flex-shrink-0">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-7 px-2"
+                          onClick={() => setShowDiffDrawer(true)}
+                        >
+                          <FileText className="h-3.5 w-3.5" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-7 px-2"
+                          onClick={() => {
+                            setPendingChanges([]);
+                            toast.success('All changes cleared');
+                          }}
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </Button>
+                        <Button
+                          size="sm"
+                          className="h-7 px-2"
+                          onClick={async () => {
+                            const message = prompt("Enter commit message:");
+                            if (!message?.trim()) return;
+
+                            try {
+                              const assetChanges = pendingChanges.map(change => ({
+                                repo_path: change.repoPath,
+                                content: change.content
+                              }));
+
+                              const { data, error } = await supabase.functions.invoke('commit-batch-changes', {
+                                body: {
+                                  site_id: siteId,
+                                  commit_message: message,
+                                  asset_changes: assetChanges
+                                }
+                              });
+
+                              if (error) throw error;
+
+                              toast.success('All changes committed!');
+                              setPendingChanges([]);
+                              loadActivities();
+                            } catch (error: any) {
+                              toast.error(error.message || 'Failed to commit');
+                            }
+                          }}
+                        >
+                          <GitCommit className="h-3.5 w-3.5 mr-1.5" />
+                          Commit
+                        </Button>
+                      </div>
+                    )}
+                  </div>
+                </CardHeader>
+              </Card>
+            )}
           </main>
         </div>
       )}
