@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import {
@@ -14,8 +14,10 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { toast } from "sonner";
-import { Loader2, Plus, PackagePlus, X } from "lucide-react";
+import { Loader2, Plus, PackagePlus, X, AlertCircle } from "lucide-react";
+import { useGithubInstallations } from "@/contexts/GithubInstallationContext";
 
 interface SubmitTemplateDialogProps {
     onTemplateAdded?: () => void;
@@ -45,6 +47,14 @@ const SubmitTemplateDialog = ({ onTemplateAdded }: SubmitTemplateDialogProps) =>
     });
     const [selectedTags, setSelectedTags] = useState<string[]>([]);
     const [customTag, setCustomTag] = useState("");
+    const [dialogInstallationError, setDialogInstallationError] = useState<string | null>(null);
+
+    const {
+        hasInstallations,
+        isLoading: installationsLoading,
+        error: installationsError,
+        refreshInstallations,
+    } = useGithubInstallations();
 
     const handleToggleTag = (tag: string) => {
         if (selectedTags.includes(tag)) {
@@ -65,6 +75,30 @@ const SubmitTemplateDialog = ({ onTemplateAdded }: SubmitTemplateDialogProps) =>
     const handleRemoveTag = (tag: string) => {
         setSelectedTags(selectedTags.filter(t => t !== tag));
     };
+
+    const handleRefreshInstallations = useCallback(async () => {
+        try {
+            const installations = await refreshInstallations();
+            setDialogInstallationError(null);
+
+            if (installations.length === 0) {
+                toast.error("No GitHub App installations found. Install the GitHub App before submitting templates.");
+            } else {
+                toast.success("GitHub App installations detected.");
+            }
+        } catch (error: any) {
+            console.error("Error refreshing GitHub installations:", error);
+            const message = error?.message || "Unable to verify GitHub App installations.";
+            setDialogInstallationError(message);
+            toast.error(message);
+        }
+    }, [refreshInstallations]);
+
+    useEffect(() => {
+        if (!open) {
+            setDialogInstallationError(null);
+        }
+    }, [open]);
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -116,6 +150,8 @@ const SubmitTemplateDialog = ({ onTemplateAdded }: SubmitTemplateDialogProps) =>
         }
     };
 
+    const installationErrorMessage = dialogInstallationError || installationsError;
+
     return (
         <Dialog open={open} onOpenChange={setOpen}>
             <DialogTrigger asChild>
@@ -131,6 +167,42 @@ const SubmitTemplateDialog = ({ onTemplateAdded }: SubmitTemplateDialogProps) =>
                         Share a GitHub template repository that others can use to create new sites
                     </DialogDescription>
                 </DialogHeader>
+
+                {installationErrorMessage && (
+                    <Alert variant="destructive" className="mb-4">
+                        <AlertCircle className="h-4 w-4" />
+                        <AlertTitle>Unable to check GitHub App installations</AlertTitle>
+                        <AlertDescription>{installationErrorMessage}</AlertDescription>
+                    </Alert>
+                )}
+
+                {!installationErrorMessage && !installationsLoading && !hasInstallations && (
+                    <Alert variant="destructive" className="mb-4">
+                        <AlertCircle className="h-4 w-4" />
+                        <AlertTitle>No GitHub App installation found</AlertTitle>
+                        <AlertDescription className="space-y-2">
+                            <p>
+                                Install the GitHub App before submitting a template. You can install or refresh installations from the Add Site dialog.
+                            </p>
+                            <Button
+                                type="button"
+                                variant="outline"
+                                size="sm"
+                                onClick={handleRefreshInstallations}
+                                disabled={installationsLoading}
+                            >
+                                {installationsLoading ? (
+                                    <>
+                                        <Loader2 className="mr-2 h-3 w-3 animate-spin" />
+                                        Refreshing...
+                                    </>
+                                ) : (
+                                    "Refresh status"
+                                )}
+                            </Button>
+                        </AlertDescription>
+                    </Alert>
+                )}
 
                 <form onSubmit={handleSubmit}>
                     <div className="space-y-4 py-4">
