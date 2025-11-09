@@ -14,9 +14,10 @@ interface PendingAssetChange {
 interface SitePreviewProps {
   siteId: string;
   pendingChanges: PendingAssetChange[];
+  commitSha?: string;
 }
 
-export const SitePreview = ({ siteId, pendingChanges }: SitePreviewProps) => {
+export const SitePreview = ({ siteId, pendingChanges, commitSha }: SitePreviewProps) => {
   const [previewUrl, setPreviewUrl] = useState<string>("");
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const filesRef = useRef<Record<string, { content: string; encoding: string }>>({});
@@ -24,7 +25,7 @@ export const SitePreview = ({ siteId, pendingChanges }: SitePreviewProps) => {
   const scrollPositionRef = useRef<{ x: number; y: number } | null>(null);
   const debounceTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
-  const { data: siteFiles, isLoading: loading, error } = useSiteFiles(siteId);
+  const { data: siteFiles, isLoading: loading, error } = useSiteFiles(siteId, commitSha);
 
   // Add message listener for debug logs from iframe
   useEffect(() => {
@@ -961,7 +962,9 @@ if (typeof window.__moduleImportMap === 'undefined') {
   return (
     <Card className="overflow-hidden h-full flex flex-col">
       <div className="bg-muted p-2 text-xs text-muted-foreground border-b flex-shrink-0">
-        Preview with pending changes
+        {commitSha 
+          ? `Preview at commit ${commitSha.substring(0, 7)}`
+          : 'Preview with pending changes'}
       </div>
       <iframe
         ref={iframeRef}

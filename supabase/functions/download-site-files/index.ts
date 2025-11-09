@@ -37,7 +37,7 @@ Deno.serve(async (req) => {
       throw new Error('Unauthorized')
     }
 
-    const { site_id } = await req.json()
+    const { site_id, commit_sha } = await req.json()
 
     // Verify user is a member of this site
     const { data: membership, error: membershipError } = await supabase
@@ -107,17 +107,25 @@ Deno.serve(async (req) => {
     // Parse repo owner and name from full name
     const [repo_owner, repo_name] = site.repo_full_name.split('/')
 
-    // Get the default branch's tree
-    const { data: ref } = await octokit.request('GET /repos/{owner}/{repo}/git/ref/{ref}', {
-      owner: repo_owner,
-      repo: repo_name,
-      ref: `heads/${site.default_branch}`,
-    })
+    let commitSha: string
+
+    // If commit_sha is provided, use it; otherwise use the default branch's latest commit
+    if (commit_sha) {
+      commitSha = commit_sha
+    } else {
+      // Get the default branch's tree
+      const { data: ref } = await octokit.request('GET /repos/{owner}/{repo}/git/ref/{ref}', {
+        owner: repo_owner,
+        repo: repo_name,
+        ref: `heads/${site.default_branch}`,
+      })
+      commitSha = ref.object.sha
+    }
 
     const { data: commit } = await octokit.request('GET /repos/{owner}/{repo}/git/commits/{commit_sha}', {
       owner: repo_owner,
       repo: repo_name,
-      commit_sha: ref.object.sha,
+      commit_sha: commitSha,
     })
 
     const { data: tree } = await octokit.request('GET /repos/{owner}/{repo}/git/trees/{tree_sha}', {

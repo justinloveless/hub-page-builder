@@ -1,6 +1,7 @@
-import { GitBranch, FileUp, FileText, UserPlus, Shield, Trash2, ExternalLink, Upload } from "lucide-react";
+import { GitBranch, FileUp, FileText, UserPlus, Shield, Trash2, ExternalLink, Upload, Eye } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Button } from "@/components/ui/button";
 import type { Tables } from "@/integrations/supabase/types";
 
 type ActivityLog = Tables<"activity_log">;
@@ -10,9 +11,11 @@ interface ActivityCardProps {
   activity: ActivityLog;
   repoFullName: string;
   userProfile?: Profile | null;
+  onPreviewCommit?: (commitSha: string) => void;
+  showCommitPreview?: boolean;
 }
 
-const ActivityCard = ({ activity, repoFullName, userProfile }: ActivityCardProps) => {
+const ActivityCard = ({ activity, repoFullName, userProfile, onPreviewCommit, showCommitPreview }: ActivityCardProps) => {
   const displayName = userProfile?.full_name || `User ${activity.user_id?.slice(0, 8) || 'System'}`;
   const initials = userProfile?.full_name
     ? userProfile.full_name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2)
@@ -63,16 +66,28 @@ const ActivityCard = ({ activity, repoFullName, userProfile }: ActivityCardProps
     // Handle commit
     if (metadata.commit_sha) {
       details.push(
-        <a
-          key="commit"
-          href={`https://github.com/${repoFullName}/commit/${metadata.commit_sha}`}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-primary"
-        >
-          <ExternalLink className="h-3 w-3" />
-          Commit {metadata.commit_sha.substring(0, 7)}
-        </a>
+        <div key="commit" className="flex items-center gap-2">
+          <a
+            href={`https://github.com/${repoFullName}/commit/${metadata.commit_sha}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-primary"
+          >
+            <ExternalLink className="h-3 w-3" />
+            Commit {metadata.commit_sha.substring(0, 7)}
+          </a>
+          {showCommitPreview && onPreviewCommit && (
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-6 px-2 text-xs"
+              onClick={() => onPreviewCommit(metadata.commit_sha)}
+            >
+              <Eye className="h-3 w-3 mr-1" />
+              Preview
+            </Button>
+          )}
+        </div>
       );
     }
 
