@@ -76,6 +76,7 @@ const AddSiteDialog = ({ onSiteAdded }: AddSiteDialogProps) => {
   });
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedTagFilter, setSelectedTagFilter] = useState<string | null>(null);
+  const [githubSearchQuery, setGithubSearchQuery] = useState("");
   const [dialogInstallationError, setDialogInstallationError] = useState<string | null>(null);
 
   const {
@@ -437,6 +438,16 @@ const AddSiteDialog = ({ onSiteAdded }: AddSiteDialogProps) => {
   // Get unique tags from all templates
   const allTags = Array.from(new Set(templates.flatMap(t => t.tags))).sort();
 
+  // Filter GitHub repositories by search query
+  const filteredInstallations = installations.map(installation => ({
+    ...installation,
+    repositories: installation.repositories.filter(repo =>
+      !githubSearchQuery ||
+      repo.name.toLowerCase().includes(githubSearchQuery.toLowerCase()) ||
+      repo.full_name.toLowerCase().includes(githubSearchQuery.toLowerCase())
+    )
+  })).filter(installation => installation.repositories.length > 0);
+
   const installationErrorMessage = dialogInstallationError || installationsError;
   const isFetchingInstallations = connectingGithub || installationsLoading;
 
@@ -727,82 +738,101 @@ const AddSiteDialog = ({ onSiteAdded }: AddSiteDialogProps) => {
 
                 {installations.length > 0 && (
                   <div className="space-y-4">
+                    {/* Search input */}
+                    <div className="relative">
+                      <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                      <Input
+                        placeholder="Search repositories..."
+                        value={githubSearchQuery}
+                        onChange={(e) => setGithubSearchQuery(e.target.value)}
+                        className="pl-10"
+                      />
+                    </div>
+
                     <div className="flex items-center justify-between">
                       <h3 className="text-sm font-medium">Available Repositories</h3>
                       <Badge variant="secondary">
-                        {installations.reduce((total, inst) => total + inst.repository_count, 0)} repos
+                        {filteredInstallations.reduce((total, inst) => total + inst.repositories.length, 0)} repos
                       </Badge>
                     </div>
 
-                    {installations.map((installation) => (
-                      <div key={installation.id} className="space-y-2">
-                        <div className="flex items-center gap-2 text-sm font-medium">
-                          <img
-                            src={installation.account.avatar_url}
-                            alt={installation.account.login}
-                            className="w-5 h-5 rounded-full"
-                          />
-                          <span>{installation.account.login}</span>
-                          <Badge variant="outline" className="text-xs">
-                            {installation.account.type}
-                          </Badge>
-                        </div>
+                    {filteredInstallations.length > 0 ? (
+                      filteredInstallations.map((installation) => (
+                        <div key={installation.id} className="space-y-2">
+                          <div className="flex items-center gap-2 text-sm font-medium">
+                            <img
+                              src={installation.account.avatar_url}
+                              alt={installation.account.login}
+                              className="w-5 h-5 rounded-full"
+                            />
+                            <span>{installation.account.login}</span>
+                            <Badge variant="outline" className="text-xs">
+                              {installation.account.type}
+                            </Badge>
+                          </div>
 
-                        <div className="space-y-2">
-                          {installation.repositories.map((repo) => {
-                            const isAdded = isRepositoryAdded(repo.full_name);
+                          <div className="space-y-2">
+                            {installation.repositories.map((repo) => {
+                              const isAdded = isRepositoryAdded(repo.full_name);
 
-                            return (
-                              <Card key={repo.full_name} className="hover:bg-accent/50 transition-colors">
-                                <CardHeader className="pb-3">
-                                  <CardTitle className="text-sm flex items-center gap-2">
-                                    <Github className="h-4 w-4" />
-                                    {repo.name}
-                                    {repo.private && (
-                                      <Badge variant="secondary" className="text-xs">Private</Badge>
-                                    )}
-                                  </CardTitle>
-                                  <CardDescription className="text-xs">
-                                    {repo.full_name}
-                                  </CardDescription>
-                                </CardHeader>
-                                <CardContent className="pb-3">
-                                  <p className="text-xs text-muted-foreground">
-                                    Default branch: <span className="font-mono">{repo.default_branch}</span>
-                                  </p>
-                                </CardContent>
-                                <CardFooter className="flex-col gap-2">
-                                  <Button
-                                    size="sm"
-                                    onClick={() => handleSelectRepository(repo, installation.id)}
-                                    className="w-full"
-                                    disabled={isAdded || loading}
-                                  >
-                                    {loading ? (
-                                      <>
-                                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                                        Adding...
-                                      </>
-                                    ) : (
-                                      <>
-                                        <Plus className="mr-2 h-4 w-4" />
-                                        Add This Repository
-                                      </>
-                                    )}
-                                  </Button>
-                                  {isAdded && (
-                                    <p className="text-xs text-green-600 dark:text-green-400 flex items-center gap-1 w-full justify-center">
-                                      <CheckCircle2 className="h-3 w-3" />
-                                      Repository already added
+                              return (
+                                <Card key={repo.full_name} className="hover:bg-accent/50 transition-colors w-full">
+                                  <CardHeader className="pb-3">
+                                    <CardTitle className="text-sm flex items-center gap-2 break-words">
+                                      <Github className="h-4 w-4 flex-shrink-0" />
+                                      <span className="break-words">{repo.name}</span>
+                                      {repo.private && (
+                                        <Badge variant="secondary" className="text-xs flex-shrink-0">Private</Badge>
+                                      )}
+                                    </CardTitle>
+                                    <CardDescription className="text-xs break-words">
+                                      {repo.full_name}
+                                    </CardDescription>
+                                  </CardHeader>
+                                  <CardContent className="pb-3">
+                                    <p className="text-xs text-muted-foreground break-words">
+                                      Default branch: <span className="font-mono">{repo.default_branch}</span>
                                     </p>
-                                  )}
-                                </CardFooter>
-                              </Card>
-                            );
-                          })}
+                                  </CardContent>
+                                  <CardFooter className="flex-col gap-2">
+                                    <Button
+                                      size="sm"
+                                      onClick={() => handleSelectRepository(repo, installation.id)}
+                                      className="w-full"
+                                      disabled={isAdded || loading}
+                                    >
+                                      {loading ? (
+                                        <>
+                                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                          Adding...
+                                        </>
+                                      ) : (
+                                        <>
+                                          <Plus className="mr-2 h-4 w-4" />
+                                          Add This Repository
+                                        </>
+                                      )}
+                                    </Button>
+                                    {isAdded && (
+                                      <p className="text-xs text-green-600 dark:text-green-400 flex items-center gap-1 w-full justify-center">
+                                        <CheckCircle2 className="h-3 w-3" />
+                                        Repository already added
+                                      </p>
+                                    )}
+                                  </CardFooter>
+                                </Card>
+                              );
+                            })}
+                          </div>
                         </div>
+                      ))
+                    ) : (
+                      <div className="text-center py-8 text-muted-foreground text-sm">
+                        <Search className="h-12 w-12 mx-auto mb-3 opacity-50" />
+                        <p>No repositories match your search.</p>
+                        <p className="text-xs mt-2">Try adjusting your search query.</p>
                       </div>
-                    ))}
+                    )}
                   </div>
                 )}
 
