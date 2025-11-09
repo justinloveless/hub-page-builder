@@ -15,8 +15,9 @@ import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { toast } from "sonner";
-import { Loader2, Plus, Github, BookOpen, Settings, CheckCircle2, PackagePlus, Search } from "lucide-react";
+import { Loader2, Plus, Github, BookOpen, Settings, CheckCircle2, PackagePlus, Search, AlertCircle } from "lucide-react";
 import type { Tables } from "@/integrations/supabase/types";
 
 interface AddSiteDialogProps {
@@ -84,6 +85,9 @@ const AddSiteDialog = ({ onSiteAdded }: AddSiteDialogProps) => {
   });
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedTagFilter, setSelectedTagFilter] = useState<string | null>(null);
+  const [checkingInstallations, setCheckingInstallations] = useState(false);
+  const [hasGithubInstallation, setHasGithubInstallation] = useState<boolean | null>(null);
+  const [installationCheckError, setInstallationCheckError] = useState<string | null>(null);
 
   // Load existing sites and templates when dialog opens
   useEffect(() => {
@@ -147,10 +151,20 @@ const AddSiteDialog = ({ onSiteAdded }: AddSiteDialogProps) => {
 
       console.log('Found installations:', data.installations);
       setInstallations(data.installations);
+      setHasGithubInstallation(true);
+      setInstallationCheckError(null);
       toast.success(`Found ${data.installations.length} installation(s) with repositories`);
     } catch (error: any) {
       console.error("Error fetching installations:", error);
-      toast.error(error.message || "Failed to fetch GitHub installations");
+      const message = error.message || "Failed to fetch GitHub installations";
+      if (message.includes("No GitHub App installations")) {
+        setHasGithubInstallation(false);
+        setInstallationCheckError(null);
+      } else {
+        setHasGithubInstallation(null);
+        setInstallationCheckError(message);
+      }
+      toast.error(message);
     } finally {
       setConnectingGithub(false);
     }
@@ -176,6 +190,8 @@ const AddSiteDialog = ({ onSiteAdded }: AddSiteDialogProps) => {
         toast.success("Connected to GitHub successfully!");
         setConnectingGithub(false);
         setPopupWindow(null);
+        setHasGithubInstallation(true);
+        setInstallationCheckError(null);
 
         // Automatically fetch all installations and repositories
         setTimeout(() => handleFetchInstallations(), 500);
@@ -184,6 +200,8 @@ const AddSiteDialog = ({ onSiteAdded }: AddSiteDialogProps) => {
         toast.error(event.data.error || "Failed to connect to GitHub");
         setConnectingGithub(false);
         setPopupWindow(null);
+        setHasGithubInstallation(false);
+        setInstallationCheckError(event.data.error || "Failed to connect to GitHub");
       }
     };
 
@@ -319,6 +337,7 @@ const AddSiteDialog = ({ onSiteAdded }: AddSiteDialogProps) => {
       toast.error(error.message || "Failed to connect to GitHub");
       setConnectingGithub(false);
       setPopupWindow(null);
+      setInstallationCheckError(error.message || "Failed to connect to GitHub");
     }
   };
 
@@ -429,6 +448,39 @@ const AddSiteDialog = ({ onSiteAdded }: AddSiteDialogProps) => {
   // Get unique tags from all templates
   const allTags = Array.from(new Set(templates.flatMap(t => t.tags))).sort();
 
+  const checkGithubInstallations = useCallback(async () => {
+    setCheckingInstallations(true);
+    setInstallationCheckError(null);
+
+    try {
+      const { data, error } = await supabase.functions.invoke('list-github-installations');
+      if (error) throw error;
+
+      const foundInstallations = data?.installations || [];
+      setHasGithubInstallation(foundInstallations.length > 0);
+
+      if (foundInstallations.length > 0) {
+        setInstallations(foundInstallations);
+      }
+    } catch (error: any) {
+      console.error("Error checking GitHub installations:", error);
+      setHasGithubInstallation(null);
+      setInstallationCheckError(error.message || "Unable to verify GitHub App installations.");
+    } finally {
+      setCheckingInstallations(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (open) {
+      checkGithubInstallations();
+    } else {
+      setHasGithubInstallation(null);
+      setInstallationCheckError(null);
+      setInstallations([]);
+    }
+  }, [open, checkGithubInstallations]);
+
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
@@ -447,6 +499,24 @@ const AddSiteDialog = ({ onSiteAdded }: AddSiteDialogProps) => {
             Connect a GitHub repository to start managing your static site
           </DialogDescription>
         </DialogHeader>
+
+        {installationCheckError && (
+          <Alert variant="destructive" className="mb-4">
+            <AlertCircle className="h-4 w-4" />
+            <AlertTitle>Unable to check GitHub App installations</AlertTitle>
+            <AlertDescription>{installationCheckError}</AlertDescription>
+          </Alert>
+        )}
+
+        {!installationCheckError && !checkingInstallations && hasGithubInstallation === false && (
+          <Alert variant="destructive" className="mb-4">
+            <AlertCircle className="h-4 w-4" />
+            <AlertTitle>No GitHub App installation found</AlertTitle>
+            <AlertDescription>
+              Install the GitHub App before adding a site or creating one from a template. Use the GitHub tab below to install or refresh installations.
+            </AlertDescription>
+          </Alert>
+        )}
 
         <Tabs value={activeTab} onValueChange={setActiveTab} className="flex-1 flex flex-col overflow-hidden">
           <TabsList className="grid w-full flex-shrink-0 grid-cols-3">
