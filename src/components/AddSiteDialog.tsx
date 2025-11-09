@@ -801,7 +801,7 @@ const AddSiteDialog = ({ onSiteAdded }: AddSiteDialogProps) => {
                                     <Button
                                       size="sm"
                                       onClick={() => handleSelectRepository(repo, installation.id)}
-                                      className="w-full"
+                                      className={`w-full ${isAdded ? 'opacity-50 cursor-not-allowed' : ''}`}
                                       disabled={isAdded || loading}
                                     >
                                       {loading ? (
@@ -819,7 +819,7 @@ const AddSiteDialog = ({ onSiteAdded }: AddSiteDialogProps) => {
                                     {isAdded && (
                                       <p className="text-xs text-green-600 dark:text-green-400 flex items-center gap-1 w-full justify-center">
                                         <CheckCircle2 className="h-3 w-3" />
-                                        Repository already added
+                                        Already added
                                       </p>
                                     )}
                                   </CardFooter>
