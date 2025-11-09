@@ -103,12 +103,51 @@ Deno.serve(async (req) => {
       privateKey: normalizedKey,
     })
 
+    // Helper function to fetch all repositories with pagination
+    async function fetchAllRepositories(octokit: any): Promise<{ total_count: number; repositories: any[] }> {
+      let allRepositories: any[] = []
+      let totalCount = 0
+      let page = 1
+      const perPage = 100 // Maximum allowed by GitHub API
+
+      while (true) {
+        const { data: reposData, headers } = await octokit.request('GET /installation/repositories', {
+          per_page: perPage,
+          page: page,
+        })
+
+        if (page === 1) {
+          totalCount = reposData.total_count
+        }
+
+        allRepositories = allRepositories.concat(reposData.repositories)
+
+        // Check if there are more pages by looking at the Link header or comparing counts
+        const linkHeader = headers.link || ''
+        const hasNextPage = linkHeader.includes('rel="next"')
+        
+        // Also check if we've fetched all repositories
+        if (!hasNextPage || allRepositories.length >= totalCount) {
+          break
+        }
+
+        page++
+      }
+
+      return {
+        total_count: totalCount,
+        repositories: allRepositories,
+      }
+    }
+
     // For each user installation, get repository details
     const installationDetails = await Promise.all(
       userInstallations.map(async (installation: any) => {
         try {
           const installationOctokit = await app.getInstallationOctokit(installation.installation_id)
-          const { data: reposData } = await installationOctokit.request('GET /installation/repositories')
+          const { total_count, repositories } = await fetchAllRepositories(installationOctokit)
+
+          console.log(`Fetched ${repositories.length} repositories (total: ${total_count}) for installation ${installation.installation_id}`)
 
           return {
             id: installation.installation_id,
@@ -117,8 +156,8 @@ Deno.serve(async (req) => {
               type: installation.account_type,
               avatar_url: installation.account_avatar_url,
             },
-            repository_count: reposData.total_count,
-            repositories: reposData.repositories.map((repo: any) => ({
+            repository_count: total_count,
+            repositories: repositories.map((repo: any) => ({
               name: repo.name,
               full_name: repo.full_name,
               default_branch: repo.default_branch,
