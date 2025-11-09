@@ -232,6 +232,44 @@ export const SchemaFieldRenderer = ({
                             />
                             <Label className="text-xs">{item ? 'True' : 'False'}</Label>
                           </div>
+                        ) : fieldSchema.items.type === 'string' && fieldSchema.items.format === 'date' ? (
+                          <Input
+                            type="date"
+                            value={item ? (item instanceof Date ? item.toISOString().split('T')[0] : item.split('T')[0]) : ''}
+                            onChange={(e) => updateArrayItem(e.target.value)}
+                            placeholder="Enter date"
+                            className="h-8 text-xs"
+                          />
+                        ) : fieldSchema.items.type === 'string' && fieldSchema.items.format === 'time' ? (
+                          <Input
+                            type="time"
+                            value={item ? (item.includes('T') ? item.split('T')[1]?.split('.')[0]?.substring(0, 5) : item.substring(0, 5)) : ''}
+                            onChange={(e) => updateArrayItem(e.target.value)}
+                            placeholder="Enter time"
+                            className="h-8 text-xs"
+                          />
+                        ) : fieldSchema.items.type === 'string' && (fieldSchema.items.format === 'date-time' || fieldSchema.items.format === 'datetime') ? (
+                          <Input
+                            type="datetime-local"
+                            value={item 
+                              ? (item instanceof Date 
+                                  ? new Date(item.getTime() - item.getTimezoneOffset() * 60000).toISOString().slice(0, 16)
+                                  : item.includes('T') 
+                                    ? item.substring(0, 16)
+                                    : item)
+                              : ''}
+                            onChange={(e) => {
+                              const localValue = e.target.value;
+                              if (localValue) {
+                                const date = new Date(localValue);
+                                updateArrayItem(date.toISOString());
+                              } else {
+                                updateArrayItem('');
+                              }
+                            }}
+                            placeholder="Enter date and time"
+                            className="h-8 text-xs"
+                          />
                         ) : (
                           // Default to string
                           <Input
@@ -307,6 +345,92 @@ export const SchemaFieldRenderer = ({
           </div>
         );
       }
+      
+      // Handle date and time formats
+      if (fieldSchema.format === 'date') {
+        // Convert ISO date string (YYYY-MM-DD) to input value
+        const dateValue = value ? (value instanceof Date ? value.toISOString().split('T')[0] : value.split('T')[0]) : '';
+        return (
+          <div key={fullKey} className="space-y-1">
+            <Label htmlFor={fullKey} className="text-xs">
+              {fieldSchema.title || fieldKey}
+            </Label>
+            {fieldSchema.description && (
+              <p className="text-xs text-muted-foreground">{fieldSchema.description}</p>
+            )}
+            <Input
+              id={fullKey}
+              type="date"
+              value={dateValue}
+              onChange={(e) => updateValue(e.target.value)}
+              placeholder={fieldSchema.placeholder}
+              className="h-9 text-xs"
+            />
+          </div>
+        );
+      }
+      
+      if (fieldSchema.format === 'time') {
+        // Convert ISO time string (HH:MM:SS) to input value (HH:MM)
+        const timeValue = value ? (value.includes('T') ? value.split('T')[1]?.split('.')[0]?.substring(0, 5) : value.substring(0, 5)) : '';
+        return (
+          <div key={fullKey} className="space-y-1">
+            <Label htmlFor={fullKey} className="text-xs">
+              {fieldSchema.title || fieldKey}
+            </Label>
+            {fieldSchema.description && (
+              <p className="text-xs text-muted-foreground">{fieldSchema.description}</p>
+            )}
+            <Input
+              id={fullKey}
+              type="time"
+              value={timeValue}
+              onChange={(e) => updateValue(e.target.value)}
+              placeholder={fieldSchema.placeholder}
+              className="h-9 text-xs"
+            />
+          </div>
+        );
+      }
+      
+      if (fieldSchema.format === 'date-time' || fieldSchema.format === 'datetime') {
+        // Convert ISO datetime string to datetime-local input value
+        const datetimeValue = value 
+          ? (value instanceof Date 
+              ? new Date(value.getTime() - value.getTimezoneOffset() * 60000).toISOString().slice(0, 16)
+              : value.includes('T') 
+                ? value.substring(0, 16)
+                : value)
+          : '';
+        return (
+          <div key={fullKey} className="space-y-1">
+            <Label htmlFor={fullKey} className="text-xs">
+              {fieldSchema.title || fieldKey}
+            </Label>
+            {fieldSchema.description && (
+              <p className="text-xs text-muted-foreground">{fieldSchema.description}</p>
+            )}
+            <Input
+              id={fullKey}
+              type="datetime-local"
+              value={datetimeValue}
+              onChange={(e) => {
+                // Convert datetime-local value to ISO string
+                const localValue = e.target.value;
+                if (localValue) {
+                  const date = new Date(localValue);
+                  updateValue(date.toISOString());
+                } else {
+                  updateValue('');
+                }
+              }}
+              placeholder={fieldSchema.placeholder}
+              className="h-9 text-xs"
+            />
+          </div>
+        );
+      }
+      
       return (
         <div key={fullKey} className="space-y-1">
           <Label htmlFor={fullKey} className="text-xs">
