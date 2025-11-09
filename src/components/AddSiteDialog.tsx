@@ -758,7 +758,7 @@ const AddSiteDialog = ({ onSiteAdded }: AddSiteDialogProps) => {
 
                     {filteredInstallations.length > 0 ? (
                       filteredInstallations.map((installation) => (
-                        <div key={installation.id} className="space-y-2">
+                        <div key={installation.id} className="space-y-2 min-w-0">
                           <div className="flex items-center gap-2 text-sm font-medium min-w-0 overflow-hidden">
                             <img
                               src={installation.account.avatar_url}
@@ -771,21 +771,21 @@ const AddSiteDialog = ({ onSiteAdded }: AddSiteDialogProps) => {
                             </Badge>
                           </div>
 
-                          <div className="space-y-2">
+                          <div className="space-y-2 min-w-0">
                             {installation.repositories.map((repo) => {
                               const isAdded = isRepositoryAdded(repo.full_name);
 
                               return (
-                                <Card key={repo.full_name} className="hover:bg-accent/50 transition-colors w-full min-w-0">
-                                  <CardHeader className="pb-3">
-                                    <CardTitle className="text-sm flex items-center gap-2 break-words min-w-0">
+                                <Card key={repo.full_name} className="hover:bg-accent/50 transition-colors w-full min-w-0 overflow-hidden">
+                                  <CardHeader className="pb-3 min-w-0">
+                                    <CardTitle className="text-sm flex items-center gap-2 break-all min-w-0">
                                       <Github className="h-4 w-4 flex-shrink-0" />
-                                      <span className="break-words min-w-0 flex-1">{repo.name}</span>
+                                      <span className="break-all min-w-0 flex-1">{repo.name}</span>
                                       {repo.private && (
                                         <Badge variant="secondary" className="text-xs flex-shrink-0">Private</Badge>
                                       )}
                                     </CardTitle>
-                                    <CardDescription className="text-xs break-words overflow-hidden">
+                                    <CardDescription className="text-xs break-all overflow-hidden min-w-0">
                                       {repo.full_name}
                                     </CardDescription>
                                   </CardHeader>
