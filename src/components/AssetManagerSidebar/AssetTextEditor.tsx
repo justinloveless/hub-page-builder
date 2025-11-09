@@ -1,8 +1,8 @@
 import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
 import { Skeleton } from "@/components/ui/skeleton";
 import type { AssetConfig } from "./types";
 import { useAssetManagerSidebarContext } from "./AssetManagerSidebarContext";
+import { MarkdownEditor } from "./MarkdownEditor";
 
 interface AssetTextEditorProps {
   asset: AssetConfig;
@@ -17,7 +17,7 @@ export const AssetTextEditor = ({
     setAssetContents,
     handleContentChange,
   } = useAssetManagerSidebarContext();
-  
+
   const content = assetContents[asset.path] || '';
   const loading = loadingContent[asset.path] || false;
   if (loading) {
@@ -25,16 +25,17 @@ export const AssetTextEditor = ({
   }
 
   return (
-    <div className="space-y-2">
+    <div className="space-y-3">
       <Label className="text-xs">Current Content</Label>
-      <Textarea
+      <MarkdownEditor
         value={content || ''}
-        onChange={(e) => setAssetContents(prev => ({ ...prev, [asset.path]: e.target.value }))}
-        onBlur={(e) => handleContentChange(asset, e.target.value)}
+        onChange={(value) => setAssetContents(prev => ({ ...prev, [asset.path]: value }))}
+        onBlur={(value) => handleContentChange(asset, value)}
         placeholder="Enter content..."
-        className="min-h-[100px] font-mono text-xs"
+        textareaClassName="min-h-[160px] font-mono text-xs"
+        previewClassName="font-sans text-xs"
       />
-      <p className="text-xs text-muted-foreground">Changes are automatically saved to batch</p>
+      <p className="text-xs text-muted-foreground">Markdown preview available. Changes are automatically saved to batch.</p>
     </div>
   );
 };

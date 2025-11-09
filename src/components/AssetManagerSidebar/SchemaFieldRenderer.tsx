@@ -4,6 +4,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Plus, Trash2 } from "lucide-react";
 import type { AssetConfig } from "./types";
+import { MarkdownEditor } from "./MarkdownEditor";
 
 interface SchemaFieldRendererProps {
   asset: AssetConfig;
@@ -315,12 +316,12 @@ export const SchemaFieldRenderer = ({
             <p className="text-xs text-muted-foreground">{fieldSchema.description}</p>
           )}
           {fieldSchema.multiline ? (
-            <Textarea
-              id={fullKey}
+            <MarkdownEditor
               value={value}
-              onChange={(e) => updateValue(e.target.value)}
+              onChange={(val) => updateValue(val)}
               placeholder={fieldSchema.placeholder}
-              className="min-h-[80px] text-xs"
+              textareaClassName="min-h-[120px] text-xs"
+              previewClassName="text-xs"
             />
           ) : (
             <Input
