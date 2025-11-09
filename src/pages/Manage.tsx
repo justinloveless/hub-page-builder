@@ -57,6 +57,7 @@ const Manage = () => {
   const isMobile = useIsMobile();
   const { isEnabled } = useFeatureFlags();
   const grapesjsEnabled = isEnabled("use_grapesjs");
+  const commitPreviewEnabled = isEnabled("live_commit_preview");
   const [loading, setLoading] = useState(true);
   const [copiedInviteId, setCopiedInviteId] = useState<string | null>(null);
   const [site, setSite] = useState<Site | null>(null);
@@ -85,6 +86,10 @@ const Manage = () => {
   const [allActivities, setAllActivities] = useState<ActivityWithProfile[]>([]);
   const [loadingAllActivities, setLoadingAllActivities] = useState(false);
   const [availableAssets, setAvailableAssets] = useState<string[]>([]);
+
+  // Commit preview dialog
+  const [showCommitPreviewDialog, setShowCommitPreviewDialog] = useState(false);
+  const [previewCommitSha, setPreviewCommitSha] = useState<string | null>(null);
 
   // Get current user's role
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
@@ -924,15 +929,31 @@ const Manage = () => {
 
                       {/* Commit Link */}
                       {metadata?.commit_sha && (
-                        <a
-                          href={`https://github.com/${site.repo_full_name}/commit/${metadata.commit_sha}`}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className={`inline-flex items-center gap-1 text-primary hover:underline ${isMobile ? 'text-sm' : 'text-xs'}`}
-                        >
-                          <ExternalLink className={isMobile ? 'h-4 w-4' : 'h-3 w-3'} />
-                          Commit {metadata.commit_sha.substring(0, 7)}
-                        </a>
+                        <div className="flex items-center gap-2">
+                          <a
+                            href={`https://github.com/${site.repo_full_name}/commit/${metadata.commit_sha}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className={`inline-flex items-center gap-1 text-primary hover:underline ${isMobile ? 'text-sm' : 'text-xs'}`}
+                          >
+                            <ExternalLink className={isMobile ? 'h-4 w-4' : 'h-3 w-3'} />
+                            Commit {metadata.commit_sha.substring(0, 7)}
+                          </a>
+                          {commitPreviewEnabled && (
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className={`${isMobile ? 'h-7 px-2 text-sm' : 'h-6 px-2 text-xs'}`}
+                              onClick={() => {
+                                setPreviewCommitSha(metadata.commit_sha);
+                                setShowCommitPreviewDialog(true);
+                              }}
+                            >
+                              <Eye className={isMobile ? 'h-3.5 w-3.5 mr-1' : 'h-3 w-3 mr-1'} />
+                              Preview
+                            </Button>
+                          )}
+                        </div>
                       )}
                     </div>
                   ) : null}
@@ -1391,6 +1412,27 @@ const Manage = () => {
         </AlertDialogContent>
       </AlertDialog>
 
+      {/* Commit Preview Dialog */}
+      <Dialog open={showCommitPreviewDialog} onOpenChange={setShowCommitPreviewDialog}>
+        <DialogContent className="max-w-6xl max-h-[90vh] flex flex-col">
+          <DialogHeader>
+            <DialogTitle>Live Preview - Commit {previewCommitSha?.substring(0, 7)}</DialogTitle>
+            <DialogDescription>
+              Preview how the site looked at this specific commit
+            </DialogDescription>
+          </DialogHeader>
+          <div className="flex-1 overflow-hidden min-h-0">
+            {previewCommitSha && siteId && (
+              <SitePreview
+                siteId={siteId}
+                pendingChanges={[]}
+                commitSha={previewCommitSha}
+              />
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
+
       {/* Activity Audit Dialog */}
       <Dialog open={showActivityDialog} onOpenChange={setShowActivityDialog}>
         <DialogContent className="max-w-4xl max-h-[90vh] flex flex-col">
@@ -1546,6 +1588,11 @@ const Manage = () => {
                   activity={activity}
                   repoFullName={site.repo_full_name}
                   userProfile={activity.user_profile}
+                  onPreviewCommit={(commitSha) => {
+                    setPreviewCommitSha(commitSha);
+                    setShowCommitPreviewDialog(true);
+                  }}
+                  showCommitPreview={commitPreviewEnabled}
                 />
               ))
             )}
