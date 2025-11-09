@@ -17,6 +17,7 @@ import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { toast } from "sonner";
 import { Loader2, Plus, PackagePlus, X, AlertCircle } from "lucide-react";
+import { useGithubInstallations } from "@/contexts/GithubInstallationContext";
 
 interface SubmitTemplateDialogProps {
     onTemplateAdded?: () => void;
@@ -46,9 +47,14 @@ const SubmitTemplateDialog = ({ onTemplateAdded }: SubmitTemplateDialogProps) =>
     });
     const [selectedTags, setSelectedTags] = useState<string[]>([]);
     const [customTag, setCustomTag] = useState("");
-    const [checkingInstallations, setCheckingInstallations] = useState(false);
-    const [hasGithubInstallation, setHasGithubInstallation] = useState<boolean | null>(null);
-    const [installationCheckError, setInstallationCheckError] = useState<string | null>(null);
+    const [dialogInstallationError, setDialogInstallationError] = useState<string | null>(null);
+
+    const {
+        hasInstallations,
+        isLoading: installationsLoading,
+        error: installationsError,
+        refreshInstallations,
+    } = useGithubInstallations();
 
     const handleToggleTag = (tag: string) => {
         if (selectedTags.includes(tag)) {
@@ -70,33 +76,29 @@ const SubmitTemplateDialog = ({ onTemplateAdded }: SubmitTemplateDialogProps) =>
         setSelectedTags(selectedTags.filter(t => t !== tag));
     };
 
-    const checkGithubInstallations = useCallback(async () => {
-        setCheckingInstallations(true);
-        setInstallationCheckError(null);
-
+    const handleRefreshInstallations = useCallback(async () => {
         try {
-            const { data, error } = await supabase.functions.invoke('list-github-installations');
-            if (error) throw error;
+            const installations = await refreshInstallations();
+            setDialogInstallationError(null);
 
-            const installations = data?.installations || [];
-            setHasGithubInstallation(installations.length > 0);
+            if (installations.length === 0) {
+                toast.error("No GitHub App installations found. Install the GitHub App before submitting templates.");
+            } else {
+                toast.success("GitHub App installations detected.");
+            }
         } catch (error: any) {
-            console.error("Error checking GitHub installations:", error);
-            setHasGithubInstallation(null);
-            setInstallationCheckError(error.message || "Unable to verify GitHub App installations.");
-        } finally {
-            setCheckingInstallations(false);
+            console.error("Error refreshing GitHub installations:", error);
+            const message = error?.message || "Unable to verify GitHub App installations.";
+            setDialogInstallationError(message);
+            toast.error(message);
         }
-    }, []);
+    }, [refreshInstallations]);
 
     useEffect(() => {
-        if (open) {
-            checkGithubInstallations();
-        } else {
-            setHasGithubInstallation(null);
-            setInstallationCheckError(null);
+        if (!open) {
+            setDialogInstallationError(null);
         }
-    }, [open, checkGithubInstallations]);
+    }, [open]);
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -148,6 +150,8 @@ const SubmitTemplateDialog = ({ onTemplateAdded }: SubmitTemplateDialogProps) =>
         }
     };
 
+    const installationErrorMessage = dialogInstallationError || installationsError;
+
     return (
         <Dialog open={open} onOpenChange={setOpen}>
             <DialogTrigger asChild>
@@ -164,15 +168,15 @@ const SubmitTemplateDialog = ({ onTemplateAdded }: SubmitTemplateDialogProps) =>
                     </DialogDescription>
                 </DialogHeader>
 
-                {installationCheckError && (
+                {installationErrorMessage && (
                     <Alert variant="destructive" className="mb-4">
                         <AlertCircle className="h-4 w-4" />
                         <AlertTitle>Unable to check GitHub App installations</AlertTitle>
-                        <AlertDescription>{installationCheckError}</AlertDescription>
+                        <AlertDescription>{installationErrorMessage}</AlertDescription>
                     </Alert>
                 )}
 
-                {!installationCheckError && !checkingInstallations && hasGithubInstallation === false && (
+                {!installationErrorMessage && !installationsLoading && !hasInstallations && (
                     <Alert variant="destructive" className="mb-4">
                         <AlertCircle className="h-4 w-4" />
                         <AlertTitle>No GitHub App installation found</AlertTitle>
@@ -184,9 +188,17 @@ const SubmitTemplateDialog = ({ onTemplateAdded }: SubmitTemplateDialogProps) =>
                                 type="button"
                                 variant="outline"
                                 size="sm"
-                                onClick={checkGithubInstallations}
+                                onClick={handleRefreshInstallations}
+                                disabled={installationsLoading}
                             >
-                                Refresh status
+                                {installationsLoading ? (
+                                    <>
+                                        <Loader2 className="mr-2 h-3 w-3 animate-spin" />
+                                        Refreshing...
+                                    </>
+                                ) : (
+                                    "Refresh status"
+                                )}
                             </Button>
                         </AlertDescription>
                     </Alert>

@@ -3,10 +3,12 @@ import { useNavigate, useSearchParams } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Loader2 } from "lucide-react";
 import { toast } from "sonner";
+import { useGithubInstallations } from "@/contexts/GithubInstallationContext";
 
 const GithubCallback = () => {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
+  const { refreshInstallations } = useGithubInstallations();
 
   useEffect(() => {
     const handleCallback = async () => {
@@ -45,6 +47,14 @@ const GithubCallback = () => {
         if (error) {
           console.error('Edge function error:', error);
           throw error;
+        }
+
+        console.log('Refreshing GitHub installations in context...');
+
+        try {
+          await refreshInstallations();
+        } catch (refreshError) {
+          console.error('Failed to refresh installations after callback:', refreshError);
         }
 
         console.log('Sending success message to opener...');
