@@ -1,10 +1,8 @@
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
 import { Plus, Trash2 } from "lucide-react";
 import type { AssetConfig } from "./types";
-import { MarkdownEditor } from "./MarkdownEditor";
+import { FieldInput, FieldWrapper } from "./SchemaFieldInputs";
 
 interface SchemaFieldRendererProps {
   asset: AssetConfig;
@@ -178,172 +176,33 @@ export const SchemaFieldRenderer = ({
                           };
 
                           return (
-                            <div key={propFullKey} className="space-y-1">
-                              <Label htmlFor={propFullKey} className="text-xs">
-                                {propSchema.title || propKey}
-                              </Label>
-                              {propSchema.description && (
-                                <p className="text-xs text-muted-foreground">{propSchema.description}</p>
-                              )}
-                              {propSchema.type === 'string' && propSchema.multiline ?
-                                (
-                                  <Textarea
-                                    id={propFullKey}
-                                    value={propValue}
-                                    onChange={(e) => updateArrayItemProp(e.target.value)}
-                                    placeholder={propSchema.placeholder}
-                                    className="min-h-[60px] text-xs"
-                                  />
-                                ) : propSchema.type === 'string' && propSchema.format === 'date' ? (
-                                  <Input
-                                    id={propFullKey}
-                                    type="date"
-                                    value={
-                                      propValue
-                                        ? propValue instanceof Date
-                                          ? propValue.toISOString().split('T')[0]
-                                          : typeof propValue === 'string'
-                                            ? propValue.split('T')[0]
-                                            : ''
-                                        : ''
-                                    }
-                                    onChange={(e) => updateArrayItemProp(e.target.value)}
-                                    placeholder={propSchema.placeholder || 'Enter date'}
-                                    className="h-8 text-xs"
-                                  />
-                                ) : propSchema.type === 'string' && propSchema.format === 'time' ? (
-                                  <Input
-                                    id={propFullKey}
-                                    type="time"
-                                    value={
-                                      propValue
-                                        ? typeof propValue === 'string'
-                                          ? propValue.includes('T')
-                                            ? propValue.split('T')[1]?.split('.')[0]?.substring(0, 5) ?? ''
-                                            : propValue.substring(0, 5)
-                                          : ''
-                                        : ''
-                                    }
-                                    onChange={(e) => updateArrayItemProp(e.target.value)}
-                                    placeholder={propSchema.placeholder || 'Enter time'}
-                                    className="h-8 text-xs"
-                                  />
-                                ) : propSchema.type === 'string' && (propSchema.format === 'date-time' || propSchema.format === 'datetime') ? (
-                                  <Input
-                                    id={propFullKey}
-                                    type="datetime-local"
-                                    value={
-                                      propValue
-                                        ? propValue instanceof Date
-                                          ? new Date(propValue.getTime() - propValue.getTimezoneOffset() * 60000).toISOString().slice(0, 16)
-                                          : typeof propValue === 'string'
-                                            ? propValue.includes('T')
-                                              ? propValue.substring(0, 16)
-                                              : propValue
-                                            : ''
-                                        : ''
-                                    }
-                                    onChange={(e) => {
-                                      const localValue = e.target.value;
-                                      if (localValue) {
-                                        const date = new Date(localValue);
-                                        updateArrayItemProp(date.toISOString());
-                                      } else {
-                                        updateArrayItemProp('');
-                                      }
-                                    }}
-                                    placeholder={propSchema.placeholder || 'Enter date and time'}
-                                    className="h-8 text-xs"
-                                  />
-                                ) : propSchema.type === 'number' || propSchema.type === 'integer' ? (
-                                  <Input
-                                    id={propFullKey}
-                                    type="number"
-                                    value={propValue}
-                                    onChange={(e) => updateArrayItemProp(propSchema.type === 'integer' ? parseInt(e.target.value) || 0 : parseFloat(e.target.value) || 0)}
-                                    placeholder={propSchema.placeholder}
-                                    className="h-8 text-xs"
-                                  />
-                                ) : (
-                                  <Input
-                                    id={propFullKey}
-                                    value={propValue}
-                                    onChange={(e) => updateArrayItemProp(e.target.value)}
-                                    placeholder={propSchema.placeholder}
-                                    className="h-8 text-xs"
-                                  />
-                                )}
-                            </div>
+                            <FieldWrapper
+                              key={propFullKey}
+                              fullKey={propFullKey}
+                              fieldKey={propKey}
+                              fieldSchema={propSchema}
+                            >
+                              <FieldInput
+                                id={propFullKey}
+                                value={propValue}
+                                onChange={updateArrayItemProp}
+                                schema={propSchema}
+                                className="h-8 text-xs"
+                              />
+                            </FieldWrapper>
                           );
                         })}
                       </div>
                     ) : (
                       // Array of simple types (string, number, boolean, or default to string)
                       <div className="pl-2">
-                        {fieldSchema.items.type === 'number' || fieldSchema.items.type === 'integer' ? (
-                          <Input
-                            value={item ?? 0}
-                            onChange={(e) => updateArrayItem(fieldSchema.items.type === 'integer' ? parseInt(e.target.value) || 0 : parseFloat(e.target.value) || 0)}
-                            placeholder="Enter value"
-                            className="h-8 text-xs"
-                          />
-                        ) : fieldSchema.items.type === 'boolean' ? (
-                          <div className="flex items-center gap-2">
-                            <input
-                              type="checkbox"
-                              checked={item ?? false}
-                              onChange={(e) => updateArrayItem(e.target.checked)}
-                              className="h-4 w-4"
-                            />
-                            <Label className="text-xs">{item ? 'True' : 'False'}</Label>
-                          </div>
-                        ) : fieldSchema.items.type === 'string' && fieldSchema.items.format === 'date' ? (
-                          <Input
-                            type="date"
-                            value={item ? (item instanceof Date ? item.toISOString().split('T')[0] : item.split('T')[0]) : ''}
-                            onChange={(e) => updateArrayItem(e.target.value)}
-                            placeholder="Enter date"
-                            className="h-8 text-xs"
-                          />
-                        ) : fieldSchema.items.type === 'string' && fieldSchema.items.format === 'time' ? (
-                          <Input
-                            type="time"
-                            value={item ? (item.includes('T') ? item.split('T')[1]?.split('.')[0]?.substring(0, 5) : item.substring(0, 5)) : ''}
-                            onChange={(e) => updateArrayItem(e.target.value)}
-                            placeholder="Enter time"
-                            className="h-8 text-xs"
-                          />
-                        ) : fieldSchema.items.type === 'string' && (fieldSchema.items.format === 'date-time' || fieldSchema.items.format === 'datetime') ? (
-                          <Input
-                            type="datetime-local"
-                            value={item
-                              ? (item instanceof Date
-                                ? new Date(item.getTime() - item.getTimezoneOffset() * 60000).toISOString().slice(0, 16)
-                                : item.includes('T')
-                                  ? item.substring(0, 16)
-                                  : item)
-                              : ''}
-                            onChange={(e) => {
-                              const localValue = e.target.value;
-                              if (localValue) {
-                                const date = new Date(localValue);
-                                updateArrayItem(date.toISOString());
-                              } else {
-                                updateArrayItem('');
-                              }
-                            }}
-                            placeholder="Enter date and time"
-                            className="h-8 text-xs"
-                          />
-                        ) : (
-                          // Default to string
-                          <Input
-                            value={item ?? ''}
-                            onChange={(e) => updateArrayItem(e.target.value)}
-                            placeholder="Enter value"
-                            className="h-8 text-xs"
-                          />
-                        )}
+                        <FieldInput
+                          id={`${fullKey}[${index}]`}
+                          value={item ?? (fieldSchema.items.type === 'number' || fieldSchema.items.type === 'integer' ? 0 : fieldSchema.items.type === 'boolean' ? false : '')}
+                          onChange={updateArrayItem}
+                          schema={fieldSchema.items}
+                          className="h-8 text-xs"
+                        />
                       </div>
                     )}
                 </div>
@@ -385,164 +244,38 @@ export const SchemaFieldRenderer = ({
       return null;
 
     case 'string':
-      if (fieldSchema.enum) {
-        return (
-          <div key={fullKey} className="space-y-1">
-            <Label htmlFor={fullKey} className="text-xs">
-              {fieldSchema.title || fieldKey}
-            </Label>
-            {fieldSchema.description && (
-              <p className="text-xs text-muted-foreground">{fieldSchema.description}</p>
-            )}
-            <select
-              id={fullKey}
-              value={value}
-              onChange={(e) => updateValue(e.target.value)}
-              className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-xs"
-            >
-              <option value="">Select...</option>
-              {fieldSchema.enum.map((option: string) => (
-                <option key={option} value={option}>{option}</option>
-              ))}
-            </select>
-          </div>
-        );
-      }
-
-      // Handle date and time formats
-      if (fieldSchema.format === 'date') {
-        // Convert ISO date string (YYYY-MM-DD) to input value
-        const dateValue = value ? (value instanceof Date ? value.toISOString().split('T')[0] : value.split('T')[0]) : '';
-        return (
-          <div key={fullKey} className="space-y-1">
-            <Label htmlFor={fullKey} className="text-xs">
-              {fieldSchema.title || fieldKey}
-            </Label>
-            {fieldSchema.description && (
-              <p className="text-xs text-muted-foreground">{fieldSchema.description}</p>
-            )}
-            <Input
-              id={fullKey}
-              type="date"
-              value={dateValue}
-              onChange={(e) => updateValue(e.target.value)}
-              placeholder={fieldSchema.placeholder}
-              className="h-9 text-xs"
-            />
-          </div>
-        );
-      }
-
-      if (fieldSchema.format === 'time') {
-        // Convert ISO time string (HH:MM:SS) to input value (HH:MM)
-        const timeValue = value ? (value.includes('T') ? value.split('T')[1]?.split('.')[0]?.substring(0, 5) : value.substring(0, 5)) : '';
-        return (
-          <div key={fullKey} className="space-y-1">
-            <Label htmlFor={fullKey} className="text-xs">
-              {fieldSchema.title || fieldKey}
-            </Label>
-            {fieldSchema.description && (
-              <p className="text-xs text-muted-foreground">{fieldSchema.description}</p>
-            )}
-            <Input
-              id={fullKey}
-              type="time"
-              value={timeValue}
-              onChange={(e) => updateValue(e.target.value)}
-              placeholder={fieldSchema.placeholder}
-              className="h-9 text-xs"
-            />
-          </div>
-        );
-      }
-
-      if (fieldSchema.format === 'date-time' || fieldSchema.format === 'datetime') {
-        // Convert ISO datetime string to datetime-local input value
-        const datetimeValue = value
-          ? (value instanceof Date
-            ? new Date(value.getTime() - value.getTimezoneOffset() * 60000).toISOString().slice(0, 16)
-            : value.includes('T')
-              ? value.substring(0, 16)
-              : value)
-          : '';
-        return (
-          <div key={fullKey} className="space-y-1">
-            <Label htmlFor={fullKey} className="text-xs">
-              {fieldSchema.title || fieldKey}
-            </Label>
-            {fieldSchema.description && (
-              <p className="text-xs text-muted-foreground">{fieldSchema.description}</p>
-            )}
-            <Input
-              id={fullKey}
-              type="datetime-local"
-              value={datetimeValue}
-              onChange={(e) => {
-                // Convert datetime-local value to ISO string
-                const localValue = e.target.value;
-                if (localValue) {
-                  const date = new Date(localValue);
-                  updateValue(date.toISOString());
-                } else {
-                  updateValue('');
-                }
-              }}
-              placeholder={fieldSchema.placeholder}
-              className="h-9 text-xs"
-            />
-          </div>
-        );
-      }
-
       return (
-        <div key={fullKey} className="space-y-1">
-          <Label htmlFor={fullKey} className="text-xs">
-            {fieldSchema.title || fieldKey}
-          </Label>
-          {fieldSchema.description && (
-            <p className="text-xs text-muted-foreground">{fieldSchema.description}</p>
-          )}
-          {fieldSchema.multiline ? (
-            <MarkdownEditor
-              value={value}
-              onChange={(val) => updateValue(val)}
-              placeholder={fieldSchema.placeholder}
-              textareaClassName="min-h-[120px] text-xs"
-              previewClassName="text-xs"
-            />
-          ) : (
-            <Input
-              id={fullKey}
-              value={value}
-              onChange={(e) => updateValue(e.target.value)}
-              placeholder={fieldSchema.placeholder}
-              className="h-9 text-xs"
-            />
-          )}
-        </div>
+        <FieldWrapper
+          fullKey={fullKey}
+          fieldKey={fieldKey}
+          fieldSchema={fieldSchema}
+        >
+          <FieldInput
+            id={fullKey}
+            value={value}
+            onChange={updateValue}
+            schema={fieldSchema}
+            className="h-9 text-xs"
+          />
+        </FieldWrapper>
       );
 
     case 'number':
     case 'integer':
       return (
-        <div key={fullKey} className="space-y-1">
-          <Label htmlFor={fullKey} className="text-xs">
-            {fieldSchema.title || fieldKey}
-          </Label>
-          {fieldSchema.description && (
-            <p className="text-xs text-muted-foreground">{fieldSchema.description}</p>
-          )}
-          <Input
+        <FieldWrapper
+          fullKey={fullKey}
+          fieldKey={fieldKey}
+          fieldSchema={fieldSchema}
+        >
+          <FieldInput
             id={fullKey}
-            type="number"
             value={value}
-            onChange={(e) => updateValue(fieldSchema.type === 'integer' ? parseInt(e.target.value) || 0 : parseFloat(e.target.value) || 0)}
-            placeholder={fieldSchema.placeholder}
-            min={fieldSchema.minimum}
-            max={fieldSchema.maximum}
+            onChange={updateValue}
+            schema={fieldSchema}
             className="h-9 text-xs"
           />
-        </div>
+        </FieldWrapper>
       );
 
     default:
