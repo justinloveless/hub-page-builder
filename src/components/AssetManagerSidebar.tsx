@@ -212,6 +212,9 @@ const AssetManagerSidebar = ({ siteId, pendingChanges, setPendingChanges }: Asse
             const isTextAsset = (asset.type === 'text' || asset.type === 'markdown') && !isJsonWithSchema;
             const isImageAsset = asset.type === 'image' || asset.type === 'img';
             const isDirectoryAsset = asset.type === 'directory' || asset.type === 'folder';
+            const containsType = asset.contains?.type?.toLowerCase();
+            const comboParts = asset.contains?.parts || [];
+            const isComboDirectory = isDirectoryAsset && containsType === 'combo' && comboParts.length > 0;
 
             return (
               <Collapsible
@@ -260,7 +263,7 @@ const AssetManagerSidebar = ({ siteId, pendingChanges, setPendingChanges }: Asse
                           jsonFormData={jsonFormData}
                           loading={loadingContent[asset.path] || false}
                           newKey={newKeys[asset.path] || ''}
-                          onJsonFormChange={(jsonData) => handleJsonFormChange(asset, jsonData)}
+                          onJsonFormChange={(updatedAsset, jsonData) => handleJsonFormChange(updatedAsset, jsonData)}
                           onAddEntry={() => addNewEntry(asset)}
                           onRemoveEntry={(key) => removeEntry(asset, key)}
                           onNewKeyChange={(value) => setNewKeys(prev => ({ ...prev, [asset.path]: value }))}
@@ -293,14 +296,15 @@ const AssetManagerSidebar = ({ siteId, pendingChanges, setPendingChanges }: Asse
                           ) : (
                             <>
                               {/* Combo Asset Type */}
-                              {asset.contains?.type === 'combo' && asset.contains.parts && getMergedDirectoryFiles(asset.path).length > 0 ? (
+                              {isComboDirectory && getMergedDirectoryFiles(asset.path).length > 0 ? (
                                 (() => {
-                                  const { groups, standalone } = groupComboAssets(getMergedDirectoryFiles(asset.path), asset.contains.parts!);
+                                  const { groups, standalone } = groupComboAssets(getMergedDirectoryFiles(asset.path), comboParts);
                                   return (
                                     <ComboAssetList
                                       asset={asset}
                                       groups={groups}
                                       standalone={standalone}
+                                      comboParts={comboParts}
                                     />
                                   );
                                 })()

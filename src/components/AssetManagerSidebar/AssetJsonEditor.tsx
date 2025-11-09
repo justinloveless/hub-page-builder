@@ -11,7 +11,7 @@ interface AssetJsonEditorProps {
   jsonFormData: Record<string, any>;
   loading: boolean;
   newKey: string;
-  onJsonFormChange: (jsonData: Record<string, any>) => void;
+  onJsonFormChange: (asset: AssetConfig, jsonData: Record<string, any>) => void;
   onAddEntry: () => void;
   onRemoveEntry: (key: string) => void;
   onNewKeyChange: (value: string) => void;

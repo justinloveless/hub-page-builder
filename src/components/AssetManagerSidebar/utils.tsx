@@ -38,7 +38,7 @@ export const getFileBaseName = (fileName: string): string => {
 
 export const getFileExtension = (fileName: string): string => {
   const lastDot = fileName.lastIndexOf('.');
-  return lastDot > 0 ? fileName.substring(lastDot + 1) : '';
+  return lastDot > 0 ? fileName.substring(lastDot) : '';
 };
 
 export const groupComboAssets = (files: AssetFile[], comboParts: Array<{ assetType: string; allowedExtensions?: string[] }>) => {

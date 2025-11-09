@@ -287,7 +287,8 @@ export const useAssetManagerSidebar = ({
   const handleFileUpload = async (asset: AssetConfig, file: File) => {
     const reader = new FileReader();
     reader.onloadend = async () => {
-      const base64 = (reader.result as string).split(',')[1];
+      const result = reader.result as string;
+      const base64 = result.split(',')[1];
 
       let fullPath = asset.path;
       if (asset.type === 'directory' || asset.path.endsWith('/')) {
@@ -303,6 +304,12 @@ export const useAssetManagerSidebar = ({
 
       const updatedChanges = pendingChanges.filter(c => c.repoPath !== fullPath);
       setPendingChanges([...updatedChanges, newChange]);
+
+      if (asset.type === 'image' || asset.type === 'img') {
+        const mimeType = file.type || `image/${file.name.split('.').pop() || 'png'}`;
+        setImageUrls(prev => ({ ...prev, [asset.path]: result.startsWith('data:') ? result : `data:${mimeType};base64,${base64}` }));
+      }
+
       toast.success("Added to batch");
     };
     reader.readAsDataURL(file);

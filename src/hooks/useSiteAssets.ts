@@ -11,6 +11,9 @@ interface AssetConfig {
   schema?: Record<string, any>;
   contains?: {
     type: string;
+    allowedExtensions?: string[];
+    maxSize?: number;
+    schema?: Record<string, any>;
     parts?: Array<{
       assetType: string;
       allowedExtensions?: string[];

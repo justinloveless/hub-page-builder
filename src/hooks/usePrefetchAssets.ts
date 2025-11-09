@@ -12,6 +12,9 @@ interface AssetConfig {
   schema?: Record<string, any>;
   contains?: {
     type: string;
+    allowedExtensions?: string[];
+    maxSize?: number;
+    schema?: Record<string, any>;
     parts?: Array<{
       assetType: string;
       allowedExtensions?: string[];
@@ -59,13 +62,13 @@ export const usePrefetchAssets = (siteId: string, assets: AssetConfig[] | undefi
           });
         }
       }
-      
+
       // For text/json/markdown/image assets, prefetch content
-      const shouldPrefetchContent = 
-        asset.type === 'text' || 
-        asset.type === 'json' || 
-        asset.type === 'markdown' || 
-        asset.type === 'image' || 
+      const shouldPrefetchContent =
+        asset.type === 'text' ||
+        asset.type === 'json' ||
+        asset.type === 'markdown' ||
+        asset.type === 'image' ||
         asset.type === 'img';
 
       if (shouldPrefetchContent) {

@@ -14,6 +14,7 @@ interface ComboAssetGroupProps {
   groupIndex: number;
   totalGroups: number;
   sortedFiles: AssetFile[];
+  comboParts: Array<{ assetType: string; allowedExtensions?: string[]; maxSize?: number; schema?: Record<string, any> }>;
 }
 
 export const ComboAssetGroup = ({
@@ -23,6 +24,7 @@ export const ComboAssetGroup = ({
   groupIndex,
   totalGroups,
   sortedFiles,
+  comboParts,
 }: ComboAssetGroupProps) => {
   const {
     comboFileContents,
@@ -61,7 +63,7 @@ export const ComboAssetGroup = ({
         e.preventDefault();
         handleStopAutoScroll();
         if (draggedComboItem !== null && draggedComboItem !== groupIndex) {
-          const { groups } = groupComboAssets(getMergedDirectoryFiles(asset.path), asset.contains!.parts!);
+          const { groups } = groupComboAssets(getMergedDirectoryFiles(asset.path), comboParts);
           handleReorderComboAssets(asset, groups, draggedComboItem, groupIndex);
         }
         setDraggedComboItem(null);
@@ -81,7 +83,7 @@ export const ComboAssetGroup = ({
             variant="ghost"
             size="sm"
             onClick={() => {
-              const { groups } = groupComboAssets(getMergedDirectoryFiles(asset.path), asset.contains!.parts!);
+              const { groups } = groupComboAssets(getMergedDirectoryFiles(asset.path), comboParts);
               handleMoveComboAsset(asset, groups, groupIndex, 'up');
             }}
             disabled={groupIndex === 0}
@@ -94,7 +96,7 @@ export const ComboAssetGroup = ({
             variant="ghost"
             size="sm"
             onClick={() => {
-              const { groups } = groupComboAssets(getMergedDirectoryFiles(asset.path), asset.contains!.parts!);
+              const { groups } = groupComboAssets(getMergedDirectoryFiles(asset.path), comboParts);
               handleMoveComboAsset(asset, groups, groupIndex, 'down');
             }}
             disabled={groupIndex === totalGroups - 1}
@@ -113,7 +115,7 @@ export const ComboAssetGroup = ({
                 onChange={(e) => setNewFileName(e.target.value)}
                 onKeyDown={(e) => {
                   if (e.key === 'Enter') {
-                    handleRenameComboAsset(asset, baseName, group.files, asset.contains!.parts!);
+                    handleRenameComboAsset(asset, baseName, group.files, comboParts);
                   } else if (e.key === 'Escape') {
                     setRenamingFile(null);
                     setNewFileName("");
@@ -125,7 +127,7 @@ export const ComboAssetGroup = ({
               <Button
                 variant="ghost"
                 size="sm"
-                onClick={() => handleRenameComboAsset(asset, baseName, group.files, asset.contains!.parts!)}
+                onClick={() => handleRenameComboAsset(asset, baseName, group.files, comboParts)}
                 className="h-7 px-2 text-xs"
               >
                 Save
@@ -172,7 +174,7 @@ export const ComboAssetGroup = ({
       </div>
       <div className="space-y-2">
         {sortedFiles.map((file) => {
-          const fileType = getFileAssetType(file.name, asset.contains!.parts!);
+          const fileType = getFileAssetType(file.name, comboParts);
           const isJson = fileType === 'json';
           const isText = fileType === 'text' || fileType === 'markdown';
           const isImage = fileType === 'image' || isImageFile(file.name);

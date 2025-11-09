@@ -11,12 +11,14 @@ interface ComboAssetListProps {
   asset: AssetConfig;
   groups: [string, { files: AssetFile[]; types: string[] }][];
   standalone: AssetFile[];
+  comboParts: Array<{ assetType: string; allowedExtensions?: string[]; maxSize?: number; schema?: Record<string, any> }>;
 }
 
 export const ComboAssetList = ({
   asset,
   groups,
   standalone,
+  comboParts,
 }: ComboAssetListProps) => {
   const {
     comboFileContents,
@@ -47,8 +49,8 @@ export const ComboAssetList = ({
           {groups.map(([baseName, group], groupIndex) => {
             // Sort files by type: images first, then text, then json
             const sortedFiles = [...group.files].sort((a, b) => {
-              const aType = getFileAssetType(a.name, asset.contains!.parts!);
-              const bType = getFileAssetType(b.name, asset.contains!.parts!);
+              const aType = getFileAssetType(a.name, comboParts);
+              const bType = getFileAssetType(b.name, comboParts);
               const aIsImage = aType === 'image' || isImageFile(a.name);
               const bIsImage = bType === 'image' || isImageFile(b.name);
               const order = { image: 0, text: 1, markdown: 1, json: 2 };
@@ -68,6 +70,7 @@ export const ComboAssetList = ({
                 groupIndex={groupIndex}
                 totalGroups={groups.length}
                 sortedFiles={sortedFiles}
+                comboParts={comboParts}
               />
             );
           })}
