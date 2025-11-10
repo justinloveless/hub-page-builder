@@ -1341,173 +1341,345 @@ const Manage = () => {
         </AlertDialogContent>
       </AlertDialog>
 
-      {/* Activity Audit Dialog */}
-      <Dialog open={showActivityDialog} onOpenChange={setShowActivityDialog}>
-        <DialogContent className="max-w-4xl max-h-[90vh] flex flex-col">
-          <DialogHeader>
-            <DialogTitle>Activity Audit Trail</DialogTitle>
-            <DialogDescription>
-              Complete history of all activities for this site
-            </DialogDescription>
-          </DialogHeader>
+      {/* Activity Audit Dialog/Drawer */}
+      {isMobile ? (
+        <Drawer open={showActivityDialog} onOpenChange={setShowActivityDialog}>
+          <DrawerContent className="max-h-[90vh] z-50">
+            <DrawerHeader>
+              <DrawerTitle>Activity Audit Trail</DrawerTitle>
+            </DrawerHeader>
+            <ScrollArea className="flex-1 overflow-auto">
+              <div className="px-4 pb-4 space-y-4">
+                {/* Filters */}
+                <div className="space-y-4 border-b pb-4">
+                  <div className="grid grid-cols-1 gap-4">
+                    {/* User Filter */}
+                    <div className="space-y-2">
+                      <label className="text-sm font-medium">Filter by User</label>
+                      <Select value={filterUserId} onValueChange={(value) => {
+                        setFilterUserId(value);
+                        handleAuditFilterChange({ userId: value });
+                      }}>
+                        <SelectTrigger>
+                          <SelectValue placeholder="All users" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="all">All users</SelectItem>
+                          {members.map((member) => {
+                            const displayName = member.profile?.full_name || `User ${member.user_id.slice(0, 8)}`;
+                            return (
+                              <SelectItem key={member.user_id} value={member.user_id}>
+                                {displayName}
+                              </SelectItem>
+                            );
+                          })}
+                        </SelectContent>
+                      </Select>
+                    </div>
 
-          {/* Filters */}
-          <div className="space-y-4 border-b pb-4">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {/* User Filter */}
-              <div className="space-y-2">
-                <label className="text-sm font-medium">Filter by User</label>
-                <Select value={filterUserId} onValueChange={(value) => {
-                  setFilterUserId(value);
-                  handleAuditFilterChange({ userId: value });
-                }}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="All users" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">All users</SelectItem>
-                    {members.map((member) => {
-                      const displayName = member.profile?.full_name || `User ${member.user_id.slice(0, 8)}`;
-                      return (
-                        <SelectItem key={member.user_id} value={member.user_id}>
-                          {displayName}
-                        </SelectItem>
-                      );
-                    })}
-                  </SelectContent>
-                </Select>
-              </div>
+                    {/* Asset Filter */}
+                    <div className="space-y-2">
+                      <label className="text-sm font-medium">Filter by Asset</label>
+                      <Select value={filterAssetPath} onValueChange={(value) => {
+                        setFilterAssetPath(value);
+                        handleAuditFilterChange({ assetPath: value });
+                      }}>
+                        <SelectTrigger>
+                          <SelectValue placeholder="All assets" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="all">All assets</SelectItem>
+                          {availableAssets.length === 0 ? (
+                            <SelectItem value="loading" disabled>Loading assets...</SelectItem>
+                          ) : (
+                            availableAssets.map((assetPath) => (
+                              <SelectItem key={assetPath} value={assetPath}>
+                                <span className="font-mono text-xs">{assetPath}</span>
+                              </SelectItem>
+                            ))
+                          )}
+                        </SelectContent>
+                      </Select>
+                    </div>
 
-              {/* Asset Filter */}
-              <div className="space-y-2">
-                <label className="text-sm font-medium">Filter by Asset</label>
-                <Select value={filterAssetPath} onValueChange={(value) => {
-                  setFilterAssetPath(value);
-                  handleAuditFilterChange({ assetPath: value });
-                }}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="All assets" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">All assets</SelectItem>
-                    {availableAssets.length === 0 ? (
-                      <SelectItem value="loading" disabled>Loading assets...</SelectItem>
-                    ) : (
-                      availableAssets.map((assetPath) => (
-                        <SelectItem key={assetPath} value={assetPath}>
-                          <span className="font-mono text-xs">{assetPath}</span>
-                        </SelectItem>
-                      ))
-                    )}
-                  </SelectContent>
-                </Select>
-              </div>
+                    {/* Date From Filter */}
+                    <div className="space-y-2">
+                      <label className="text-sm font-medium">From Date</label>
+                      <Popover>
+                        <PopoverTrigger asChild>
+                          <Button
+                            variant="outline"
+                            className="w-full justify-start text-left font-normal"
+                          >
+                            <CalendarIcon className="mr-2 h-4 w-4" />
+                            {filterDateFrom ? format(filterDateFrom, "PPP") : "Pick a date"}
+                          </Button>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-auto p-0">
+                          <Calendar
+                            mode="single"
+                            selected={filterDateFrom}
+                            onSelect={(date) => {
+                              setFilterDateFrom(date);
+                              handleAuditFilterChange({ dateFrom: date });
+                            }}
+                            initialFocus
+                          />
+                        </PopoverContent>
+                      </Popover>
+                    </div>
 
-              {/* Date From Filter */}
-              <div className="space-y-2">
-                <label className="text-sm font-medium">From Date</label>
-                <Popover>
-                  <PopoverTrigger asChild>
+                    {/* Date To Filter */}
+                    <div className="space-y-2">
+                      <label className="text-sm font-medium">To Date</label>
+                      <Popover>
+                        <PopoverTrigger asChild>
+                          <Button
+                            variant="outline"
+                            className="w-full justify-start text-left font-normal"
+                          >
+                            <CalendarIcon className="mr-2 h-4 w-4" />
+                            {filterDateTo ? format(filterDateTo, "PPP") : "Pick a date"}
+                          </Button>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-auto p-0">
+                          <Calendar
+                            mode="single"
+                            selected={filterDateTo}
+                            onSelect={(date) => {
+                              setFilterDateTo(date);
+                              handleAuditFilterChange({ dateTo: date });
+                            }}
+                            initialFocus
+                          />
+                        </PopoverContent>
+                      </Popover>
+                    </div>
+                  </div>
+
+                  {/* Clear Filters Button */}
+                  <div className="flex justify-end">
                     <Button
                       variant="outline"
-                      className="w-full justify-start text-left font-normal"
-                    >
-                      <CalendarIcon className="mr-2 h-4 w-4" />
-                      {filterDateFrom ? format(filterDateFrom, "PPP") : "Pick a date"}
-                    </Button>
-                  </PopoverTrigger>
-                  <PopoverContent className="w-auto p-0">
-                    <Calendar
-                      mode="single"
-                      selected={filterDateFrom}
-                      onSelect={(date) => {
-                        setFilterDateFrom(date);
-                        handleAuditFilterChange({ dateFrom: date });
+                      size="sm"
+                      onClick={() => {
+                        clearFilters();
+                        handleAuditFilterChange({
+                          userId: "all",
+                          dateFrom: undefined,
+                          dateTo: undefined,
+                          assetPath: "all",
+                        });
                       }}
-                      initialFocus
-                    />
-                  </PopoverContent>
-                </Popover>
-              </div>
-
-              {/* Date To Filter */}
-              <div className="space-y-2">
-                <label className="text-sm font-medium">To Date</label>
-                <Popover>
-                  <PopoverTrigger asChild>
-                    <Button
-                      variant="outline"
-                      className="w-full justify-start text-left font-normal"
                     >
-                      <CalendarIcon className="mr-2 h-4 w-4" />
-                      {filterDateTo ? format(filterDateTo, "PPP") : "Pick a date"}
+                      <X className="mr-2 h-4 w-4" />
+                      Clear Filters
                     </Button>
-                  </PopoverTrigger>
-                  <PopoverContent className="w-auto p-0">
-                    <Calendar
-                      mode="single"
-                      selected={filterDateTo}
-                      onSelect={(date) => {
-                        setFilterDateTo(date);
-                        handleAuditFilterChange({ dateTo: date });
-                      }}
-                      initialFocus
-                    />
-                  </PopoverContent>
-                </Popover>
-              </div>
-            </div>
+                  </div>
+                </div>
 
-            {/* Clear Filters Button */}
-            <div className="flex justify-end">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => {
-                  clearFilters();
-                  handleAuditFilterChange({
-                    userId: "all",
-                    dateFrom: undefined,
-                    dateTo: undefined,
-                    assetPath: "all",
-                  });
-                }}
-              >
-                <X className="mr-2 h-4 w-4" />
-                Clear Filters
-              </Button>
-            </div>
-          </div>
+                {/* Activity List */}
+                <div className="space-y-4">
+                  {loadingAllActivities ? (
+                    <div className="flex items-center justify-center py-8">
+                      <div className="text-sm text-muted-foreground">Loading activities...</div>
+                    </div>
+                  ) : allActivities.length === 0 ? (
+                    <div className="flex items-center justify-center py-8">
+                      <div className="text-sm text-muted-foreground">No activities found</div>
+                    </div>
+                  ) : (
+                    allActivities.map((activity) => (
+                      <ActivityCard
+                        key={activity.id}
+                        activity={activity}
+                        repoFullName={site.repo_full_name}
+                        userProfile={activity.user_profile}
+                        onPreviewCommit={(commitSha) => {
+                          setPreviewCommitSha(commitSha);
+                          setShowPreview(true);
+                          setShowActivityDialog(false);
+                          if (isMobile) {
+                            setShowMobileSidebar(false);
+                          }
+                        }}
+                        showCommitPreview={commitPreviewEnabled}
+                      />
+                    ))
+                  )}
+                </div>
+              </div>
+            </ScrollArea>
+          </DrawerContent>
+        </Drawer>
+      ) : (
+        <Dialog open={showActivityDialog} onOpenChange={setShowActivityDialog}>
+          <DialogContent className="max-w-4xl max-h-[90vh] flex flex-col">
+            <DialogHeader>
+              <DialogTitle>Activity Audit Trail</DialogTitle>
+              <DialogDescription>
+                Complete history of all activities for this site
+              </DialogDescription>
+            </DialogHeader>
 
-          {/* Activity List */}
-          <div className="flex-1 overflow-y-auto mt-4 space-y-4">
-            {loadingAllActivities ? (
-              <div className="flex items-center justify-center py-8">
-                <div className="text-sm text-muted-foreground">Loading activities...</div>
+            {/* Filters */}
+            <div className="space-y-4 border-b pb-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {/* User Filter */}
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">Filter by User</label>
+                  <Select value={filterUserId} onValueChange={(value) => {
+                    setFilterUserId(value);
+                    handleAuditFilterChange({ userId: value });
+                  }}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="All users" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All users</SelectItem>
+                      {members.map((member) => {
+                        const displayName = member.profile?.full_name || `User ${member.user_id.slice(0, 8)}`;
+                        return (
+                          <SelectItem key={member.user_id} value={member.user_id}>
+                            {displayName}
+                          </SelectItem>
+                        );
+                      })}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                {/* Asset Filter */}
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">Filter by Asset</label>
+                  <Select value={filterAssetPath} onValueChange={(value) => {
+                    setFilterAssetPath(value);
+                    handleAuditFilterChange({ assetPath: value });
+                  }}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="All assets" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All assets</SelectItem>
+                      {availableAssets.length === 0 ? (
+                        <SelectItem value="loading" disabled>Loading assets...</SelectItem>
+                      ) : (
+                        availableAssets.map((assetPath) => (
+                          <SelectItem key={assetPath} value={assetPath}>
+                            <span className="font-mono text-xs">{assetPath}</span>
+                          </SelectItem>
+                        ))
+                      )}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                {/* Date From Filter */}
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">From Date</label>
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <Button
+                        variant="outline"
+                        className="w-full justify-start text-left font-normal"
+                      >
+                        <CalendarIcon className="mr-2 h-4 w-4" />
+                        {filterDateFrom ? format(filterDateFrom, "PPP") : "Pick a date"}
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-auto p-0">
+                      <Calendar
+                        mode="single"
+                        selected={filterDateFrom}
+                        onSelect={(date) => {
+                          setFilterDateFrom(date);
+                          handleAuditFilterChange({ dateFrom: date });
+                        }}
+                        initialFocus
+                      />
+                    </PopoverContent>
+                  </Popover>
+                </div>
+
+                {/* Date To Filter */}
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">To Date</label>
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <Button
+                        variant="outline"
+                        className="w-full justify-start text-left font-normal"
+                      >
+                        <CalendarIcon className="mr-2 h-4 w-4" />
+                        {filterDateTo ? format(filterDateTo, "PPP") : "Pick a date"}
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-auto p-0">
+                      <Calendar
+                        mode="single"
+                        selected={filterDateTo}
+                        onSelect={(date) => {
+                          setFilterDateTo(date);
+                          handleAuditFilterChange({ dateTo: date });
+                        }}
+                        initialFocus
+                      />
+                    </PopoverContent>
+                  </Popover>
+                </div>
               </div>
-            ) : allActivities.length === 0 ? (
-              <div className="flex items-center justify-center py-8">
-                <div className="text-sm text-muted-foreground">No activities found</div>
-              </div>
-            ) : (
-              allActivities.map((activity) => (
-                <ActivityCard
-                  key={activity.id}
-                  activity={activity}
-                  repoFullName={site.repo_full_name}
-                  userProfile={activity.user_profile}
-                  onPreviewCommit={(commitSha) => {
-                    setPreviewCommitSha(commitSha);
-                    setShowPreview(true);
-                    setShowActivityDialog(false);
+
+              {/* Clear Filters Button */}
+              <div className="flex justify-end">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    clearFilters();
+                    handleAuditFilterChange({
+                      userId: "all",
+                      dateFrom: undefined,
+                      dateTo: undefined,
+                      assetPath: "all",
+                    });
                   }}
-                  showCommitPreview={commitPreviewEnabled}
-                />
-              ))
-            )}
-          </div>
-        </DialogContent>
-      </Dialog>
+                >
+                  <X className="mr-2 h-4 w-4" />
+                  Clear Filters
+                </Button>
+              </div>
+            </div>
+
+            {/* Activity List */}
+            <div className="flex-1 overflow-y-auto mt-4 space-y-4">
+              {loadingAllActivities ? (
+                <div className="flex items-center justify-center py-8">
+                  <div className="text-sm text-muted-foreground">Loading activities...</div>
+                </div>
+              ) : allActivities.length === 0 ? (
+                <div className="flex items-center justify-center py-8">
+                  <div className="text-sm text-muted-foreground">No activities found</div>
+                </div>
+              ) : (
+                allActivities.map((activity) => (
+                  <ActivityCard
+                    key={activity.id}
+                    activity={activity}
+                    repoFullName={site.repo_full_name}
+                    userProfile={activity.user_profile}
+                    onPreviewCommit={(commitSha) => {
+                      setPreviewCommitSha(commitSha);
+                      setShowPreview(true);
+                      setShowActivityDialog(false);
+                    }}
+                    showCommitPreview={commitPreviewEnabled}
+                  />
+                ))
+              )}
+            </div>
+          </DialogContent>
+        </Dialog>
+      )}
     </div>
   );
 };
