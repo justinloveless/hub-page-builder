@@ -106,3 +106,20 @@ npm run cap:open:ios          # Open iOS project in Xcode
 npm run cap:open:android      # Open Android project in Android Studio
 npm run assets:generate       # Regenerate app icons and splash screens
 ```
+
+### Over-The-Air (OTA) Updates ⚡
+
+**Your app is configured for automatic OTA updates!** When you deploy web changes, mobile users get them automatically without app store updates.
+
+**Deploy Updates:**
+```bash
+npm run build           # Build your changes
+# Deploy dist/ to hosting → Users auto-update within 5 minutes!
+```
+
+**Only submit to app stores when:**
+- Adding/updating Capacitor plugins
+- Changing native code
+- Modifying permissions
+
+See [OTA_UPDATES_CONFIGURED.md](./OTA_UPDATES_CONFIGURED.md) for complete details.
