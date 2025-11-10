@@ -18,7 +18,7 @@ export const StringInput = ({ id, value, onChange, schema, className = "h-9 text
                 id={id}
                 value={value}
                 onChange={(e) => onChange(e.target.value)}
-                className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-xs"
+                className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-xs [font-size:16px]"
             >
                 <option value="">Select...</option>
                 {schema.enum.map((option: string) => (
