@@ -71,3 +71,55 @@ Yes, you can!
 To connect a domain, navigate to Project > Settings > Domains and click Connect Domain.
 
 Read more here: [Setting up a custom domain](https://docs.lovable.dev/features/custom-domain#custom-domain)
+
+## How can I publish this PWA to app stores?
+
+This project is configured with Capacitor to publish as a native app to both iOS App Store and Google Play Store.
+
+### Quick Start
+
+```bash
+# For iOS (requires macOS with Xcode)
+npm run cap:build:ios
+
+# For Android (requires Android Studio)
+npm run cap:build:android
+```
+
+### Documentation
+
+- **Quick Start Guide**: [QUICK_START_APP_STORES.md](./QUICK_START_APP_STORES.md) - Fast reference for building and submitting
+- **Detailed Guide**: [APP_STORE_SUBMISSION.md](./APP_STORE_SUBMISSION.md) - Complete step-by-step instructions
+
+### Prerequisites
+
+- **iOS**: Apple Developer Account ($99/year) + macOS with Xcode
+- **Android**: Google Play Developer Account ($25 one-time) + Android Studio
+- **Both**: Privacy Policy URL (required by both app stores)
+
+### Key Commands
+
+```bash
+npm run build                  # Build web app
+npm run cap:sync              # Sync to native projects
+npm run cap:open:ios          # Open iOS project in Xcode
+npm run cap:open:android      # Open Android project in Android Studio
+npm run assets:generate       # Regenerate app icons and splash screens
+```
+
+### Over-The-Air (OTA) Updates ⚡
+
+**Your app is configured for automatic OTA updates!** When you deploy web changes, mobile users get them automatically without app store updates.
+
+**Deploy Updates:**
+```bash
+npm run build           # Build your changes
+# Deploy dist/ to hosting → Users auto-update within 5 minutes!
+```
+
+**Only submit to app stores when:**
+- Adding/updating Capacitor plugins
+- Changing native code
+- Modifying permissions
+
+See [OTA_UPDATES_CONFIGURED.md](./OTA_UPDATES_CONFIGURED.md) for complete details.
