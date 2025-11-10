@@ -848,120 +848,22 @@ const Manage = () => {
             </Button>
           </div>
           <div className="space-y-3">
-            {activities.slice(0, 3).map((activity) => {
-              const displayName = activity.user_profile?.full_name || `User ${activity.user_id?.slice(0, 8) || 'System'}`;
-              const metadata = activity.metadata as any;
-
-              return (
-                <div key={activity.id} className={`w-full space-y-1 ${isMobile ? 'text-sm' : 'text-xs'}`}>
-                  <div className="flex items-start justify-between gap-2">
-                    {/* Left side: Action and details */}
-                    <div className="flex-1 min-w-0 space-y-1">
-                      <p className="font-medium truncate">{activity.action}</p>
-
-                      {/* File Path */}
-                      {metadata?.file_path && (
-                        <div className={`flex items-center gap-1 text-muted-foreground ${isMobile ? 'text-sm' : 'text-xs'}`}>
-                          <FileText className={`flex-shrink-0 ${isMobile ? 'h-4 w-4' : 'h-3 w-3'}`} />
-                          <span className="font-mono truncate">{metadata.file_path}</span>
-                        </div>
-                      )}
-
-                      {/* File Name (if no file_path) */}
-                      {!metadata?.file_path && metadata?.file_name && (
-                        <div className={`flex items-center gap-1 text-muted-foreground ${isMobile ? 'text-sm' : 'text-xs'}`}>
-                          <FileText className={`flex-shrink-0 ${isMobile ? 'h-4 w-4' : 'h-3 w-3'}`} />
-                          <span className="font-mono truncate">{metadata.file_name}</span>
-                        </div>
-                      )}
-
-                      {/* Asset Count */}
-                      {metadata?.asset_count && (
-                        <div className={`flex items-center gap-1 text-muted-foreground ${isMobile ? 'text-sm' : 'text-xs'}`}>
-                          <Upload className={isMobile ? 'h-4 w-4' : 'h-3 w-3'} />
-                          {metadata.asset_count} {metadata.asset_count === 1 ? 'file' : 'files'}
-                        </div>
-                      )}
-
-                      {/* Email for invitations */}
-                      {metadata?.email && (
-                        <p className={`text-muted-foreground ${isMobile ? 'text-sm' : 'text-xs'}`}>
-                          Sent to: <span className="font-medium">{metadata.email}</span>
-                        </p>
-                      )}
-
-                      {/* Role changes */}
-                      {metadata?.role && (
-                        <div className={`flex items-center gap-1 text-muted-foreground ${isMobile ? 'text-sm' : 'text-xs'}`}>
-                          <Shield className={isMobile ? 'h-4 w-4' : 'h-3 w-3'} />
-                          Role: {metadata.role}
-                        </div>
-                      )}
-                    </div>
-
-                    {/* Right side: User and date */}
-                    <div className={`flex-shrink-0 text-right space-y-0.5 ${isMobile ? 'text-sm' : 'text-xs'}`}>
-                      <p className="text-muted-foreground">
-                        <span className="font-medium">{displayName}</span>
-                      </p>
-                      <p className="text-muted-foreground">
-                        {new Date(activity.created_at).toLocaleDateString()}
-                      </p>
-                    </div>
-                  </div>
-
-                  {/* Links at the bottom */}
-                  {(metadata?.pr_url && metadata?.pr_number) || metadata?.commit_sha ? (
-                    <div className="flex items-center gap-2 flex-wrap">
-                      {/* PR Link */}
-                      {metadata?.pr_url && metadata?.pr_number && (
-                        <a
-                          href={metadata.pr_url}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className={`inline-flex items-center gap-1 text-primary hover:underline ${isMobile ? 'text-sm' : 'text-xs'}`}
-                        >
-                          <GitBranch className={isMobile ? 'h-4 w-4' : 'h-3 w-3'} />
-                          PR #{metadata.pr_number}
-                        </a>
-                      )}
-
-                      {/* Commit Link */}
-                      {metadata?.commit_sha && (
-                        <div className="flex items-center gap-2">
-                          <a
-                            href={`https://github.com/${site.repo_full_name}/commit/${metadata.commit_sha}`}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className={`inline-flex items-center gap-1 text-primary hover:underline ${isMobile ? 'text-sm' : 'text-xs'}`}
-                          >
-                            <ExternalLink className={isMobile ? 'h-4 w-4' : 'h-3 w-3'} />
-                            Commit {metadata.commit_sha.substring(0, 7)}
-                          </a>
-                          {commitPreviewEnabled && (
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              className={`${isMobile ? 'h-7 px-2 text-sm' : 'h-6 px-2 text-xs'}`}
-                              onClick={() => {
-                                setPreviewCommitSha(metadata.commit_sha);
-                                setShowPreview(true);
-                                if (isMobile) {
-                                  setShowMobileSidebar(false);
-                                }
-                              }}
-                            >
-                              <Eye className={isMobile ? 'h-3.5 w-3.5 mr-1' : 'h-3 w-3 mr-1'} />
-                              Preview
-                            </Button>
-                          )}
-                        </div>
-                      )}
-                    </div>
-                  ) : null}
-                </div>
-              );
-            })}
+            {activities.slice(0, 3).map((activity) => (
+              <ActivityCard
+                key={activity.id}
+                activity={activity}
+                repoFullName={site.repo_full_name}
+                userProfile={activity.user_profile}
+                onPreviewCommit={(commitSha) => {
+                  setPreviewCommitSha(commitSha);
+                  setShowPreview(true);
+                  if (isMobile) {
+                    setShowMobileSidebar(false);
+                  }
+                }}
+                showCommitPreview={commitPreviewEnabled}
+              />
+            ))}
             {activities.length === 0 && (
               <p className={`text-muted-foreground ${isMobile ? 'text-sm' : 'text-xs'}`}>No recent activity</p>
             )}
