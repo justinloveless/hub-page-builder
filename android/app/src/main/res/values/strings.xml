@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">StaticSnack</string>
+    <string name="title_activity_main">StaticSnack</string>
+    <string name="package_name">com.staticsnack.app</string>
+    <string name="custom_url_scheme">com.staticsnack.app</string>
+</resources>
