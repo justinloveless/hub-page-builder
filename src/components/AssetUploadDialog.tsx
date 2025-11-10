@@ -60,12 +60,13 @@ const AssetUploadDialog = ({ open, onOpenChange, asset, siteId, pendingChanges, 
 
   const isTextAsset = asset.type === "text" || asset.type === "markdown";
   const isJsonAsset = asset.type === "json" && asset.schema;
+  const isCalendarAsset = asset.type === "calendar" || asset.type === "events";
   const isMarkdownAsset = asset.type === "markdown" || asset.path.endsWith(".md");
 
   useEffect(() => {
     if (open) {
       loadExistingFiles();
-      if ((isTextAsset || isJsonAsset) && activeTab === 'edit') {
+      if ((isTextAsset || isJsonAsset || isCalendarAsset) && activeTab === 'edit') {
         loadExistingContent();
       }
     }
@@ -104,7 +105,7 @@ const AssetUploadDialog = ({ open, onOpenChange, asset, siteId, pendingChanges, 
         setCurrentSha(data.sha);
         
         // Parse JSON for schema-based editing
-        if (isJsonAsset) {
+        if (isJsonAsset || isCalendarAsset) {
           try {
             const parsed = JSON.parse(data.content);
             setJsonFormData(parsed);
@@ -263,7 +264,7 @@ const AssetUploadDialog = ({ open, onOpenChange, asset, siteId, pendingChanges, 
   const uploadTextContent = async (saveToBatch: boolean = false) => {
     let contentToUpload = textContent;
     
-    if (isJsonAsset) {
+    if (isJsonAsset || isCalendarAsset) {
       try {
         contentToUpload = JSON.stringify(jsonFormData, null, 2);
       } catch (e) {
@@ -548,12 +549,12 @@ const AssetUploadDialog = ({ open, onOpenChange, asset, siteId, pendingChanges, 
         </DialogHeader>
 
         <Tabs value={activeTab} onValueChange={setActiveTab} className="flex-1 flex flex-col overflow-hidden">
-          <TabsList className="grid w-full flex-shrink-0" style={{ gridTemplateColumns: isMarkdownAsset ? 'repeat(4, 1fr)' : (isTextAsset || isJsonAsset) ? 'repeat(3, 1fr)' : 'repeat(2, 1fr)' }}>
+          <TabsList className="grid w-full flex-shrink-0" style={{ gridTemplateColumns: isMarkdownAsset ? 'repeat(4, 1fr)' : (isTextAsset || isJsonAsset || isCalendarAsset) ? 'repeat(3, 1fr)' : 'repeat(2, 1fr)' }}>
             <TabsTrigger value="view">
               <Eye className="mr-2 h-4 w-4" />
               Current Assets
             </TabsTrigger>
-            {(isTextAsset || isJsonAsset) && (
+            {(isTextAsset || isJsonAsset || isCalendarAsset) && (
               <TabsTrigger value="edit">
                 <FileText className="mr-2 h-4 w-4" />
                 Edit Content
@@ -639,7 +640,7 @@ const AssetUploadDialog = ({ open, onOpenChange, asset, siteId, pendingChanges, 
             )}
           </TabsContent>
 
-          {(isTextAsset || isJsonAsset) && (
+          {(isTextAsset || isJsonAsset || isCalendarAsset) && (
             <TabsContent value="edit" className="mt-0 h-full">
               {loadingContent ? (
                 <div className="flex items-center justify-center py-8">
@@ -648,7 +649,7 @@ const AssetUploadDialog = ({ open, onOpenChange, asset, siteId, pendingChanges, 
                 </div>
               ) : (
                 <div className="space-y-4 pb-4 px-1">
-                  {isJsonAsset && asset.schema ? (
+                  {(isJsonAsset || isCalendarAsset) && asset.schema ? (
                     <>
                       {asset.schema.properties ? (
                         <div className="space-y-4">

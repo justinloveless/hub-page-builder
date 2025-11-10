@@ -1,0 +1,165 @@
+{
+  "version": "1.0",
+  "assets": [
+    {
+      "path": "data/events.json",
+      "type": "calendar",
+      "label": "Events Calendar",
+      "description": "Manage your calendar events and schedule",
+      "maxSize": 1048576,
+      "allowedExtensions": [".json"],
+      "schema": {
+        "type": "object",
+        "additionalProperties": {
+          "type": "object",
+          "properties": {
+            "title": {
+              "type": "string",
+              "title": "Event Title",
+              "description": "The name of the event",
+              "placeholder": "Team Meeting"
+            },
+            "description": {
+              "type": "string",
+              "title": "Description",
+              "description": "Event details and information",
+              "placeholder": "Discuss project progress...",
+              "multiline": true
+            },
+            "startDate": {
+              "type": "string",
+              "title": "Start Date",
+              "description": "ISO format date-time (e.g., 2025-11-10T10:00:00)",
+              "placeholder": "2025-11-10T10:00:00"
+            },
+            "endDate": {
+              "type": "string",
+              "title": "End Date",
+              "description": "ISO format date-time (e.g., 2025-11-10T11:00:00)",
+              "placeholder": "2025-11-10T11:00:00"
+            },
+            "location": {
+              "type": "string",
+              "title": "Location",
+              "description": "Physical or virtual location",
+              "placeholder": "Conference Room A or https://zoom.us/..."
+            },
+            "allDay": {
+              "type": "boolean",
+              "title": "All Day Event",
+              "description": "Mark this event as an all-day event",
+              "default": false
+            },
+            "recurring": {
+              "type": "string",
+              "title": "Recurring",
+              "description": "Recurrence pattern for the event",
+              "enum": ["", "daily", "weekly", "monthly", "yearly"],
+              "placeholder": "Select recurrence..."
+            },
+            "color": {
+              "type": "string",
+              "title": "Event Color",
+              "description": "Visual color for the event (hex code)",
+              "placeholder": "#3b82f6"
+            },
+            "attendees": {
+              "type": "string",
+              "title": "Attendees",
+              "description": "Comma-separated list of attendee emails",
+              "placeholder": "john@example.com, jane@example.com",
+              "multiline": true
+            }
+          }
+        }
+      }
+    },
+    {
+      "path": "data/synced-calendar.json",
+      "type": "calendar",
+      "label": "Synced Calendar (External)",
+      "description": "Calendar synced with Google, Apple, or Outlook",
+      "maxSize": 2097152,
+      "allowedExtensions": [".json"],
+      "metadata": {
+        "externalSync": true,
+        "providers": ["google", "apple", "outlook"]
+      },
+      "schema": {
+        "type": "object",
+        "properties": {
+          "_config": {
+            "type": "object",
+            "title": "Calendar Configuration",
+            "description": "External calendar sync settings",
+            "properties": {
+              "provider": {
+                "type": "string",
+                "title": "Calendar Provider",
+                "description": "External calendar service",
+                "enum": ["local", "google", "apple", "outlook"],
+                "default": "local"
+              },
+              "calendarId": {
+                "type": "string",
+                "title": "Calendar ID",
+                "description": "External calendar identifier",
+                "placeholder": "primary or your-calendar-id"
+              },
+              "lastSync": {
+                "type": "string",
+                "title": "Last Sync Time",
+                "description": "Timestamp of last successful sync (auto-populated)",
+                "placeholder": "Auto-populated"
+              }
+            }
+          }
+        },
+        "additionalProperties": {
+          "type": "object",
+          "properties": {
+            "title": {
+              "type": "string",
+              "title": "Event Title"
+            },
+            "description": {
+              "type": "string",
+              "title": "Description",
+              "multiline": true
+            },
+            "startDate": {
+              "type": "string",
+              "title": "Start Date"
+            },
+            "endDate": {
+              "type": "string",
+              "title": "End Date"
+            },
+            "location": {
+              "type": "string",
+              "title": "Location"
+            },
+            "allDay": {
+              "type": "boolean",
+              "title": "All Day Event"
+            },
+            "recurring": {
+              "type": "string",
+              "title": "Recurring Pattern"
+            },
+            "externalId": {
+              "type": "string",
+              "title": "External Event ID",
+              "description": "ID from external calendar provider (auto-populated)"
+            },
+            "synced": {
+              "type": "boolean",
+              "title": "Synced",
+              "description": "Whether this event is synced with external provider"
+            }
+          }
+        }
+      }
+    }
+  ]
+}
