@@ -60,6 +60,12 @@ All colors MUST be HSL.
     --sidebar-border: 230 20% 88%;
 
     --sidebar-ring: 200 85% 55%;
+    
+    /* Safe area insets for iOS */
+    --safe-area-inset-top: env(safe-area-inset-top);
+    --safe-area-inset-bottom: env(safe-area-inset-bottom);
+    --safe-area-inset-left: env(safe-area-inset-left);
+    --safe-area-inset-right: env(safe-area-inset-right);
   }
 
   .dark {
@@ -112,7 +118,31 @@ All colors MUST be HSL.
     @apply border-border;
   }
 
+  html {
+    @apply bg-background;
+    /* Fix iOS Safari fixed header issue - make viewport non-scrollable */
+    height: 100%;
+    overflow: hidden;
+    /* Prevent overscroll bounce on iOS */
+    overscroll-behavior: none;
+    /* Prevent pull-to-refresh */
+    touch-action: pan-x pan-y;
+  }
+
   body {
     @apply bg-background text-foreground;
+    /* Fix iOS Safari fixed header issue - make body non-scrollable */
+    height: 100%;
+    overflow: hidden;
+    /* Prevent overscroll bounce on iOS */
+    overscroll-behavior: none;
+    /* Prevent pull-to-refresh */
+    touch-action: pan-x pan-y;
+  }
+
+  #root {
+    /* Fix iOS Safari fixed header issue - make root non-scrollable */
+    height: 100%;
+    overflow: hidden;
   }
 }

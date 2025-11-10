@@ -30,9 +30,9 @@ const Index = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-background via-background to-secondary/20">
-      {/* Header */}
-      <header className="border-b border-border bg-card/50 backdrop-blur-sm">
+    <div className="h-full flex flex-col bg-gradient-to-br from-background via-background to-secondary/20">
+      {/* Header - Fixed */}
+      <header className="border-b border-border bg-card/50 backdrop-blur-sm flex-shrink-0">
         <div className="container mx-auto px-4 h-16 flex items-center justify-between">
           <div className="flex items-center gap-3">
             <img src={logo} alt="StaticSnack" className="w-10 h-10 rounded-lg" />
@@ -41,6 +41,9 @@ const Index = () => {
           <Button onClick={() => navigate("/auth")}>Get Started</Button>
         </div>
       </header>
+
+      {/* Main Content - Scrollable */}
+      <div className="flex-1 overflow-y-auto">
 
       {/* Hero Section */}
       <section className="container mx-auto px-4 py-20 text-center">
@@ -108,6 +111,7 @@ const Index = () => {
           </div>
         </div>
       </section>
+      </div>
     </div>
   );
 };

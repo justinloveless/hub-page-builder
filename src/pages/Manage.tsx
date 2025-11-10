@@ -670,7 +670,7 @@ const Manage = () => {
 
   if (loading) {
     return (
-      <div className="h-screen w-full flex flex-col bg-background overflow-hidden">
+      <div className="h-screen w-full flex flex-col bg-background overflow-hidden" style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}>
         <header className="border-b border-border bg-card/50 backdrop-blur-sm flex-shrink-0 z-50">
           <div className="container mx-auto px-4 h-16 flex items-center">
             <Skeleton className="h-8 w-8 rounded mr-4" />
@@ -874,7 +874,7 @@ const Manage = () => {
   );
 
   return (
-    <div className="h-screen w-full flex flex-col bg-background overflow-hidden">
+    <div className="h-screen w-full flex flex-col bg-background overflow-hidden" style={{paddingBottom: 'env(safe-area-inset-bottom)' }}>
       {/* Header */}
       <header className="border-b border-border bg-card/50 backdrop-blur-sm flex-shrink-0 z-50">
         <div className="px-4 py-3">

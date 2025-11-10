@@ -10,7 +10,8 @@ const config: CapacitorConfig = {
   },
   ios: {
     contentInset: 'automatic',
-    scheme: 'StaticSnack'
+    scheme: 'StaticSnack',
+    backgroundColor: '#12142b'
   },
   android: {
     allowMixedContent: true,

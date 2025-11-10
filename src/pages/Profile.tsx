@@ -131,9 +131,9 @@ const Profile = () => {
   };
 
   return (
-    <div className="min-h-screen bg-background">
-      {/* Header */}
-      <header className="border-b border-border bg-card/50 backdrop-blur-sm sticky top-0 z-50">
+    <div className="h-full flex flex-col bg-background">
+      {/* Header - Fixed */}
+      <header className="border-b border-border bg-card/50 backdrop-blur-sm flex-shrink-0 z-50">
         <div className="container mx-auto px-4 h-16 flex items-center">
           <Button
             variant="ghost"
@@ -149,8 +149,9 @@ const Profile = () => {
         </div>
       </header>
 
-      {/* Main Content */}
-      <main className="container mx-auto px-4 py-8 max-w-2xl">
+      {/* Main Content - Scrollable */}
+      <main className="flex-1 overflow-y-auto" style={{ paddingBottom: 'calc(2rem + env(safe-area-inset-bottom))' }}>
+        <div className="container mx-auto px-4 py-8 max-w-2xl">
         <Card>
           <CardHeader>
             <CardTitle>Your Profile</CardTitle>
@@ -242,6 +243,7 @@ const Profile = () => {
             </form>
           </CardContent>
         </Card>
+        </div>
       </main>
     </div>
   );

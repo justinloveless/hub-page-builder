@@ -91,9 +91,9 @@ const Dashboard = () => {
   }
 
   return (
-    <div className="min-h-screen bg-background">
-      {/* Header */}
-      <header className="border-b border-border bg-card/50 backdrop-blur-sm sticky top-0 z-50">
+    <div className="h-full flex flex-col bg-background">
+      {/* Header - Fixed */}
+      <header className="border-b border-border bg-card/50 backdrop-blur-sm flex-shrink-0 z-50">
         <div className="container mx-auto px-4 h-16 flex items-center justify-between">
           <div className="flex items-center gap-2 sm:gap-3 min-w-0">
             <img src={logo} alt="StaticSnack" className="w-10 h-10 rounded-lg flex-shrink-0" />
@@ -126,8 +126,9 @@ const Dashboard = () => {
         </div>
       </header>
 
-      {/* Main Content */}
-      <main className="container mx-auto px-4 py-8">
+      {/* Main Content - Scrollable */}
+      <main className="flex-1 overflow-y-auto" style={{ paddingBottom: 'calc(2rem + env(safe-area-inset-bottom))' }}>
+        <div className="container mx-auto px-4 py-8">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-8">
           <div>
             <h2 className="text-2xl sm:text-3xl font-bold mb-2">Your Sites</h2>
@@ -165,6 +166,7 @@ const Dashboard = () => {
             ))}
           </div>
         )}
+        </div>
       </main>
     </div>
   );

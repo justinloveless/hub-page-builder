@@ -72,9 +72,9 @@ const Settings = () => {
   }, [navigate]);
 
   return (
-    <div className="min-h-screen bg-background">
-      {/* Header */}
-      <header className="border-b border-border bg-card/50 backdrop-blur-sm sticky top-0 z-50">
+    <div className="h-full flex flex-col bg-background">
+      {/* Header - Fixed */}
+      <header className="border-b border-border bg-card/50 backdrop-blur-sm flex-shrink-0 z-50">
         <div className="container mx-auto px-4 h-16 flex items-center">
           <Button
             variant="ghost"
@@ -88,8 +88,9 @@ const Settings = () => {
         </div>
       </header>
 
-      {/* Main Content */}
-      <main className="container mx-auto px-4 py-8 max-w-3xl">
+      {/* Main Content - Scrollable */}
+      <main className="flex-1 overflow-y-auto" style={{ paddingBottom: 'calc(2rem + env(safe-area-inset-bottom))' }}>
+        <div className="container mx-auto px-4 py-8 max-w-3xl">
         <Tabs defaultValue="github" className="w-full">
           <TabsList className="grid w-full grid-cols-3">
             <TabsTrigger value="github">GitHub App</TabsTrigger>
@@ -244,6 +245,7 @@ const Settings = () => {
             </Card>
           </TabsContent>
         </Tabs>
+        </div>
       </main>
     </div>
   );
