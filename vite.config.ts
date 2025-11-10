@@ -16,6 +16,10 @@ export default defineConfig(({ mode }) => ({
     VitePWA({
       registerType: 'autoUpdate',
       includeAssets: ['favicon.png'],
+      devOptions: {
+        enabled: true,
+        type: 'module'
+      },
       manifest: {
         name: 'StaticSnack - GitHub Pages Site Manager',
         short_name: 'StaticSnack',
@@ -77,15 +81,68 @@ export default defineConfig(({ mode }) => ({
       workbox: {
         globPatterns: ['**/*.{js,css,html,ico,png,svg,woff,woff2,webp}'],
         maximumFileSizeToCacheInBytes: 3 * 1024 * 1024, // 3 MB
+        // Clean old caches automatically
+        cleanupOutdatedCaches: true,
+        // Skip waiting and claim clients immediately for faster updates
+        skipWaiting: true,
+        clientsClaim: true,
         runtimeCaching: [
           {
+            // Cache app shell with NetworkFirst - always try to get latest version
+            urlPattern: ({ request, url }) => {
+              return request.destination === 'document' || 
+                     url.pathname.startsWith('/assets/') ||
+                     url.pathname === '/' ||
+                     url.pathname === '/index.html';
+            },
+            handler: 'NetworkFirst',
+            options: {
+              cacheName: 'app-shell-v1',
+              networkTimeoutSeconds: 10,
+              expiration: {
+                maxEntries: 50,
+                maxAgeSeconds: 60 * 60 * 24 * 7 // 7 days
+              },
+              cacheableResponse: {
+                statuses: [0, 200]
+              }
+            }
+          },
+          {
+            // Supabase API calls
             urlPattern: /^https:\/\/.*\.supabase\.co\/.*/i,
             handler: 'NetworkFirst',
             options: {
               cacheName: 'supabase-cache',
+              networkTimeoutSeconds: 10,
               expiration: {
                 maxEntries: 50,
                 maxAgeSeconds: 60 * 60 * 24 // 24 hours
+              }
+            }
+          },
+          {
+            // GitHub API calls
+            urlPattern: /^https:\/\/api\.github\.com\/.*/i,
+            handler: 'NetworkFirst',
+            options: {
+              cacheName: 'github-api-cache',
+              networkTimeoutSeconds: 10,
+              expiration: {
+                maxEntries: 100,
+                maxAgeSeconds: 60 * 60 * 2 // 2 hours
+              }
+            }
+          },
+          {
+            // Images
+            urlPattern: /\.(?:png|jpg|jpeg|svg|gif|webp|ico)$/i,
+            handler: 'CacheFirst',
+            options: {
+              cacheName: 'images-cache',
+              expiration: {
+                maxEntries: 100,
+                maxAgeSeconds: 60 * 60 * 24 * 30 // 30 days
               }
             }
           }
