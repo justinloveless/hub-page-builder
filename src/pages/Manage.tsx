@@ -87,8 +87,7 @@ const Manage = () => {
   const [loadingAllActivities, setLoadingAllActivities] = useState(false);
   const [availableAssets, setAvailableAssets] = useState<string[]>([]);
 
-  // Commit preview dialog
-  const [showCommitPreviewDialog, setShowCommitPreviewDialog] = useState(false);
+  // Commit preview state (now replaces main preview instead of dialog)
   const [previewCommitSha, setPreviewCommitSha] = useState<string | null>(null);
 
   // Get current user's role
@@ -946,7 +945,10 @@ const Manage = () => {
                               className={`${isMobile ? 'h-7 px-2 text-sm' : 'h-6 px-2 text-xs'}`}
                               onClick={() => {
                                 setPreviewCommitSha(metadata.commit_sha);
-                                setShowCommitPreviewDialog(true);
+                                setShowPreview(true);
+                                if (isMobile) {
+                                  setShowMobileSidebar(false);
+                                }
                               }}
                             >
                               <Eye className={isMobile ? 'h-3.5 w-3.5 mr-1' : 'h-3 w-3 mr-1'} />
@@ -1100,7 +1102,9 @@ const Manage = () => {
                       <div className="flex items-center justify-between gap-4">
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-2">
-                            <CardTitle className="text-base">Live Preview</CardTitle>
+                            <CardTitle className="text-base">
+                              {previewCommitSha ? `Live Preview - Commit ${previewCommitSha.substring(0, 7)}` : 'Live Preview'}
+                            </CardTitle>
                             <Button
                               variant="ghost"
                               size="icon"
@@ -1112,12 +1116,23 @@ const Manage = () => {
                             </Button>
                           </div>
                           <CardDescription className="text-xs">
-                            {pendingChanges.length > 0
-                              ? `${pendingChanges.length} pending ${pendingChanges.length === 1 ? 'change' : 'changes'} ready to commit`
-                              : 'Changes appear here in real-time before committing'}
+                            {previewCommitSha
+                              ? 'Viewing a previous commit'
+                              : pendingChanges.length > 0
+                                ? `${pendingChanges.length} pending ${pendingChanges.length === 1 ? 'change' : 'changes'} ready to commit`
+                                : 'Changes appear here in real-time before committing'}
                           </CardDescription>
                         </div>
-                        {pendingChanges.length > 0 && (
+                        {previewCommitSha ? (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => setPreviewCommitSha(null)}
+                          >
+                            <ArrowLeft className="h-4 w-4 mr-2" />
+                            Return to Latest
+                          </Button>
+                        ) : pendingChanges.length > 0 && (
                           <div className="flex items-center gap-2 flex-shrink-0">
                             <Button
                               variant="outline"
@@ -1178,7 +1193,8 @@ const Manage = () => {
                     <CardContent className="p-0 flex-1 overflow-hidden">
                       <SitePreview
                         siteId={siteId!}
-                        pendingChanges={pendingChanges}
+                        pendingChanges={previewCommitSha ? [] : pendingChanges}
+                        {...(previewCommitSha && { commitSha: previewCommitSha })}
                       />
                     </CardContent>
                   </Card>
@@ -1208,7 +1224,7 @@ const Manage = () => {
                   <div className="flex items-center justify-between gap-2">
                     <div className="flex items-center gap-2 flex-1 min-w-0">
                       <p className="text-xs font-medium">
-                        Live Preview
+                        {previewCommitSha ? `Commit ${previewCommitSha.substring(0, 7)}` : 'Live Preview'}
                       </p>
                       <Button
                         variant="ghost"
@@ -1220,7 +1236,17 @@ const Manage = () => {
                         <EyeOff className="h-3.5 w-3.5" />
                       </Button>
                     </div>
-                    {pendingChanges.length > 0 && (
+                    {previewCommitSha ? (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="h-7 px-2"
+                        onClick={() => setPreviewCommitSha(null)}
+                      >
+                        <ArrowLeft className="h-3.5 w-3.5 mr-1" />
+                        Return
+                      </Button>
+                    ) : pendingChanges.length > 0 && (
                       <div className="flex items-center gap-1.5 flex-shrink-0">
                         <Button
                           variant="ghost"
@@ -1282,7 +1308,8 @@ const Manage = () => {
                 <CardContent className="p-0 flex-1 overflow-hidden">
                   <SitePreview
                     siteId={siteId!}
-                    pendingChanges={pendingChanges}
+                    pendingChanges={previewCommitSha ? [] : pendingChanges}
+                    {...(previewCommitSha && { commitSha: previewCommitSha })}
                   />
                 </CardContent>
               </Card>
@@ -1411,27 +1438,6 @@ const Manage = () => {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-
-      {/* Commit Preview Dialog */}
-      <Dialog open={showCommitPreviewDialog} onOpenChange={setShowCommitPreviewDialog}>
-        <DialogContent className="max-w-6xl max-h-[90vh] flex flex-col">
-          <DialogHeader>
-            <DialogTitle>Live Preview - Commit {previewCommitSha?.substring(0, 7)}</DialogTitle>
-            <DialogDescription>
-              Preview how the site looked at this specific commit
-            </DialogDescription>
-          </DialogHeader>
-          <div className="flex-1 overflow-hidden min-h-0">
-            {previewCommitSha && siteId && (
-              <SitePreview
-                siteId={siteId}
-                pendingChanges={[]}
-                commitSha={previewCommitSha}
-              />
-            )}
-          </div>
-        </DialogContent>
-      </Dialog>
 
       {/* Activity Audit Dialog */}
       <Dialog open={showActivityDialog} onOpenChange={setShowActivityDialog}>
@@ -1590,7 +1596,8 @@ const Manage = () => {
                   userProfile={activity.user_profile}
                   onPreviewCommit={(commitSha) => {
                     setPreviewCommitSha(commitSha);
-                    setShowCommitPreviewDialog(true);
+                    setShowPreview(true);
+                    setShowActivityDialog(false);
                   }}
                   showCommitPreview={commitPreviewEnabled}
                 />
