@@ -988,7 +988,7 @@ const Manage = () => {
         showPreview ? (
           <ResizablePanelGroup direction="horizontal" className="flex-1 min-h-0">
             {/* Sidebar */}
-            <ResizablePanel defaultSize={20} minSize={15} maxSize={35} className="overflow-hidden min-h-0">
+            <ResizablePanel defaultSize={35} minSize={25} maxSize={50} className="overflow-hidden min-h-0">
               <div className="h-full flex flex-col min-w-0 border-r">
                 {sidebarContent}
               </div>
