@@ -1,5 +1,6 @@
-{
-  "team-standup-2025-11-10": {
+[
+  {
+    "id": "team-standup-2025-11-10",
     "title": "Daily Team Standup",
     "description": "Quick sync-up to discuss progress, blockers, and plans for the day",
     "startDate": "2025-11-10T09:00:00",
@@ -10,7 +11,8 @@
     "color": "#3b82f6",
     "attendees": "team@example.com"
   },
-  "product-launch-2025-12-01": {
+  {
+    "id": "product-launch-2025-12-01",
     "title": "Product Launch Event",
     "description": "Official launch of our new product line with presentations, demos, and networking",
     "startDate": "2025-12-01T00:00:00",
@@ -21,7 +23,8 @@
     "color": "#10b981",
     "attendees": "all@example.com, press@example.com, partners@example.com"
   },
-  "client-demo-2025-11-15": {
+  {
+    "id": "client-demo-2025-11-15",
     "title": "Client Demo Presentation",
     "description": "Demonstrate new features and capabilities to our key enterprise client",
     "startDate": "2025-11-15T14:00:00",
@@ -32,7 +35,8 @@
     "color": "#f59e0b",
     "attendees": "client@bigcorp.com, sales@example.com, demo-team@example.com"
   },
-  "quarterly-review-2025-12-15": {
+  {
+    "id": "quarterly-review-2025-12-15",
     "title": "Q4 Quarterly Business Review",
     "description": "Review Q4 performance, discuss achievements, challenges, and set Q1 objectives",
     "startDate": "2025-12-15T10:00:00",
@@ -43,7 +47,8 @@
     "color": "#8b5cf6",
     "attendees": "leadership@example.com, dept-heads@example.com"
   },
-  "company-holiday-party-2025-12-20": {
+  {
+    "id": "company-holiday-party-2025-12-20",
     "title": "Annual Holiday Party",
     "description": "Celebrate the year's achievements with food, entertainment, and team bonding",
     "startDate": "2025-12-20T18:00:00",
@@ -54,7 +59,8 @@
     "color": "#ef4444",
     "attendees": "everyone@example.com"
   },
-  "workshop-agile-2025-11-18": {
+  {
+    "id": "workshop-agile-2025-11-18",
     "title": "Agile Methodology Workshop",
     "description": "Interactive workshop on agile practices, sprint planning, and retrospectives",
     "startDate": "2025-11-18T13:00:00",
@@ -65,7 +71,8 @@
     "color": "#06b6d4",
     "attendees": "dev-team@example.com, product-managers@example.com"
   },
-  "investor-call-2025-11-25": {
+  {
+    "id": "investor-call-2025-11-25",
     "title": "Monthly Investor Update Call",
     "description": "Monthly update on company metrics, milestones, and strategic initiatives",
     "startDate": "2025-11-25T16:00:00",
@@ -76,4 +83,4 @@
     "color": "#ec4899",
     "attendees": "investors@example.com, cfo@example.com, ceo@example.com"
   }
-}
+]

@@ -18,10 +18,15 @@ Create or update `assets.config.json` in your site repository:
       "maxSize": 1048576,
       "allowedExtensions": [".json"],
       "schema": {
-        "type": "object",
-        "additionalProperties": {
+        "type": "array",
+        "items": {
           "type": "object",
           "properties": {
+            "id": {
+              "type": "string",
+              "title": "Event ID",
+              "placeholder": "team-meeting-2025-11-10"
+            },
             "title": {
               "type": "string",
               "title": "Event Title"
@@ -60,8 +65,9 @@ Create or update `assets.config.json` in your site repository:
 In the Asset Manager, click on "My Events" and add your first event:
 
 ```json
-{
-  "team-meeting": {
+[
+  {
+    "id": "team-meeting",
     "title": "Team Meeting",
     "description": "Weekly sync-up",
     "startDate": "2025-11-10T10:00:00",
@@ -69,7 +75,7 @@ In the Asset Manager, click on "My Events" and add your first event:
     "location": "Conference Room A",
     "allDay": false
   }
-}
+]
 ```
 
 ## Step 3: Display Events on Your Site
@@ -83,7 +89,7 @@ Add this to your HTML file:
   fetch('data/events.json')
     .then(res => res.json())
     .then(events => {
-      const html = Object.entries(events).map(([id, event]) => `
+      const html = events.map(event => `
         <div class="event">
           <h3>${event.title}</h3>
           <p>${event.description}</p>

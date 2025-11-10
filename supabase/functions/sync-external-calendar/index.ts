@@ -30,7 +30,7 @@ interface CalendarEvent {
   synced: boolean;
 }
 
-async function syncGoogleCalendar(calendarId: string, apiKey: string): Promise<Record<string, CalendarEvent>> {
+async function syncGoogleCalendar(calendarId: string, apiKey: string): Promise<CalendarEvent[]> {
   // Google Calendar API v3
   const now = new Date().toISOString();
   const url = `https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(calendarId)}/events?key=${apiKey}&timeMin=${now}&maxResults=100&singleEvents=true&orderBy=startTime`;
@@ -42,12 +42,11 @@ async function syncGoogleCalendar(calendarId: string, apiKey: string): Promise<R
   }
   
   const data = await response.json();
-  const events: Record<string, CalendarEvent> = {};
+  const events: CalendarEvent[] = [];
   
   for (const item of data.items || []) {
-    const eventId = `google-${item.id}`;
-    events[eventId] = {
-      id: eventId,
+    events.push({
+      id: `google-${item.id}`,
       title: item.summary || 'Untitled Event',
       description: item.description || '',
       startDate: item.start.dateTime || item.start.date,
@@ -59,13 +58,13 @@ async function syncGoogleCalendar(calendarId: string, apiKey: string): Promise<R
       attendees: item.attendees?.map((a: any) => a.email).join(', ') || '',
       externalId: item.id,
       synced: true
-    };
+    });
   }
   
   return events;
 }
 
-async function syncOutlookCalendar(calendarId: string, accessToken: string): Promise<Record<string, CalendarEvent>> {
+async function syncOutlookCalendar(calendarId: string, accessToken: string): Promise<CalendarEvent[]> {
   // Microsoft Graph API
   const now = new Date().toISOString();
   const url = `https://graph.microsoft.com/v1.0/me/calendars/${calendarId}/events?$filter=start/dateTime ge '${now}'&$top=100&$orderby=start/dateTime`;
@@ -83,12 +82,11 @@ async function syncOutlookCalendar(calendarId: string, accessToken: string): Pro
   }
   
   const data = await response.json();
-  const events: Record<string, CalendarEvent> = {};
+  const events: CalendarEvent[] = [];
   
   for (const item of data.value || []) {
-    const eventId = `outlook-${item.id}`;
-    events[eventId] = {
-      id: eventId,
+    events.push({
+      id: `outlook-${item.id}`,
       title: item.subject || 'Untitled Event',
       description: item.bodyPreview || '',
       startDate: item.start.dateTime,
@@ -100,13 +98,13 @@ async function syncOutlookCalendar(calendarId: string, accessToken: string): Pro
       attendees: item.attendees?.map((a: any) => a.emailAddress.address).join(', ') || '',
       externalId: item.id,
       synced: true
-    };
+    });
   }
   
   return events;
 }
 
-async function syncAppleCalendar(calendarId: string, username: string, password: string): Promise<Record<string, CalendarEvent>> {
+async function syncAppleCalendar(calendarId: string, username: string, password: string): Promise<CalendarEvent[]> {
   // CalDAV protocol for iCloud
   // This is a simplified implementation - full CalDAV support would require more complex parsing
   const url = `https://caldav.icloud.com/${username}/calendars/${calendarId}`;
@@ -138,7 +136,7 @@ async function syncAppleCalendar(calendarId: string, username: string, password:
   
   // Parse iCal format events from response
   // This is a placeholder - you'd need a proper iCal parser
-  const events: Record<string, CalendarEvent> = {};
+  const events: CalendarEvent[] = [];
   return events;
 }
 
@@ -183,7 +181,7 @@ serve(async (req) => {
     }
 
     // Sync calendar based on provider
-    let events: Record<string, CalendarEvent> = {};
+    let events: CalendarEvent[] = [];
     
     try {
       switch (provider) {
@@ -222,7 +220,7 @@ serve(async (req) => {
     return new Response(JSON.stringify({ 
       success: true,
       events,
-      count: Object.keys(events).length,
+      count: events.length,
       lastSync: new Date().toISOString(),
       provider,
       calendarId: calendar_id

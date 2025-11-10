@@ -19,6 +19,7 @@ interface CalendarAssetManagerProps {
 }
 
 interface CalendarEvent {
+  id: string;
   title: string;
   description?: string;
   startDate: string;
@@ -34,7 +35,7 @@ interface CalendarEvent {
 
 const CalendarAssetManager = ({ siteId, assetPath, assetConfig, onUpdate }: CalendarAssetManagerProps) => {
   const [syncing, setSyncing] = useState(false);
-  const [events, setEvents] = useState<Record<string, CalendarEvent>>({});
+  const [events, setEvents] = useState<CalendarEvent[]>([]);
   const [lastSync, setLastSync] = useState<string | null>(null);
   
   // External calendar config
@@ -191,7 +192,7 @@ const CalendarAssetManager = ({ siteId, assetPath, assetConfig, onUpdate }: Cale
                 <Button
                   variant="outline"
                   onClick={handleExportEvents}
-                  disabled={Object.keys(events).length === 0}
+                  disabled={events.length === 0}
                   className="flex-1"
                 >
                   <Download className="mr-2 h-4 w-4" />
@@ -216,10 +217,10 @@ const CalendarAssetManager = ({ siteId, assetPath, assetConfig, onUpdate }: Cale
                 </Button>
               </div>
 
-              {Object.keys(events).length > 0 && (
+              {events.length > 0 && (
                 <div className="space-y-2 max-h-96 overflow-y-auto">
-                  {Object.entries(events).map(([id, event]) => (
-                    <div key={id} className="p-3 border rounded-lg hover:bg-accent/50">
+                  {events.map((event) => (
+                    <div key={event.id} className="p-3 border rounded-lg hover:bg-accent/50">
                       <div className="flex items-start justify-between">
                         <div className="flex-1">
                           <h4 className="font-medium">{event.title}</h4>

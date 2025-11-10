@@ -207,15 +207,16 @@ Response: {
 ## Technical Details
 
 ### Event Data Structure
-Events are stored as key-value pairs in JSON:
+Events are stored as an array of objects in JSON:
 ```json
-{
-  "event-unique-id": {
+[
+  {
+    "id": "event-unique-id",
     "title": "Event Name",
     "startDate": "2025-11-10T10:00:00",
     // ... other properties
   }
-}
+]
 ```
 
 ### Schema Validation

@@ -26,10 +26,16 @@ Add this to your site's `assets.config.json`:
       "maxSize": 1048576,
       "allowedExtensions": [".json"],
       "schema": {
-        "type": "object",
-        "additionalProperties": {
+        "type": "array",
+        "items": {
           "type": "object",
           "properties": {
+            "id": {
+              "type": "string",
+              "title": "Event ID",
+              "description": "Unique identifier for the event",
+              "placeholder": "team-meeting-2025-11-10"
+            },
             "title": {
               "type": "string",
               "title": "Event Title",
@@ -100,8 +106,9 @@ Add this to your site's `assets.config.json`:
 Your `data/events.json` file would look like this:
 
 ```json
-{
-  "team-meeting-nov-10": {
+[
+  {
+    "id": "team-meeting-nov-10",
     "title": "Team Standup",
     "description": "Daily team sync-up meeting",
     "startDate": "2025-11-10T09:00:00",
@@ -112,7 +119,8 @@ Your `data/events.json` file would look like this:
     "color": "#3b82f6",
     "attendees": "team@example.com"
   },
-  "project-launch": {
+  {
+    "id": "project-launch",
     "title": "Product Launch Event",
     "description": "Official launch of our new product line",
     "startDate": "2025-12-01T00:00:00",
@@ -123,7 +131,8 @@ Your `data/events.json` file would look like this:
     "color": "#10b981",
     "attendees": "all@example.com, press@example.com"
   },
-  "client-demo": {
+  {
+    "id": "client-demo",
     "title": "Client Demo Presentation",
     "description": "Demonstrate new features to key client",
     "startDate": "2025-11-15T14:00:00",
@@ -134,7 +143,7 @@ Your `data/events.json` file would look like this:
     "color": "#f59e0b",
     "attendees": "client@example.com, sales@example.com"
   }
-}
+]
 ```
 
 ## External Calendar Integration
@@ -238,8 +247,7 @@ For external calendar integration, add metadata to enable syncing:
 async function loadEvents() {
   const response = await fetch('/data/events.json');
   const events = await response.json();
-  return Object.entries(events).map(([id, event]) => ({
-    id,
+  return events.map(event => ({
     ...event,
     start: new Date(event.startDate),
     end: new Date(event.endDate)
@@ -262,28 +270,28 @@ function getUpcomingEvents(events, days = 7) {
   const now = new Date();
   const future = new Date(now.getTime() + days * 24 * 60 * 60 * 1000);
   
-  return Object.entries(events)
-    .filter(([_, event]) => {
+  return events
+    .filter(event => {
       const start = new Date(event.startDate);
       return start >= now && start <= future;
     })
     .sort((a, b) => 
-      new Date(a[1].startDate) - new Date(b[1].startDate)
+      new Date(a.startDate) - new Date(b.startDate)
     );
 }
 
 // Get events by location
 function getEventsByLocation(events, location) {
-  return Object.entries(events)
-    .filter(([_, event]) => 
-      event.location?.toLowerCase().includes(location.toLowerCase())
-    );
+  return events.filter(event => 
+    event.location?.toLowerCase().includes(location.toLowerCase())
+  );
 }
 
 // Get recurring events
 function getRecurringEvents(events) {
-  return Object.entries(events)
-    .filter(([_, event]) => event.recurring && event.recurring !== '');
+  return events.filter(event => 
+    event.recurring && event.recurring !== ''
+  );
 }
 ```
 
@@ -406,6 +414,7 @@ Check out example repositories:
 
 ```typescript
 interface CalendarEvent {
+  id: string;        // Unique identifier
   title: string;
   description?: string;
   startDate: string;
@@ -427,13 +436,13 @@ interface CalendarConfig {
 }
 
 // Load events
-async function loadCalendarEvents(path: string): Promise<Record<string, CalendarEvent>>;
+async function loadCalendarEvents(path: string): Promise<CalendarEvent[]>;
 
 // Sync with external provider
-async function syncExternalCalendar(config: CalendarConfig): Promise<void>;
+async function syncExternalCalendar(config: CalendarConfig): Promise<CalendarEvent[]>;
 
 // Create event
-async function createEvent(eventId: string, event: CalendarEvent): Promise<void>;
+async function createEvent(event: CalendarEvent): Promise<void>;
 
 // Update event
 async function updateEvent(eventId: string, event: Partial<CalendarEvent>): Promise<void>;

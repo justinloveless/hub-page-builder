@@ -9,10 +9,16 @@
       "maxSize": 1048576,
       "allowedExtensions": [".json"],
       "schema": {
-        "type": "object",
-        "additionalProperties": {
+        "type": "array",
+        "items": {
           "type": "object",
           "properties": {
+            "id": {
+              "type": "string",
+              "title": "Event ID",
+              "description": "Unique identifier for the event",
+              "placeholder": "team-meeting-2025-11-10"
+            },
             "title": {
               "type": "string",
               "title": "Event Title",
@@ -86,38 +92,16 @@
         "providers": ["google", "apple", "outlook"]
       },
       "schema": {
-        "type": "object",
-        "properties": {
-          "_config": {
-            "type": "object",
-            "title": "Calendar Configuration",
-            "description": "External calendar sync settings",
-            "properties": {
-              "provider": {
-                "type": "string",
-                "title": "Calendar Provider",
-                "description": "External calendar service",
-                "enum": ["local", "google", "apple", "outlook"],
-                "default": "local"
-              },
-              "calendarId": {
-                "type": "string",
-                "title": "Calendar ID",
-                "description": "External calendar identifier",
-                "placeholder": "primary or your-calendar-id"
-              },
-              "lastSync": {
-                "type": "string",
-                "title": "Last Sync Time",
-                "description": "Timestamp of last successful sync (auto-populated)",
-                "placeholder": "Auto-populated"
-              }
-            }
-          }
-        },
-        "additionalProperties": {
+        "type": "array",
+        "items": {
           "type": "object",
           "properties": {
+            "id": {
+              "type": "string",
+              "title": "Event ID",
+              "description": "Unique identifier for the event",
+              "placeholder": "event-unique-id"
+            },
             "title": {
               "type": "string",
               "title": "Event Title"
@@ -146,6 +130,14 @@
             "recurring": {
               "type": "string",
               "title": "Recurring Pattern"
+            },
+            "color": {
+              "type": "string",
+              "title": "Event Color"
+            },
+            "attendees": {
+              "type": "string",
+              "title": "Attendees"
             },
             "externalId": {
               "type": "string",

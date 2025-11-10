@@ -269,9 +269,8 @@
         
         const eventsData = await response.json();
         
-        // Convert to array with IDs
-        allEvents = Object.entries(eventsData).map(([id, event]) => ({
-          id,
+        // Events are already an array with IDs
+        allEvents = eventsData.map(event => ({
           ...event,
           startDateTime: new Date(event.startDate),
           endDateTime: new Date(event.endDate)

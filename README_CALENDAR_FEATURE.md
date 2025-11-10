@@ -142,6 +142,7 @@ Use the `CalendarAssetManager` component to sync with:
 ### Event Data Structure
 ```typescript
 interface CalendarEvent {
+  id: string;        // Unique identifier
   title: string;
   description?: string;
   startDate: string; // ISO 8601
