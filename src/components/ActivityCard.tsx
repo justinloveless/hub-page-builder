@@ -66,7 +66,7 @@ const ActivityCard = ({ activity, repoFullName, userProfile, onPreviewCommit, sh
     // Handle commit
     if (metadata.commit_sha) {
       details.push(
-        <div key="commit" className="flex items-center gap-2">
+        <div key="commit" className="flex flex-col sm:flex-row items-start sm:items-center gap-2">
           <a
             href={`https://github.com/${repoFullName}/commit/${metadata.commit_sha}`}
             target="_blank"
