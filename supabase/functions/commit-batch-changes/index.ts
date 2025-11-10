@@ -278,8 +278,9 @@ Deno.serve(async (req) => {
 
     console.log('Updated branch reference');
 
-    // Log the activity
-    await supabase.from('activity_log').insert({
+    // Log the activity using service role client to bypass RLS
+    const supabaseAdmin = createClient(supabaseUrl, supabaseKey);
+    const { error: activityError } = await supabaseAdmin.from('activity_log').insert({
       site_id,
       user_id: user.id,
       action: 'batch_commit',
@@ -290,6 +291,12 @@ Deno.serve(async (req) => {
         files: asset_changes.map((c: any) => c.repo_path),
       },
     });
+
+    if (activityError) {
+      console.error('Failed to log activity:', activityError);
+      // Don't fail the whole operation if activity logging fails
+      // but log it for debugging
+    }
 
     return new Response(JSON.stringify({
       success: true,

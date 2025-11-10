@@ -264,7 +264,7 @@ Deno.serve(async (req) => {
     }
 
     // Log activity
-    await supabaseClient
+    const { error: activityError } = await supabaseClient
       .from('activity_log')
       .insert({
         site_id: site_id,
@@ -276,6 +276,11 @@ Deno.serve(async (req) => {
           commit_sha: response.data.commit.sha,
         },
       })
+
+    if (activityError) {
+      console.error('Failed to log activity:', activityError);
+      // Don't fail the upload if activity logging fails
+    }
 
     return new Response(
       JSON.stringify({

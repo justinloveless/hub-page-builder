@@ -253,7 +253,7 @@ Deno.serve(async (req) => {
     }
 
     // Log the activity
-    await supabase.from('activity_log').insert({
+    const { error: activityError } = await supabase.from('activity_log').insert({
       site_id: site_id,
       user_id: user.id,
       action: 'delete_asset',
@@ -263,6 +263,11 @@ Deno.serve(async (req) => {
         commit_sha: deleteData.commit.sha,
       },
     });
+
+    if (activityError) {
+      console.error('Failed to log activity:', activityError);
+      // Don't fail the delete if activity logging fails
+    }
 
     return new Response(JSON.stringify({
       success: true,
