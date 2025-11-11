@@ -24,7 +24,7 @@ function normalizePemKey(pem: string): string {
 
 // Template for site-assets.json
 const SITE_ASSETS_TEMPLATE = {
-  "$schema": "https://raw.githubusercontent.com/StaticSnack/staticsnack/main/site-assets.schema.json",
+  "$schema": "https://raw.githubusercontent.com/justinloveless/hub-page-builder/refs/heads/main/site-assets.schema.json"
   version: "1.0",
   description: "Configuration file defining manageable assets for this static site",
   assets: [
