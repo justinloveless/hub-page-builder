@@ -1,0 +1,9 @@
+{
+  "provider": "google",
+  "calendarId": "primary",
+  "displayName": "Company Calendar",
+  "refreshInterval": 15,
+  "maxEvents": 100,
+  "showPastEvents": false,
+  "daysAhead": 90
+}

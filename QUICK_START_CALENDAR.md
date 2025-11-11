@@ -102,34 +102,59 @@ Add this to your HTML file:
 </script>
 ```
 
-## Step 4 (Optional): Sync with External Calendar
+## Step 4 (Optional): External Calendar Integration
 
-### For Google Calendar:
+To display events from Google Calendar, Outlook, or Apple Calendar:
 
-1. Get API key from [Google Cloud Console](https://console.cloud.google.com/)
-2. Use the CalendarAssetManager component:
-   - Select "Google Calendar"
-   - Enter your calendar ID (usually your email)
-   - Enter API key
-   - Click "Sync Calendar"
+### 1. Configure Available Providers
 
-### For Apple Calendar:
+In your `assets.config.json`, specify which providers your site supports:
 
-1. Generate app-specific password at [appleid.apple.com](https://appleid.apple.com/)
-2. Use the CalendarAssetManager:
-   - Select "Apple Calendar"
-   - Enter calendar ID ("home")
-   - Enter app-specific password
-   - Click "Sync Calendar"
+```json
+{
+  "path": "data/calendar-config.json",
+  "type": "calendar",
+  "metadata": {
+    "calendarType": "external",
+    "availableProviders": ["google", "outlook"]
+  },
+  "schema": {
+    "type": "object",
+    "properties": {
+      "provider": {
+        "enum": ["google", "outlook"]
+      },
+      "calendarId": {
+        "type": "string"
+      }
+    }
+  }
+}
+```
 
-### For Outlook:
+### 2. Set Up in Your Site
 
-1. Get access token from [Azure Portal](https://portal.azure.com/)
-2. Use the CalendarAssetManager:
-   - Select "Outlook Calendar"
-   - Enter calendar ID
-   - Enter access token
-   - Click "Sync Calendar"
+**Your site handles the API calls, not Static Snack!**
+
+- Set up API keys in your site (Google, Microsoft, Apple)
+- Implement calendar fetching service
+- Load configuration from `calendar-config.json`
+- Fetch and display events
+
+### 3. Configure in Asset Manager
+
+Content managers can then:
+- Select which provider to use
+- Enter the calendar ID
+- Set refresh interval and other options
+
+### Full Implementation Guide
+
+See `EXTERNAL_CALENDAR_IMPLEMENTATION.md` for:
+- Complete setup instructions
+- Code examples for Google, Outlook, Apple
+- React/Vue integration
+- Error handling and caching
 
 ## Examples
 

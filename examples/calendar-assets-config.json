@@ -81,74 +81,64 @@
       }
     },
     {
-      "path": "data/synced-calendar.json",
+      "path": "data/calendar-config.json",
       "type": "calendar",
-      "label": "Synced Calendar (External)",
-      "description": "Calendar synced with Google, Apple, or Outlook",
-      "maxSize": 2097152,
+      "label": "External Calendar Configuration",
+      "description": "Configure which external calendar to display",
+      "maxSize": 102400,
       "allowedExtensions": [".json"],
       "metadata": {
-        "externalSync": true,
-        "providers": ["google", "apple", "outlook"]
+        "calendarType": "external",
+        "availableProviders": ["google", "outlook"]
       },
       "schema": {
-        "type": "array",
-        "items": {
-          "type": "object",
-          "properties": {
-            "id": {
-              "type": "string",
-              "title": "Event ID",
-              "description": "Unique identifier for the event",
-              "placeholder": "event-unique-id"
-            },
-            "title": {
-              "type": "string",
-              "title": "Event Title"
-            },
-            "description": {
-              "type": "string",
-              "title": "Description",
-              "multiline": true
-            },
-            "startDate": {
-              "type": "string",
-              "title": "Start Date"
-            },
-            "endDate": {
-              "type": "string",
-              "title": "End Date"
-            },
-            "location": {
-              "type": "string",
-              "title": "Location"
-            },
-            "allDay": {
-              "type": "boolean",
-              "title": "All Day Event"
-            },
-            "recurring": {
-              "type": "string",
-              "title": "Recurring Pattern"
-            },
-            "color": {
-              "type": "string",
-              "title": "Event Color"
-            },
-            "attendees": {
-              "type": "string",
-              "title": "Attendees"
-            },
-            "externalId": {
-              "type": "string",
-              "title": "External Event ID",
-              "description": "ID from external calendar provider (auto-populated)"
-            },
-            "synced": {
-              "type": "boolean",
-              "title": "Synced",
-              "description": "Whether this event is synced with external provider"
-            }
+        "type": "object",
+        "properties": {
+          "provider": {
+            "type": "string",
+            "title": "Calendar Provider",
+            "description": "Which calendar service to use (must be configured in your site)",
+            "enum": ["google", "outlook"],
+            "placeholder": "Select provider..."
+          },
+          "calendarId": {
+            "type": "string",
+            "title": "Calendar ID",
+            "description": "The ID of the calendar to display",
+            "placeholder": "primary or calendar-id@group.calendar.google.com"
+          },
+          "displayName": {
+            "type": "string",
+            "title": "Display Name",
+            "description": "Name to show for this calendar",
+            "placeholder": "Team Events"
+          },
+          "refreshInterval": {
+            "type": "number",
+            "title": "Refresh Interval (minutes)",
+            "description": "How often to fetch new events from the provider",
+            "default": 15,
+            "placeholder": "15"
+          },
+          "maxEvents": {
+            "type": "number",
+            "title": "Maximum Events",
+            "description": "Maximum number of upcoming events to display",
+            "default": 100,
+            "placeholder": "100"
+          },
+          "showPastEvents": {
+            "type": "boolean",
+            "title": "Show Past Events",
+            "description": "Include events that have already occurred",
+            "default": false
+          },
+          "daysAhead": {
+            "type": "number",
+            "title": "Days Ahead",
+            "description": "How many days into the future to fetch events",
+            "default": 90,
+            "placeholder": "90"
           }
         }
       }

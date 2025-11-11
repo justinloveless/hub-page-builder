@@ -1,0 +1,29 @@
+[
+  {
+    "provider": "google",
+    "calendarId": "primary",
+    "displayName": "Main Calendar",
+    "refreshInterval": 15,
+    "maxEvents": 50,
+    "showPastEvents": false,
+    "daysAhead": 90
+  },
+  {
+    "provider": "google",
+    "calendarId": "team@example.com",
+    "displayName": "Team Calendar",
+    "refreshInterval": 30,
+    "maxEvents": 50,
+    "showPastEvents": false,
+    "daysAhead": 60
+  },
+  {
+    "provider": "outlook",
+    "calendarId": "calendar-id-here",
+    "displayName": "Client Meetings",
+    "refreshInterval": 60,
+    "maxEvents": 25,
+    "showPastEvents": false,
+    "daysAhead": 30
+  }
+]

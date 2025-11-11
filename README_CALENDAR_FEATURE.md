@@ -73,12 +73,16 @@ fetch('data/events.json')
   .then(events => displayEvents(events));
 ```
 
-### 4. External Sync (Optional)
+### 4. External Calendar (Optional)
 
-Use the `CalendarAssetManager` component to sync with:
-- Google Calendar (API key)
-- Apple Calendar (app-specific password)
-- Outlook Calendar (OAuth token)
+**Configuration-based approach:**
+
+1. **Declare providers** in your assets.config.json
+2. **Implement fetching** in your site with your API keys
+3. **Configure calendar** via Asset Manager
+4. **Display events** from external provider
+
+See `EXTERNAL_CALENDAR_IMPLEMENTATION.md` for complete guide.
 
 ## 📋 Features
 
@@ -88,12 +92,13 @@ Use the `CalendarAssetManager` component to sync with:
 - Import/Export functionality
 - Full CRUD operations through UI
 
-### ✅ External Calendar Sync
-- Fetch events from Google Calendar
-- Fetch events from Apple Calendar (iCloud)
-- Fetch events from Outlook/Microsoft 365
-- One-way sync (read-only)
-- Automatic format conversion
+### ✅ External Calendar Integration
+- Configuration storage for external calendars
+- Provider availability declaration per site
+- Your site fetches from Google Calendar
+- Your site fetches from Apple Calendar (iCloud)
+- Your site fetches from Outlook/Microsoft 365
+- Flexible implementation (client or server-side)
 
 ### ✅ Event Properties
 - Title and description
@@ -128,16 +133,23 @@ Use the `CalendarAssetManager` component to sync with:
 - Format: JSON with key-value pairs
 - Schema: Flexible with additionalProperties support
 
-### External Sync APIs
-- **Google**: Calendar API v3
-- **Apple**: CalDAV protocol
-- **Outlook**: Microsoft Graph API
+### External Calendar Architecture
+- **Static Snack**: Stores configuration only (which calendar to display)
+- **Your Site**: Makes API calls with your own keys
+- **Providers**: Google Calendar API v3, Microsoft Graph API, CalDAV
+- **Security**: API keys stay with site owner, not centralized
 
-### Edge Function
-- Endpoint: `/functions/v1/sync-external-calendar`
-- Authentication: Required (Supabase Auth)
-- Rate limiting: Respects provider limits
-- Max events: 100 per sync (configurable)
+### Configuration Format
+```json
+{
+  "provider": "google",
+  "calendarId": "primary",
+  "displayName": "Company Calendar",
+  "refreshInterval": 15,
+  "maxEvents": 100,
+  "daysAhead": 90
+}
+```
 
 ### Event Data Structure
 ```typescript
