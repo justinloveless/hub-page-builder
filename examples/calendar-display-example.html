@@ -1,0 +1,433 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Calendar Events Display Example</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      min-height: 100vh;
+      padding: 20px;
+    }
+
+    .container {
+      max-width: 1200px;
+      margin: 0 auto;
+    }
+
+    h1 {
+      color: white;
+      text-align: center;
+      margin-bottom: 30px;
+      font-size: 2.5rem;
+    }
+
+    .filters {
+      background: white;
+      padding: 20px;
+      border-radius: 12px;
+      margin-bottom: 20px;
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+    }
+
+    .filter-buttons {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+
+    .filter-btn {
+      padding: 10px 20px;
+      border: 2px solid #667eea;
+      background: white;
+      color: #667eea;
+      border-radius: 8px;
+      cursor: pointer;
+      font-weight: 600;
+      transition: all 0.3s ease;
+    }
+
+    .filter-btn:hover, .filter-btn.active {
+      background: #667eea;
+      color: white;
+    }
+
+    .events-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
+      gap: 20px;
+    }
+
+    .event-card {
+      background: white;
+      border-radius: 12px;
+      padding: 20px;
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+      transition: transform 0.3s ease, box-shadow 0.3s ease;
+      border-left: 5px solid #667eea;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .event-card:hover {
+      transform: translateY(-5px);
+      box-shadow: 0 15px 40px rgba(0, 0, 0, 0.3);
+    }
+
+    .event-color {
+      position: absolute;
+      top: 0;
+      right: 0;
+      width: 60px;
+      height: 60px;
+      border-radius: 0 12px 0 100%;
+      opacity: 0.3;
+    }
+
+    .event-title {
+      font-size: 1.5rem;
+      font-weight: 700;
+      margin-bottom: 10px;
+      color: #333;
+    }
+
+    .event-description {
+      color: #666;
+      margin-bottom: 15px;
+      line-height: 1.6;
+    }
+
+    .event-meta {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      margin-top: 15px;
+    }
+
+    .event-meta-item {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      color: #555;
+      font-size: 0.9rem;
+    }
+
+    .badge {
+      display: inline-block;
+      padding: 4px 12px;
+      border-radius: 20px;
+      font-size: 0.8rem;
+      font-weight: 600;
+      margin-right: 8px;
+    }
+
+    .badge-recurring {
+      background: #fef3c7;
+      color: #92400e;
+    }
+
+    .badge-allday {
+      background: #dbeafe;
+      color: #1e3a8a;
+    }
+
+    .badge-synced {
+      background: #d1fae5;
+      color: #065f46;
+    }
+
+    .upcoming-section {
+      background: white;
+      border-radius: 12px;
+      padding: 20px;
+      margin-bottom: 20px;
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+    }
+
+    .upcoming-section h2 {
+      color: #333;
+      margin-bottom: 15px;
+      font-size: 1.8rem;
+    }
+
+    .upcoming-list {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .upcoming-item {
+      display: flex;
+      align-items: center;
+      padding: 15px;
+      background: #f9fafb;
+      border-radius: 8px;
+      border-left: 4px solid #667eea;
+    }
+
+    .upcoming-date {
+      background: #667eea;
+      color: white;
+      padding: 10px;
+      border-radius: 8px;
+      text-align: center;
+      margin-right: 15px;
+      min-width: 80px;
+    }
+
+    .upcoming-date-day {
+      font-size: 1.5rem;
+      font-weight: 700;
+    }
+
+    .upcoming-date-month {
+      font-size: 0.8rem;
+      text-transform: uppercase;
+    }
+
+    .upcoming-details {
+      flex: 1;
+    }
+
+    .upcoming-title {
+      font-weight: 600;
+      color: #333;
+      margin-bottom: 4px;
+    }
+
+    .upcoming-time {
+      font-size: 0.9rem;
+      color: #666;
+    }
+
+    .loading {
+      text-align: center;
+      padding: 40px;
+      color: white;
+      font-size: 1.2rem;
+    }
+
+    .error {
+      background: #fee2e2;
+      color: #991b1b;
+      padding: 20px;
+      border-radius: 12px;
+      margin: 20px 0;
+    }
+
+    @media (max-width: 768px) {
+      .events-grid {
+        grid-template-columns: 1fr;
+      }
+
+      h1 {
+        font-size: 2rem;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>📅 Upcoming Events</h1>
+
+    <div class="filters">
+      <div class="filter-buttons">
+        <button class="filter-btn active" data-filter="all">All Events</button>
+        <button class="filter-btn" data-filter="upcoming">Next 7 Days</button>
+        <button class="filter-btn" data-filter="recurring">Recurring</button>
+        <button class="filter-btn" data-filter="allday">All Day</button>
+      </div>
+    </div>
+
+    <div class="upcoming-section" id="upcomingSection">
+      <h2>Next Week</h2>
+      <div class="upcoming-list" id="upcomingList"></div>
+    </div>
+
+    <div id="content">
+      <div class="loading">Loading events...</div>
+    </div>
+  </div>
+
+  <script>
+    let allEvents = [];
+    let currentFilter = 'all';
+
+    // Load events from JSON file
+    async function loadEvents() {
+      try {
+        const response = await fetch('data/events.json');
+        if (!response.ok) throw new Error('Failed to load events');
+        
+        const eventsData = await response.json();
+        
+        // Events are already an array with IDs
+        allEvents = eventsData.map(event => ({
+          ...event,
+          startDateTime: new Date(event.startDate),
+          endDateTime: new Date(event.endDate)
+        }));
+
+        // Sort by start date
+        allEvents.sort((a, b) => a.startDateTime - b.startDateTime);
+
+        displayUpcoming();
+        displayEvents(allEvents);
+      } catch (error) {
+        console.error('Error loading events:', error);
+        document.getElementById('content').innerHTML = `
+          <div class="error">
+            <strong>Error:</strong> Could not load calendar events. 
+            Please make sure data/events.json exists and is properly formatted.
+          </div>
+        `;
+      }
+    }
+
+    function displayUpcoming() {
+      const now = new Date();
+      const nextWeek = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
+      
+      const upcomingEvents = allEvents
+        .filter(event => event.startDateTime >= now && event.startDateTime <= nextWeek)
+        .slice(0, 5);
+
+      const upcomingList = document.getElementById('upcomingList');
+      
+      if (upcomingEvents.length === 0) {
+        upcomingList.innerHTML = '<p style="color: #666;">No events in the next 7 days</p>';
+        return;
+      }
+
+      upcomingList.innerHTML = upcomingEvents.map(event => {
+        const day = event.startDateTime.getDate();
+        const month = event.startDateTime.toLocaleDateString('en-US', { month: 'short' });
+        const time = event.allDay ? 'All Day' : event.startDateTime.toLocaleTimeString('en-US', { 
+          hour: 'numeric', 
+          minute: '2-digit',
+          hour12: true 
+        });
+
+        return `
+          <div class="upcoming-item">
+            <div class="upcoming-date">
+              <div class="upcoming-date-day">${day}</div>
+              <div class="upcoming-date-month">${month}</div>
+            </div>
+            <div class="upcoming-details">
+              <div class="upcoming-title">${event.title}</div>
+              <div class="upcoming-time">${time} ${event.location ? '• ' + event.location : ''}</div>
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
+
+    function displayEvents(events) {
+      const content = document.getElementById('content');
+      
+      if (events.length === 0) {
+        content.innerHTML = '<div class="loading">No events found matching your filter</div>';
+        return;
+      }
+
+      const eventsHTML = events.map(event => {
+        const badges = [];
+        if (event.recurring) badges.push('<span class="badge badge-recurring">🔄 Recurring</span>');
+        if (event.allDay) badges.push('<span class="badge badge-allday">📅 All Day</span>');
+        if (event.synced) badges.push('<span class="badge badge-synced">🔗 Synced</span>');
+
+        const startDate = event.startDateTime.toLocaleDateString('en-US', {
+          weekday: 'long',
+          year: 'numeric',
+          month: 'long',
+          day: 'numeric'
+        });
+
+        const time = event.allDay ? 'All Day' : 
+          `${event.startDateTime.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true })} - 
+           ${event.endDateTime.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true })}`;
+
+        return `
+          <div class="event-card">
+            <div class="event-color" style="background-color: ${event.color || '#667eea'}"></div>
+            <h3 class="event-title">${event.title}</h3>
+            <div class="event-description">${event.description || ''}</div>
+            <div>${badges.join('')}</div>
+            <div class="event-meta">
+              <div class="event-meta-item">
+                📅 ${startDate}
+              </div>
+              <div class="event-meta-item">
+                ⏰ ${time}
+              </div>
+              ${event.location ? `
+                <div class="event-meta-item">
+                  📍 ${event.location}
+                </div>
+              ` : ''}
+              ${event.attendees ? `
+                <div class="event-meta-item">
+                  👥 ${event.attendees.split(',').length} attendee(s)
+                </div>
+              ` : ''}
+            </div>
+          </div>
+        `;
+      }).join('');
+
+      content.innerHTML = `<div class="events-grid">${eventsHTML}</div>`;
+    }
+
+    function filterEvents(filterType) {
+      currentFilter = filterType;
+      
+      // Update active button
+      document.querySelectorAll('.filter-btn').forEach(btn => {
+        btn.classList.toggle('active', btn.dataset.filter === filterType);
+      });
+
+      let filtered = allEvents;
+      const now = new Date();
+      const nextWeek = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
+
+      switch(filterType) {
+        case 'upcoming':
+          filtered = allEvents.filter(event => 
+            event.startDateTime >= now && event.startDateTime <= nextWeek
+          );
+          break;
+        case 'recurring':
+          filtered = allEvents.filter(event => event.recurring && event.recurring !== '');
+          break;
+        case 'allday':
+          filtered = allEvents.filter(event => event.allDay);
+          break;
+        case 'all':
+        default:
+          // Show all future events
+          filtered = allEvents.filter(event => event.startDateTime >= now);
+          break;
+      }
+
+      displayEvents(filtered);
+    }
+
+    // Event listeners
+    document.querySelectorAll('.filter-btn').forEach(btn => {
+      btn.addEventListener('click', () => filterEvents(btn.dataset.filter));
+    });
+
+    // Initialize
+    loadEvents();
+  </script>
+</body>
+</html>

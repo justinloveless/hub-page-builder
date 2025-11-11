@@ -1,4 +1,4 @@
-import { Image, Folder, FileText } from "lucide-react";
+import { Image, Folder, FileText, Calendar } from "lucide-react";
 
 export const getAssetIcon = (type: string) => {
   switch (type.toLowerCase()) {
@@ -8,6 +8,9 @@ export const getAssetIcon = (type: string) => {
     case 'directory':
     case 'folder':
       return <Folder className="h-5 w-5 text-yellow-500" />;
+    case 'calendar':
+    case 'events':
+      return <Calendar className="h-5 w-5 text-purple-500" />;
     default:
       return <FileText className="h-5 w-5 text-gray-500" />;
   }

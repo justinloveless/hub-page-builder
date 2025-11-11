@@ -1,0 +1,147 @@
+{
+  "version": "1.0",
+  "assets": [
+    {
+      "path": "data/events.json",
+      "type": "calendar",
+      "label": "Events Calendar",
+      "description": "Manage your calendar events and schedule",
+      "maxSize": 1048576,
+      "allowedExtensions": [".json"],
+      "schema": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "id": {
+              "type": "string",
+              "title": "Event ID",
+              "description": "Unique identifier for the event",
+              "placeholder": "team-meeting-2025-11-10"
+            },
+            "title": {
+              "type": "string",
+              "title": "Event Title",
+              "description": "The name of the event",
+              "placeholder": "Team Meeting"
+            },
+            "description": {
+              "type": "string",
+              "title": "Description",
+              "description": "Event details and information",
+              "placeholder": "Discuss project progress...",
+              "multiline": true
+            },
+            "startDate": {
+              "type": "string",
+              "title": "Start Date",
+              "description": "ISO format date-time (e.g., 2025-11-10T10:00:00)",
+              "placeholder": "2025-11-10T10:00:00"
+            },
+            "endDate": {
+              "type": "string",
+              "title": "End Date",
+              "description": "ISO format date-time (e.g., 2025-11-10T11:00:00)",
+              "placeholder": "2025-11-10T11:00:00"
+            },
+            "location": {
+              "type": "string",
+              "title": "Location",
+              "description": "Physical or virtual location",
+              "placeholder": "Conference Room A or https://zoom.us/..."
+            },
+            "allDay": {
+              "type": "boolean",
+              "title": "All Day Event",
+              "description": "Mark this event as an all-day event",
+              "default": false
+            },
+            "recurring": {
+              "type": "string",
+              "title": "Recurring",
+              "description": "Recurrence pattern for the event",
+              "enum": ["", "daily", "weekly", "monthly", "yearly"],
+              "placeholder": "Select recurrence..."
+            },
+            "color": {
+              "type": "string",
+              "title": "Event Color",
+              "description": "Visual color for the event (hex code)",
+              "placeholder": "#3b82f6"
+            },
+            "attendees": {
+              "type": "string",
+              "title": "Attendees",
+              "description": "Comma-separated list of attendee emails",
+              "placeholder": "john@example.com, jane@example.com",
+              "multiline": true
+            }
+          }
+        }
+      }
+    },
+    {
+      "path": "data/calendar-config.json",
+      "type": "calendar",
+      "label": "External Calendar Configuration",
+      "description": "Configure which external calendar to display",
+      "maxSize": 102400,
+      "allowedExtensions": [".json"],
+      "metadata": {
+        "calendarType": "external",
+        "availableProviders": ["google", "outlook"]
+      },
+      "schema": {
+        "type": "object",
+        "properties": {
+          "provider": {
+            "type": "string",
+            "title": "Calendar Provider",
+            "description": "Which calendar service to use (must be configured in your site)",
+            "enum": ["google", "outlook"],
+            "placeholder": "Select provider..."
+          },
+          "calendarId": {
+            "type": "string",
+            "title": "Calendar ID",
+            "description": "The ID of the calendar to display",
+            "placeholder": "primary or calendar-id@group.calendar.google.com"
+          },
+          "displayName": {
+            "type": "string",
+            "title": "Display Name",
+            "description": "Name to show for this calendar",
+            "placeholder": "Team Events"
+          },
+          "refreshInterval": {
+            "type": "number",
+            "title": "Refresh Interval (minutes)",
+            "description": "How often to fetch new events from the provider",
+            "default": 15,
+            "placeholder": "15"
+          },
+          "maxEvents": {
+            "type": "number",
+            "title": "Maximum Events",
+            "description": "Maximum number of upcoming events to display",
+            "default": 100,
+            "placeholder": "100"
+          },
+          "showPastEvents": {
+            "type": "boolean",
+            "title": "Show Past Events",
+            "description": "Include events that have already occurred",
+            "default": false
+          },
+          "daysAhead": {
+            "type": "number",
+            "title": "Days Ahead",
+            "description": "How many days into the future to fetch events",
+            "default": 90,
+            "placeholder": "90"
+          }
+        }
+      }
+    }
+  ]
+}
