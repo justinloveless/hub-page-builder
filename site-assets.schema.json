@@ -1,0 +1,179 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://staticsnack.com/schemas/site-assets.json",
+  "title": "Site Assets Configuration",
+  "description": "Configuration file defining manageable assets for static sites",
+  "type": "object",
+  "required": ["version", "assets"],
+  "additionalProperties": false,
+  "properties": {
+    "version": {
+      "type": "string",
+      "description": "Schema version for the site-assets configuration",
+      "pattern": "^\\d+\\.\\d+$",
+      "examples": ["1.0", "2.0"]
+    },
+    "description": {
+      "type": "string",
+      "description": "Optional description of this configuration file",
+      "examples": ["Configuration file for site assets", "Manageable assets for this static site"]
+    },
+    "assets": {
+      "type": "array",
+      "description": "Array of asset definitions for the site",
+      "items": {
+        "$ref": "#/definitions/asset"
+      },
+      "minItems": 0
+    }
+  },
+  "definitions": {
+    "asset": {
+      "type": "object",
+      "required": ["path", "type"],
+      "additionalProperties": false,
+      "properties": {
+        "path": {
+          "type": "string",
+          "description": "Relative path to the asset file or directory from the repository root",
+          "examples": ["images/hero.jpg", "content/about.md", "data/events.json", "images/gallery"]
+        },
+        "type": {
+          "type": "string",
+          "description": "Type of asset",
+          "enum": ["image", "video", "audio", "text", "document", "data", "json", "calendar", "directory", "markdown", "html", "css", "javascript"],
+          "examples": ["image", "text", "calendar", "directory"]
+        },
+        "label": {
+          "type": "string",
+          "description": "Human-readable label for the asset",
+          "examples": ["Hero Image", "About Page Content", "Events Calendar"]
+        },
+        "description": {
+          "type": "string",
+          "description": "Detailed description of the asset and its purpose",
+          "examples": ["Main homepage hero image", "Markdown content for the about page"]
+        },
+        "maxSize": {
+          "type": "integer",
+          "description": "Maximum file size in bytes",
+          "minimum": 1,
+          "examples": [524288, 1048576, 2097152]
+        },
+        "allowedExtensions": {
+          "type": "array",
+          "description": "Array of allowed file extensions (including the dot)",
+          "items": {
+            "type": "string",
+            "pattern": "^\\.",
+            "examples": [".jpg", ".png", ".webp", ".md", ".json"]
+          },
+          "minItems": 1,
+          "uniqueItems": true
+        },
+        "schema": {
+          "type": "object",
+          "description": "JSON Schema definition for structured data assets (e.g., JSON, YAML)",
+          "additionalProperties": true
+        },
+        "metadata": {
+          "type": "object",
+          "description": "Additional metadata for asset configuration",
+          "additionalProperties": true,
+          "properties": {
+            "externalSync": {
+              "type": "boolean",
+              "description": "Whether this asset syncs with an external source"
+            },
+            "calendarType": {
+              "type": "string",
+              "description": "Type of calendar configuration",
+              "enum": ["local", "external"],
+              "examples": ["local", "external"]
+            },
+            "availableProviders": {
+              "type": "array",
+              "description": "List of external providers available for this asset",
+              "items": {
+                "type": "string",
+                "enum": ["google", "apple", "outlook", "ical"]
+              },
+              "uniqueItems": true
+            },
+            "syncInterval": {
+              "type": "string",
+              "description": "How often to sync with external sources",
+              "enum": ["realtime", "hourly", "daily", "weekly", "manual"],
+              "examples": ["hourly", "daily"]
+            }
+          }
+        },
+        "contains": {
+          "type": "object",
+          "description": "For directory-type assets, defines what the directory can contain",
+          "additionalProperties": false,
+          "properties": {
+            "type": {
+              "type": "string",
+              "description": "Type of assets allowed in the directory",
+              "enum": ["image", "video", "audio", "text", "document", "data", "json", "any"],
+              "examples": ["image", "any"]
+            },
+            "allowedExtensions": {
+              "type": "array",
+              "description": "Array of allowed file extensions for directory contents",
+              "items": {
+                "type": "string",
+                "pattern": "^\\.",
+                "examples": [".jpg", ".png", ".webp"]
+              },
+              "minItems": 1,
+              "uniqueItems": true
+            },
+            "maxSize": {
+              "type": "integer",
+              "description": "Maximum file size in bytes for each file in the directory",
+              "minimum": 1
+            },
+            "schema": {
+              "type": "object",
+              "description": "JSON Schema for structured files in the directory",
+              "additionalProperties": true
+            },
+            "parts": {
+              "type": "array",
+              "description": "For complex multi-part assets within a directory",
+              "items": {
+                "type": "object",
+                "required": ["assetType"],
+                "properties": {
+                  "assetType": {
+                    "type": "string",
+                    "description": "Type of asset part",
+                    "examples": ["image", "data", "config"]
+                  },
+                  "allowedExtensions": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "pattern": "^\\."
+                    },
+                    "uniqueItems": true
+                  },
+                  "maxSize": {
+                    "type": "integer",
+                    "minimum": 1
+                  },
+                  "schema": {
+                    "type": "object",
+                    "additionalProperties": true
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

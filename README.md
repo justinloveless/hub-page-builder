@@ -60,6 +60,47 @@ This project is built with:
 - shadcn-ui
 - Tailwind CSS
 
+## Site Assets Configuration
+
+This project includes a JSON schema for `site-assets.json` files that define manageable assets for static sites.
+
+### Quick Start
+
+Create a `site-assets.json` file in your static site repository:
+
+```json
+{
+  "$schema": "https://raw.githubusercontent.com/StaticSnack/staticsnack/main/site-assets.schema.json",
+  "version": "1.0",
+  "assets": [
+    {
+      "path": "images/hero.jpg",
+      "type": "image",
+      "label": "Hero Image",
+      "maxSize": 2097152,
+      "allowedExtensions": [".jpg", ".png", ".webp"]
+    }
+  ]
+}
+```
+
+### Documentation
+
+- **Schema Documentation**: [SITE_ASSETS_SCHEMA.md](./SITE_ASSETS_SCHEMA.md) - Complete schema reference
+- **Schema File**: [site-assets.schema.json](./site-assets.schema.json) - JSON Schema definition
+- **Complete Example**: [examples/site-assets-complete-example.json](./examples/site-assets-complete-example.json)
+- **Calendar Assets Guide**: [CALENDAR_ASSETS_GUIDE.md](./CALENDAR_ASSETS_GUIDE.md)
+
+### Supported Asset Types
+
+- Images, videos, audio files
+- Text, Markdown, HTML, CSS, JavaScript
+- JSON data and calendar events
+- Documents (PDF, etc.)
+- Directories with multiple assets
+
+The schema provides IDE autocomplete and validation when you reference it in your `site-assets.json` file.
+
 ## How can I deploy this project?
 
 Simply open [Lovable](https://lovable.dev/projects/6f3bd631-4e7b-4101-aa7d-609ec28e7247) and click on Share -> Publish.

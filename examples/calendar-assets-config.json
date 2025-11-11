@@ -1,4 +1,5 @@
 {
+  "$schema": "../site-assets.schema.json",
   "version": "1.0",
   "assets": [
     {

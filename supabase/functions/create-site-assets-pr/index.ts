@@ -24,6 +24,7 @@ function normalizePemKey(pem: string): string {
 
 // Template for site-assets.json
 const SITE_ASSETS_TEMPLATE = {
+  "$schema": "https://raw.githubusercontent.com/StaticSnack/staticsnack/main/site-assets.schema.json",
   version: "1.0",
   description: "Configuration file defining manageable assets for this static site",
   assets: [
@@ -56,8 +57,11 @@ const SITE_ASSETS_TEMPLATE = {
       type: "directory",
       label: "Photo Gallery",
       description: "Collection of gallery images",
-      maxSize: 2097152,
-      allowedExtensions: [".jpg", ".png", ".webp"]
+      contains: {
+        type: "image",
+        maxSize: 2097152,
+        allowedExtensions: [".jpg", ".png", ".webp"]
+      }
     }
   ]
 }
@@ -230,16 +234,22 @@ This PR adds a \`site-assets.json\` configuration file to define manageable asse
 
 ### What's included:
 - ✅ Template configuration with example assets
-- ✅ Schema documentation through examples
+- ✅ JSON Schema validation (references the official schema)
 - ✅ Common asset types (images, text, directories)
+- ✅ Clear labels and descriptions for each asset
+
+### Schema Validation
+The file includes a \`$schema\` reference for automatic validation in your IDE. This ensures your configuration follows the correct format.
 
 ### Next steps:
 1. Review the template structure
 2. Customize the assets array for your site's needs
-3. Update paths, labels, and descriptions
+3. Update paths, labels, and descriptions to match your site
 4. Merge this PR to enable asset management
 
-The site manager will use this file to provide a user-friendly interface for non-technical users to manage site content.`
+The site manager will use this file to provide a user-friendly interface for non-technical users to manage site content.
+
+📖 [Schema Documentation](https://github.com/StaticSnack/staticsnack/blob/main/SITE_ASSETS_SCHEMA.md)`
 
     const { data: prData } = await octokit.request('POST /repos/{owner}/{repo}/pulls', {
       owner,
