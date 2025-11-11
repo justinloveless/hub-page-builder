@@ -1,0 +1,259 @@
+{
+  "$schema": "../site-assets.schema.json",
+  "version": "1.0",
+  "description": "Complete example of site-assets configuration with all supported features",
+  "assets": [
+    {
+      "path": "images/hero.jpg",
+      "type": "image",
+      "label": "Hero Image",
+      "description": "Main homepage hero/banner image displayed at the top",
+      "maxSize": 2097152,
+      "allowedExtensions": [".jpg", ".png", ".webp"]
+    },
+    {
+      "path": "images/logo.png",
+      "type": "image",
+      "label": "Site Logo",
+      "description": "Primary logo displayed in header and footer",
+      "maxSize": 524288,
+      "allowedExtensions": [".png", ".svg", ".webp"]
+    },
+    {
+      "path": "images/favicon.ico",
+      "type": "image",
+      "label": "Favicon",
+      "description": "Browser tab icon",
+      "maxSize": 102400,
+      "allowedExtensions": [".ico", ".png"]
+    },
+    {
+      "path": "content/about.md",
+      "type": "markdown",
+      "label": "About Page Content",
+      "description": "Markdown content for the about page",
+      "maxSize": 51200,
+      "allowedExtensions": [".md"]
+    },
+    {
+      "path": "content/terms.md",
+      "type": "markdown",
+      "label": "Terms of Service",
+      "description": "Legal terms and conditions",
+      "maxSize": 102400,
+      "allowedExtensions": [".md"]
+    },
+    {
+      "path": "images/gallery",
+      "type": "directory",
+      "label": "Photo Gallery",
+      "description": "Collection of gallery images for the photo gallery page",
+      "contains": {
+        "type": "image",
+        "maxSize": 2097152,
+        "allowedExtensions": [".jpg", ".png", ".webp"]
+      }
+    },
+    {
+      "path": "images/team",
+      "type": "directory",
+      "label": "Team Photos",
+      "description": "Profile photos of team members",
+      "contains": {
+        "type": "image",
+        "maxSize": 1048576,
+        "allowedExtensions": [".jpg", ".png", ".webp"]
+      }
+    },
+    {
+      "path": "data/events.json",
+      "type": "calendar",
+      "label": "Events Calendar",
+      "description": "Local calendar events managed directly in JSON",
+      "maxSize": 1048576,
+      "allowedExtensions": [".json"],
+      "schema": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "id": {
+              "type": "string",
+              "title": "Event ID",
+              "description": "Unique identifier for the event"
+            },
+            "title": {
+              "type": "string",
+              "title": "Event Title",
+              "description": "The name of the event"
+            },
+            "description": {
+              "type": "string",
+              "title": "Description",
+              "description": "Event details and information"
+            },
+            "startDate": {
+              "type": "string",
+              "title": "Start Date",
+              "description": "ISO format date-time"
+            },
+            "endDate": {
+              "type": "string",
+              "title": "End Date",
+              "description": "ISO format date-time"
+            },
+            "location": {
+              "type": "string",
+              "title": "Location",
+              "description": "Physical or virtual location"
+            },
+            "allDay": {
+              "type": "boolean",
+              "title": "All Day Event",
+              "default": false
+            }
+          }
+        }
+      }
+    },
+    {
+      "path": "data/calendar-config.json",
+      "type": "calendar",
+      "label": "External Calendar Configuration",
+      "description": "Configure which external calendar to display",
+      "maxSize": 102400,
+      "allowedExtensions": [".json"],
+      "metadata": {
+        "calendarType": "external",
+        "availableProviders": ["google", "outlook"],
+        "syncInterval": "hourly"
+      },
+      "schema": {
+        "type": "object",
+        "properties": {
+          "provider": {
+            "type": "string",
+            "title": "Calendar Provider",
+            "enum": ["google", "outlook"]
+          },
+          "calendarId": {
+            "type": "string",
+            "title": "Calendar ID"
+          },
+          "displayName": {
+            "type": "string",
+            "title": "Display Name"
+          },
+          "refreshInterval": {
+            "type": "number",
+            "title": "Refresh Interval (minutes)",
+            "default": 15
+          },
+          "maxEvents": {
+            "type": "number",
+            "title": "Maximum Events",
+            "default": 100
+          }
+        }
+      }
+    },
+    {
+      "path": "data/team.json",
+      "type": "json",
+      "label": "Team Members",
+      "description": "JSON data for team member profiles",
+      "maxSize": 524288,
+      "allowedExtensions": [".json"],
+      "schema": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "name": {
+              "type": "string",
+              "title": "Name"
+            },
+            "role": {
+              "type": "string",
+              "title": "Role"
+            },
+            "bio": {
+              "type": "string",
+              "title": "Biography"
+            },
+            "image": {
+              "type": "string",
+              "title": "Image Path"
+            },
+            "email": {
+              "type": "string",
+              "title": "Email",
+              "format": "email"
+            }
+          },
+          "required": ["name", "role"]
+        }
+      }
+    },
+    {
+      "path": "data/config.json",
+      "type": "json",
+      "label": "Site Configuration",
+      "description": "Global site configuration settings",
+      "maxSize": 102400,
+      "allowedExtensions": [".json"],
+      "schema": {
+        "type": "object",
+        "properties": {
+          "siteName": {
+            "type": "string",
+            "title": "Site Name"
+          },
+          "tagline": {
+            "type": "string",
+            "title": "Tagline"
+          },
+          "contactEmail": {
+            "type": "string",
+            "title": "Contact Email",
+            "format": "email"
+          },
+          "socialMedia": {
+            "type": "object",
+            "title": "Social Media Links",
+            "properties": {
+              "twitter": {
+                "type": "string",
+                "title": "Twitter URL"
+              },
+              "facebook": {
+                "type": "string",
+                "title": "Facebook URL"
+              },
+              "linkedin": {
+                "type": "string",
+                "title": "LinkedIn URL"
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "path": "assets/videos/promo.mp4",
+      "type": "video",
+      "label": "Promotional Video",
+      "description": "Main promotional video for the homepage",
+      "maxSize": 52428800,
+      "allowedExtensions": [".mp4", ".webm"]
+    },
+    {
+      "path": "documents/brochure.pdf",
+      "type": "document",
+      "label": "Company Brochure",
+      "description": "Downloadable company brochure PDF",
+      "maxSize": 5242880,
+      "allowedExtensions": [".pdf"]
+    }
+  ]
+}
