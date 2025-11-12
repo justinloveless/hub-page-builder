@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -7,10 +7,11 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/component
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Package, GitCommit, Trash2, FileText, ChevronDown, ChevronRight } from "lucide-react";
+import { Package, GitCommit, Trash2, FileText, ChevronDown, ChevronRight, RotateCw } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import type { PendingAssetChange } from "@/pages/Manage";
+import { generateCommitMessage, generateCommitMessageSuggestions } from "@/lib/commitMessageGenerator";
 
 interface PendingBatchChangesProps {
   siteId: string;
@@ -25,7 +26,21 @@ const PendingBatchChanges = ({ siteId, pendingChanges, setPendingChanges, onRefr
   const [showCommitDialog, setShowCommitDialog] = useState(false);
   const [showClearDialog, setShowClearDialog] = useState(false);
   const [commitMessage, setCommitMessage] = useState("");
+  const [suggestions, setSuggestions] = useState<string[]>([]);
   const [expandedChanges, setExpandedChanges] = useState<Set<string>>(new Set());
+
+  // Auto-generate commit message when pending changes update
+  useEffect(() => {
+    if (pendingChanges.length > 0) {
+      const generatedMessage = generateCommitMessage(pendingChanges);
+      setCommitMessage(generatedMessage);
+      const messageSuggestions = generateCommitMessageSuggestions(pendingChanges);
+      setSuggestions(messageSuggestions);
+    } else {
+      setCommitMessage("");
+      setSuggestions([]);
+    }
+  }, [pendingChanges]);
 
   const toggleExpanded = (repoPath: string) => {
     const newExpanded = new Set(expandedChanges);
@@ -307,15 +322,51 @@ const PendingBatchChanges = ({ siteId, pendingChanges, setPendingChanges, onRefr
               This will commit {pendingChanges.length} pending {pendingChanges.length === 1 ? 'change' : 'changes'} to your repository.
             </AlertDialogDescription>
           </AlertDialogHeader>
-          <div className="py-4">
-            <Label htmlFor="commit-message">Commit Message</Label>
-            <Input
-              id="commit-message"
-              value={commitMessage}
-              onChange={(e) => setCommitMessage(e.target.value)}
-              placeholder="Describe your changes..."
-              className="mt-2"
-            />
+          <div className="py-4 space-y-4">
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <Label htmlFor="commit-message">Commit Message</Label>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => {
+                    const newMessage = generateCommitMessage(pendingChanges);
+                    setCommitMessage(newMessage);
+                  }}
+                  className="h-7 text-xs"
+                >
+                  <RotateCw className="h-3 w-3 mr-1" />
+                  Regenerate
+                </Button>
+              </div>
+              <Input
+                id="commit-message"
+                value={commitMessage}
+                onChange={(e) => setCommitMessage(e.target.value)}
+                placeholder="Describe your changes..."
+                className="mt-2"
+              />
+            </div>
+            {suggestions.length > 1 && (
+              <div className="space-y-2">
+                <Label className="text-xs text-muted-foreground">Suggestions:</Label>
+                <div className="flex flex-wrap gap-2">
+                  {suggestions.map((suggestion, index) => (
+                    <Button
+                      key={index}
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setCommitMessage(suggestion)}
+                      className="h-7 text-xs"
+                    >
+                      {suggestion}
+                    </Button>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>

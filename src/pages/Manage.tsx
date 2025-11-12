@@ -18,6 +18,7 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { generateCommitMessage } from "@/lib/commitMessageGenerator";
 import { Drawer, DrawerContent, DrawerHeader, DrawerTitle } from "@/components/ui/drawer";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import AssetManagerSidebar from "@/components/AssetManagerSidebar";
@@ -1058,7 +1059,8 @@ const Manage = () => {
                             <Button
                               size="sm"
                               onClick={async () => {
-                                const message = prompt("Enter commit message:");
+                                const autoMessage = generateCommitMessage(pendingChanges);
+                                const message = prompt("Enter commit message:", autoMessage);
                                 if (!message?.trim()) return;
 
                                 try {
@@ -1173,7 +1175,8 @@ const Manage = () => {
                           size="sm"
                           className="h-7 px-2"
                           onClick={async () => {
-                            const message = prompt("Enter commit message:");
+                            const autoMessage = generateCommitMessage(pendingChanges);
+                            const message = prompt("Enter commit message:", autoMessage);
                             if (!message?.trim()) return;
 
                             try {
@@ -1258,7 +1261,8 @@ const Manage = () => {
                           size="sm"
                           className="h-7 px-2"
                           onClick={async () => {
-                            const message = prompt("Enter commit message:");
+                            const autoMessage = generateCommitMessage(pendingChanges);
+                            const message = prompt("Enter commit message:", autoMessage);
                             if (!message?.trim()) return;
 
                             try {
